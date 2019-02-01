@@ -41,8 +41,8 @@ class UniformGridTraverser
         virtual ~UniformGridTraverser();
 
         //! Traverse the uniform grid using the primitives it contains (simple stencil)
-        void traverse(const GPUArray<unsigned int>& out,
-                      const GPUArray<Scalar4> spheres,
+        void traverse(const GlobalArray<unsigned int>& out,
+                      const GlobalArray<Scalar4> spheres,
                       unsigned int N,
                       const UniformGrid& grid,
                       const BoxDim& box);
@@ -73,7 +73,7 @@ class UniformGridTraverser
         unsigned char m_threads;    //!< Number of threads per particle
         unsigned int m_num_stencil; //!< Number of stencils
         uint3 m_stencil_dim;        //!< Dimension stencil was made for
-        GPUArray<int3> m_stencil;   //!< Stencil for traversal
+        GlobalArray<int3> m_stencil;   //!< Stencil for traversal
 
         std::unique_ptr<Autotuner> m_tune_traverse; //!< Autotuner for traversal kernel
 

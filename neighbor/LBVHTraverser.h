@@ -53,11 +53,11 @@ class LBVHTraverser
          *
          * The format for a \a sphere is (x,y,z,R), where R is the radius of the sphere.
          */
-        virtual void traverse(const GPUArray<unsigned int>& out,
-                              const GPUArray<Scalar4>& spheres,
+        virtual void traverse(const GlobalArray<unsigned int>& out,
+                              const GlobalArray<Scalar4>& spheres,
                               unsigned int N,
                               const LBVH& lbvh,
-                              const GPUArray<Scalar3>& images = GPUArray<Scalar3>()) = 0;
+                              const GlobalArray<Scalar3>& images = GlobalArray<Scalar3>()) = 0;
 
     protected:
         std::shared_ptr<const ExecutionConfiguration> m_exec_conf;  //!< Execution configuration

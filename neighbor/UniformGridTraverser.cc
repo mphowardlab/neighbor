@@ -39,8 +39,8 @@ UniformGridTraverser::~UniformGridTraverser()
  * The caller must ensure that all \a spheres lie within the bounds of the \a grid, or
  * traversal will produce incorrect results.
  */
-void UniformGridTraverser::traverse(const GPUArray<unsigned int>& out,
-                                    const GPUArray<Scalar4> spheres,
+void UniformGridTraverser::traverse(const GlobalArray<unsigned int>& out,
+                                    const GlobalArray<Scalar4> spheres,
                                     unsigned int N,
                                     const UniformGrid& grid,
                                     const BoxDim& box)
@@ -112,7 +112,7 @@ void UniformGridTraverser::createStencil(const UniformGrid& grid)
     m_num_stencil = (max.x-min.x+1)*(max.y-min.y+1)*(max.z-min.z+1);
     if (m_stencil.getNumElements() < m_num_stencil)
         {
-        GPUArray<int3> tmp(m_num_stencil, m_exec_conf);
+        GlobalArray<int3> tmp(m_num_stencil, m_exec_conf);
         m_stencil.swap(tmp);
         }
 

@@ -62,35 +62,35 @@ void LBVH::allocate(unsigned int N)
     m_N_nodes = m_N + m_N_internal;
 
     // tree node memory
-    GPUArray<int> parent(m_N_nodes, m_exec_conf);
+    GlobalArray<int> parent(m_N_nodes, m_exec_conf);
     m_parent.swap(parent);
 
-    GPUArray<int> left(m_N_internal, m_exec_conf);
+    GlobalArray<int> left(m_N_internal, m_exec_conf);
     m_left.swap(left);
 
-    GPUArray<int> right(m_N_internal, m_exec_conf);
+    GlobalArray<int> right(m_N_internal, m_exec_conf);
     m_right.swap(right);
 
-    GPUArray<float3> lo(m_N_nodes, m_exec_conf);
+    GlobalArray<float3> lo(m_N_nodes, m_exec_conf);
     m_lo.swap(lo);
 
-    GPUArray<float3> hi(m_N_nodes, m_exec_conf);
+    GlobalArray<float3> hi(m_N_nodes, m_exec_conf);
     m_hi.swap(hi);
 
     // morton code generation / sorting memory
-    GPUArray<unsigned int> codes(m_N, m_exec_conf);
+    GlobalArray<unsigned int> codes(m_N, m_exec_conf);
     m_codes.swap(codes);
 
-    GPUArray<unsigned int> indexes(m_N, m_exec_conf);
+    GlobalArray<unsigned int> indexes(m_N, m_exec_conf);
     m_indexes.swap(indexes);
 
-    GPUArray<unsigned int> sorted_codes(m_N, m_exec_conf);
+    GlobalArray<unsigned int> sorted_codes(m_N, m_exec_conf);
     m_sorted_codes.swap(sorted_codes);
 
-    GPUArray<unsigned int> sorted_indexes(m_N, m_exec_conf);
+    GlobalArray<unsigned int> sorted_indexes(m_N, m_exec_conf);
     m_sorted_indexes.swap(sorted_indexes);
 
-    GPUArray<unsigned int> locks(m_N_internal, m_exec_conf);
+    GlobalArray<unsigned int> locks(m_N_internal, m_exec_conf);
     m_locks.swap(locks);
     }
 
@@ -108,7 +108,7 @@ void LBVH::allocate(unsigned int N)
  * \note
  * Currently, small LBVHs (`N` <= 2) are not implemented, and an error will be raised.
  */
-void LBVH::build(const GPUArray<Scalar4>& points, unsigned int N, const Scalar3 lo, const Scalar3 hi)
+void LBVH::build(const GlobalArray<Scalar4>& points, unsigned int N, const Scalar3 lo, const Scalar3 hi)
     {
     if (N < 2)
         {

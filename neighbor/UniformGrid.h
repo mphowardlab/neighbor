@@ -11,7 +11,7 @@
 #endif
 
 #include "hoomd/HOOMDMath.h"
-#include "hoomd/GPUArray.h"
+#include "hoomd/GlobalArray.h"
 #include "hoomd/Index1D.h"
 #include "hoomd/Autotuner.h"
 
@@ -48,7 +48,7 @@ class UniformGrid
         ~UniformGrid();
 
         //! Build the UniformGrid
-        void build(const GPUArray<Scalar4>& points, unsigned int N);
+        void build(const GlobalArray<Scalar4>& points, unsigned int N);
 
         //! Get lower bound of grid
         Scalar3 getLo() const
@@ -81,13 +81,13 @@ class UniformGrid
             }
 
         //! Get first index of first particle in cell
-        const GPUArray<unsigned int>& getFirsts() const
+        const GlobalArray<unsigned int>& getFirsts() const
             {
             return m_first;
             }
 
         //! Get number of particles in cell
-        const GPUArray<unsigned int>& getSizes() const
+        const GlobalArray<unsigned int>& getSizes() const
             {
             return m_size;
             }
@@ -99,13 +99,13 @@ class UniformGrid
             }
 
         //! Get cell index for each primitive in sorted order
-        const GPUArray<unsigned int>& getCells() const
+        const GlobalArray<unsigned int>& getCells() const
             {
             return m_sorted_cells;
             }
 
         //! Get original primitive indexes in sorted order
-        const GPUArray<unsigned int>& getPrimitives() const
+        const GlobalArray<unsigned int>& getPrimitives() const
             {
             return m_sorted_indexes;
             }
@@ -116,7 +116,7 @@ class UniformGrid
          * For performance, the original index of the primitive is stored
          * in the w component.
          */
-        const GPUArray<Scalar4>& getPoints() const
+        const GlobalArray<Scalar4>& getPoints() const
             {
             return m_points;
             }
@@ -143,15 +143,15 @@ class UniformGrid
         Scalar3 m_width;        //!< Actual bin width in each dimension
         uint3 m_dim;            //!< Number of bins in each dimension
         Index3D m_indexer;      //!< Indexer into the cell list
-        GPUArray<unsigned int> m_first;     //!< First particle in each cell
-        GPUArray<unsigned int> m_size;      //!< Number of particles in each cell
+        GlobalArray<unsigned int> m_first;     //!< First particle in each cell
+        GlobalArray<unsigned int> m_size;      //!< Number of particles in each cell
 
         unsigned int m_N;                           //!< Number of points
-        GPUArray<unsigned int> m_cells;             //!< Cells for each point
-        GPUArray<unsigned int> m_sorted_cells;      //!< Cells for each point in sorted order
-        GPUArray<unsigned int> m_indexes;           //!< Particles in cell list order
-        GPUArray<unsigned int> m_sorted_indexes;    //!< Primitives sorted in cell order
-        GPUArray<Scalar4> m_points;                 //!< Sorted points
+        GlobalArray<unsigned int> m_cells;             //!< Cells for each point
+        GlobalArray<unsigned int> m_sorted_cells;      //!< Cells for each point in sorted order
+        GlobalArray<unsigned int> m_indexes;           //!< Particles in cell list order
+        GlobalArray<unsigned int> m_sorted_indexes;    //!< Primitives sorted in cell order
+        GlobalArray<Scalar4> m_points;                 //!< Sorted points
 
         std::unique_ptr<Autotuner> m_tune_bin;      //!< Autotuner for binning kernel
         std::unique_ptr<Autotuner> m_tune_cells;    //!< Autotuner for cell search kernel

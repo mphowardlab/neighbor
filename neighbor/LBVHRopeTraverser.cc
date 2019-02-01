@@ -44,11 +44,11 @@ LBVHRopeTraverser::~LBVHRopeTraverser()
  * If the query sphere does not overlap OR it has reached a leaf node, the traversal should proceed
  * along the rope. Traversal terminates when the LBVHSentinel is reached for the rope.
  */
-void LBVHRopeTraverser::traverse(const GPUArray<unsigned int>& out,
-                                 const GPUArray<Scalar4>& spheres,
+void LBVHRopeTraverser::traverse(const GlobalArray<unsigned int>& out,
+                                 const GlobalArray<Scalar4>& spheres,
                                  unsigned int N,
                                  const LBVH& lbvh,
-                                 const GPUArray<Scalar3>& images)
+                                 const GlobalArray<Scalar3>& images)
     {
     // kernel uses int32 bitflags for the images, so limit to 32 images
     const unsigned int Nimages = images.getNumElements();
@@ -111,7 +111,7 @@ void LBVHRopeTraverser::compress(const LBVH& lbvh)
     const unsigned int num_data = lbvh.getNNodes();
     if (num_data > m_data.getNumElements())
         {
-        GPUArray<int4> tmp(num_data, m_exec_conf);
+        GlobalArray<int4> tmp(num_data, m_exec_conf);
         m_data.swap(tmp);
         }
     ArrayHandle<int4> d_data(m_data, access_location::device, access_mode::overwrite);

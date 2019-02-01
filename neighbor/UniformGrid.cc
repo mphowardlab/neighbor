@@ -55,7 +55,7 @@ UniformGrid::~UniformGrid()
  * used to construct the UniformGrid. An error will not be raised. Instead, points will simply be
  * clamped into the box.
  */
-void UniformGrid::build(const GPUArray<Scalar4>& points, unsigned int N)
+void UniformGrid::build(const GlobalArray<Scalar4>& points, unsigned int N)
     {
     allocate(N);
 
@@ -167,9 +167,9 @@ void UniformGrid::sizeGrid(const Scalar3 lo, const Scalar3 hi, Scalar width)
     m_width = make_scalar3(m_L.x/m_dim.x, m_L.y/m_dim.y, m_L.z/m_dim.z);
 
     // allocate memory per grid cell
-    GPUArray<unsigned int> first(m_indexer.getNumElements(), m_exec_conf);
+    GlobalArray<unsigned int> first(m_indexer.getNumElements(), m_exec_conf);
     m_first.swap(first);
-    GPUArray<unsigned int> size(m_indexer.getNumElements(), m_exec_conf);
+    GlobalArray<unsigned int> size(m_indexer.getNumElements(), m_exec_conf);
     m_size.swap(size);
     }
 
@@ -186,19 +186,19 @@ void UniformGrid::allocate(unsigned int N)
     // per-particle memory
     m_N = N;
 
-    GPUArray<unsigned int> cells(N, m_exec_conf);
+    GlobalArray<unsigned int> cells(N, m_exec_conf);
     m_cells.swap(cells);
 
-    GPUArray<unsigned int> sorted_cells(N, m_exec_conf);
+    GlobalArray<unsigned int> sorted_cells(N, m_exec_conf);
     m_sorted_cells.swap(sorted_cells);
 
-    GPUArray<unsigned int> indexes(N, m_exec_conf);
+    GlobalArray<unsigned int> indexes(N, m_exec_conf);
     m_indexes.swap(indexes);
 
-    GPUArray<unsigned int> sorted_indexes(N, m_exec_conf);
+    GlobalArray<unsigned int> sorted_indexes(N, m_exec_conf);
     m_sorted_indexes.swap(sorted_indexes);
 
-    GPUArray<Scalar4> points(N, m_exec_conf);
+    GlobalArray<Scalar4> points(N, m_exec_conf);
     m_points.swap(points);
     }
 } // end namespace neighbor

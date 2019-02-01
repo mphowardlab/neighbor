@@ -175,8 +175,8 @@ int main(int argc, char * argv[])
                 }
             output << std::setw(8) << frame << " " << std::setw(16) << std::fixed << std::setprecision(5) << times[times.size()/2];
 
-            GPUArray<Scalar4> spheres(pdata->getN(), exec_conf);
-            GPUArray<unsigned int> hits(pdata->getN(), exec_conf);
+            GlobalArray<Scalar4> spheres(pdata->getN(), exec_conf);
+            GlobalArray<unsigned int> hits(pdata->getN(), exec_conf);
                 {
                 ArrayHandle<Scalar4> h_spheres(spheres, access_location::host, access_mode::overwrite);
                 ArrayHandle<Scalar4> h_pos(pdata->getPositions(), access_location::host, access_mode::read);

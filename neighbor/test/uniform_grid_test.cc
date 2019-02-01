@@ -7,6 +7,8 @@
 #include "neighbor/UniformGrid.cuh"
 #include "neighbor/UniformGridTraverser.h"
 
+#include "hoomd/GlobalArray.h"
+
 #include "upp11_config.h"
 HOOMD_UP_MAIN()
 
@@ -18,7 +20,7 @@ UP_TEST( uniform_grid_test )
     // points for grid
     const Scalar3 lo = make_scalar3(-2., -3., -4.);
     const Scalar3 hi = make_scalar3(2., 3., 4.);
-    GPUArray<Scalar4> points(4, exec_conf);
+    GlobalArray<Scalar4> points(4, exec_conf);
         {
         ArrayHandle<Scalar4> h_points(points, access_location::host, access_mode::overwrite);
         h_points.data[0] = make_scalar4( 1.,  2.,  3., 0.);
@@ -121,7 +123,7 @@ UP_TEST( uniform_grid_traverser_test )
     // points for grid
     const Scalar3 lo = make_scalar3(-2., -2., -2.);
     const Scalar3 hi = make_scalar3( 2.,  2.,  2.);
-    GPUArray<Scalar4> points(9, exec_conf);
+    GlobalArray<Scalar4> points(9, exec_conf);
         {
         ArrayHandle<Scalar4> h_points(points, access_location::host, access_mode::overwrite);
         h_points.data[0] = make_scalar4(-1.6,-1.6,-1.6, 0.);
@@ -140,8 +142,8 @@ UP_TEST( uniform_grid_traverser_test )
     auto grid = std::make_shared<neighbor::UniformGrid>(exec_conf, lo, hi, rcut);
     grid->build(points, 9);
 
-    GPUArray<Scalar4> spheres(4, exec_conf);
-    GPUArray<unsigned int> hits(spheres.getNumElements(), exec_conf);
+    GlobalArray<Scalar4> spheres(4, exec_conf);
+    GlobalArray<unsigned int> hits(spheres.getNumElements(), exec_conf);
         {
         ArrayHandle<Scalar4> h_spheres(spheres, access_location::host, access_mode::overwrite);
         h_spheres.data[0] = make_scalar4(-1.6,-1.6,-1.6, 0.1);
@@ -188,7 +190,7 @@ UP_TEST( uniform_grid_validate )
     auto grid = std::make_shared<neighbor::UniformGrid>(exec_conf, box.getLo(), box.getHi(), rcut);
 
     // generate random points in the box
-    GPUArray<Scalar4> points(N, exec_conf);
+    GlobalArray<Scalar4> points(N, exec_conf);
         {
         ArrayHandle<Scalar4> h_points(points, access_location::host, access_mode::overwrite);
         std::mt19937 mt(42);
@@ -201,7 +203,7 @@ UP_TEST( uniform_grid_validate )
     grid->build(points, N);
 
     // query spheres for grid
-    GPUArray<Scalar4> spheres(N, exec_conf);
+    GlobalArray<Scalar4> spheres(N, exec_conf);
         {
         ArrayHandle<Scalar4> h_points(points, access_location::host, access_mode::read);
         ArrayHandle<Scalar4> h_spheres(spheres, access_location::host, access_mode::overwrite);
@@ -213,12 +215,12 @@ UP_TEST( uniform_grid_validate )
         }
 
     // build hit list
-    GPUArray<unsigned int> hits(N, exec_conf);
+    GlobalArray<unsigned int> hits(N, exec_conf);
     neighbor::UniformGridTraverser traverser(exec_conf);
     traverser.traverse(hits, spheres, spheres.getNumElements(), *grid, box);
 
     // generate list of reference collisions
-    GPUArray<unsigned int> ref_hits(N, exec_conf);
+    GlobalArray<unsigned int> ref_hits(N, exec_conf);
         {
         const Scalar rcut2 = rcut*rcut;
         ArrayHandle<unsigned int> h_ref_hits(ref_hits, access_location::host, access_mode::overwrite);

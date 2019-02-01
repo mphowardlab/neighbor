@@ -20,7 +20,7 @@ UP_TEST( lbvh_test )
     auto lbvh = std::make_shared<neighbor::LBVH>(exec_conf);
 
     // points for tree
-    GPUArray<Scalar4> points(3, exec_conf);
+    GlobalArray<Scalar4> points(3, exec_conf);
         {
         ArrayHandle<Scalar4> h_points(points, access_location::host, access_mode::overwrite);
         h_points.data[0] = make_scalar4(2.5, 0., 0., 0.);
@@ -29,7 +29,7 @@ UP_TEST( lbvh_test )
         }
 
     // query spheres for tree
-    GPUArray<Scalar4> spheres(7, exec_conf);
+    GlobalArray<Scalar4> spheres(7, exec_conf);
         {
         ArrayHandle<Scalar4> h_spheres(spheres, access_location::host, access_mode::overwrite);
         // p2
@@ -112,7 +112,7 @@ UP_TEST( lbvh_test )
     exec_conf->msg->notice(0) << "Testing rope traverser..." << std::endl;
         {
         neighbor::LBVHRopeTraverser traverser(exec_conf);
-        GPUArray<unsigned int> hits(spheres.getNumElements(), exec_conf);
+        GlobalArray<unsigned int> hits(spheres.getNumElements(), exec_conf);
         traverser.traverse(hits, spheres, spheres.getNumElements(), *lbvh);
 
         ArrayHandle<int4> h_data(traverser.getData(), access_location::host, access_mode::read);
@@ -180,7 +180,7 @@ UP_TEST( lbvh_periodic_test )
     auto lbvh = std::make_shared<neighbor::LBVH>(exec_conf);
 
     // points for tree
-    GPUArray<Scalar4> points(3, exec_conf);
+    GlobalArray<Scalar4> points(3, exec_conf);
         {
         ArrayHandle<Scalar4> h_points(points, access_location::host, access_mode::overwrite);
         h_points.data[0] = make_scalar4( 1.9, 1.9, 1.9, 0.);
@@ -192,8 +192,8 @@ UP_TEST( lbvh_periodic_test )
     lbvh->build(points, points.getNumElements(), min, max);
 
     // query spheres for tree that intersect through boundaries
-    GPUArray<Scalar4> spheres(2, exec_conf);
-    GPUArray<Scalar3> images(26, exec_conf);
+    GlobalArray<Scalar4> spheres(2, exec_conf);
+    GlobalArray<Scalar3> images(26, exec_conf);
         {
         ArrayHandle<Scalar4> h_spheres(spheres, access_location::host, access_mode::overwrite);
         // p2
@@ -219,7 +219,7 @@ UP_TEST( lbvh_periodic_test )
 
     // no hits without images
     neighbor::LBVHRopeTraverser traverser(exec_conf);
-    GPUArray<unsigned int> hits(spheres.getNumElements(), exec_conf);
+    GlobalArray<unsigned int> hits(spheres.getNumElements(), exec_conf);
     traverser.traverse(hits, spheres, spheres.getNumElements(), *lbvh);
         {
         ArrayHandle<unsigned int> h_hits(hits, access_location::host, access_mode::read);
@@ -249,7 +249,7 @@ UP_TEST( lbvh_validate )
     const Scalar rcut = 1.0;
 
     // generate random points in the box
-    GPUArray<Scalar4> points(N, exec_conf);
+    GlobalArray<Scalar4> points(N, exec_conf);
         {
         ArrayHandle<Scalar4> h_points(points, access_location::host, access_mode::overwrite);
         std::mt19937 mt(42);
@@ -262,7 +262,7 @@ UP_TEST( lbvh_validate )
     lbvh->build(points, N, box.getLo(), box.getHi());
 
     // query spheres for tree
-    GPUArray<Scalar4> spheres(N, exec_conf);
+    GlobalArray<Scalar4> spheres(N, exec_conf);
         {
         ArrayHandle<Scalar4> h_points(points, access_location::host, access_mode::read);
         ArrayHandle<Scalar4> h_spheres(spheres, access_location::host, access_mode::overwrite);
@@ -274,7 +274,7 @@ UP_TEST( lbvh_validate )
         }
 
     // traversal images
-    GPUArray<Scalar3> images(26, exec_conf);
+    GlobalArray<Scalar3> images(26, exec_conf);
         {
         ArrayHandle<Scalar3> h_images(images, access_location::host, access_mode::overwrite);
         unsigned int idx=0;
@@ -293,12 +293,12 @@ UP_TEST( lbvh_validate )
         }
 
     // build hit list
-    GPUArray<unsigned int> hits(N, exec_conf);
+    GlobalArray<unsigned int> hits(N, exec_conf);
     neighbor::LBVHRopeTraverser traverser(exec_conf);
     traverser.traverse(hits, spheres, spheres.getNumElements(), *lbvh, images);
 
     // generate list of reference collisions
-    GPUArray<unsigned int> ref_hits(N, exec_conf);
+    GlobalArray<unsigned int> ref_hits(N, exec_conf);
         {
         const Scalar rcut2 = rcut*rcut;
         ArrayHandle<unsigned int> h_ref_hits(ref_hits, access_location::host, access_mode::overwrite);

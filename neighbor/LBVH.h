@@ -11,7 +11,7 @@
 #endif
 
 #include "hoomd/HOOMDMath.h"
-#include "hoomd/GPUArray.h"
+#include "hoomd/GlobalArray.h"
 #include "hoomd/Autotuner.h"
 
 namespace neighbor
@@ -57,7 +57,7 @@ class LBVH
         ~LBVH();
 
         //! Build the LBVH
-        void build(const GPUArray<Scalar4>& points, unsigned int N, const Scalar3 lo, const Scalar3 hi);
+        void build(const GlobalArray<Scalar4>& points, unsigned int N, const Scalar3 lo, const Scalar3 hi);
 
         //! Get the LBVH root node
         int getRoot() const
@@ -84,37 +84,37 @@ class LBVH
             }
 
         //! Get the array of parents of a given node
-        const GPUArray<int>& getParents() const
+        const GlobalArray<int>& getParents() const
             {
             return m_parent;
             }
 
         //! Get the array of left children of a given node
-        const GPUArray<int>& getLeftChildren() const
+        const GlobalArray<int>& getLeftChildren() const
             {
             return m_left;
             }
 
         //! Get the array of right children of a given node
-        const GPUArray<int>& getRightChildren() const
+        const GlobalArray<int>& getRightChildren() const
             {
             return m_right;
             }
 
         //! Get the lower bounds of the boxes enclosing a node
-        const GPUArray<float3>& getLowerBounds() const
+        const GlobalArray<float3>& getLowerBounds() const
             {
             return m_lo;
             }
 
         //! Get the upper bounds of the boxes enclosing a node
-        const GPUArray<float3>& getUpperBounds() const
+        const GlobalArray<float3>& getUpperBounds() const
             {
             return m_hi;
             }
 
         //! Get the original indexes of the primitives in each leaf node
-        const GPUArray<unsigned int>& getPrimitives() const
+        const GlobalArray<unsigned int>& getPrimitives() const
             {
             return m_sorted_indexes;
             }
@@ -144,18 +144,18 @@ class LBVH
         unsigned int m_N_internal;  //!< Number of internal nodes in tree
         unsigned int m_N_nodes;     //!< Number of nodes in the tree
 
-        GPUArray<int> m_parent; //!< Parent node
-        GPUArray<int> m_left;   //!< Left child
-        GPUArray<int> m_right;  //!< Right child
-        GPUArray<float3> m_lo;  //!< Lower bound of AABB
-        GPUArray<float3> m_hi;  //!< Upper bound of AABB
+        GlobalArray<int> m_parent; //!< Parent node
+        GlobalArray<int> m_left;   //!< Left child
+        GlobalArray<int> m_right;  //!< Right child
+        GlobalArray<float3> m_lo;  //!< Lower bound of AABB
+        GlobalArray<float3> m_hi;  //!< Upper bound of AABB
 
-        GPUArray<unsigned int> m_codes;             //!< Morton codes
-        GPUArray<unsigned int> m_indexes;           //!< Primitive indexes
-        GPUArray<unsigned int> m_sorted_codes;      //!< Sorted morton codes
-        GPUArray<unsigned int> m_sorted_indexes;    //!< Sorted primitive indexes
+        GlobalArray<unsigned int> m_codes;             //!< Morton codes
+        GlobalArray<unsigned int> m_indexes;           //!< Primitive indexes
+        GlobalArray<unsigned int> m_sorted_codes;      //!< Sorted morton codes
+        GlobalArray<unsigned int> m_sorted_indexes;    //!< Sorted primitive indexes
 
-        GPUArray<unsigned int> m_locks; //!< Node locks for generating aabb hierarchy
+        GlobalArray<unsigned int> m_locks; //!< Node locks for generating aabb hierarchy
 
         std::unique_ptr<Autotuner> m_tune_gen_codes;    //!< Autotuner for generating Morton codes kernel
         std::unique_ptr<Autotuner> m_tune_gen_tree;     //!< Autotuner for generating tree hierarchy kernel

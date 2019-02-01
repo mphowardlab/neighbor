@@ -8,7 +8,7 @@
 
 #include "LBVHTraverser.h"
 
-#include "hoomd/GPUArray.h"
+#include "hoomd/GlobalArray.h"
 #include "hoomd/GPUFlags.h"
 #include "hoomd/Autotuner.h"
 
@@ -53,14 +53,14 @@ class LBVHRopeTraverser : public LBVHTraverser
         ~LBVHRopeTraverser();
 
         //! Traverse the LBVH.
-        virtual void traverse(const GPUArray<unsigned int>& out,
-                              const GPUArray<Scalar4>& spheres,
+        virtual void traverse(const GlobalArray<unsigned int>& out,
+                              const GlobalArray<Scalar4>& spheres,
                               unsigned int N,
                               const LBVH& lbvh,
-                              const GPUArray<Scalar3>& images = GPUArray<Scalar3>());
+                              const GlobalArray<Scalar3>& images = GlobalArray<Scalar3>());
 
         //! Access the compressed LBVH data for traversal
-        const GPUArray<int4>& getData() const
+        const GlobalArray<int4>& getData() const
             {
             return m_data;
             }
@@ -80,7 +80,7 @@ class LBVHRopeTraverser : public LBVHTraverser
             }
 
     private:
-        GPUArray<int4> m_data;        //!< Internal representation of the LBVH for traversal
+        GlobalArray<int4> m_data;        //!< Internal representation of the LBVH for traversal
         GPUFlags<float3> m_lbvh_lo;   //!< Lower bound of tree
         GPUFlags<float3> m_lbvh_hi;   //!< Upper bound of tree
         GPUFlags<float3> m_bins;      //!< Bin size for compression
