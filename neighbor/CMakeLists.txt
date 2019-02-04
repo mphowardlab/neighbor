@@ -8,14 +8,14 @@
 # c++ source files
 set(_cc_sources
     LBVH.cc
-    LBVHRopeTraverser.cc
+    LBVHTraverser.cc
     UniformGrid.cc
     UniformGridTraverser.cc
     )
 # cuda source files
 set(_cu_sources
     LBVH.cu
-    LBVHRopeTraverser.cu
+    LBVHTraverser.cu
     UniformGrid.cu
     UniformGridTraverser.cu
     )
@@ -23,8 +23,9 @@ set(_cu_sources
 set(_h_sources
     LBVH.cuh
     LBVH.h
-    LBVHRopeTraverser.cuh
-    LBVHRopeTraverser.h
+    LBVHTraverser.cuh
+    LBVHTraverser.h
+    OutputOps.h
     UniformGrid.cuh
     UniformGrid.h
     UniformGridTraverser.cuh

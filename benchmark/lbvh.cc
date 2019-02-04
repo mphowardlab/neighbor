@@ -4,7 +4,8 @@
 // Maintainer: mphoward
 
 #include "neighbor/LBVH.h"
-#include "neighbor/LBVHRopeTraverser.h"
+#include "neighbor/LBVHTraverser.h"
+#include "neighbor/OutputOps.h"
 
 #include "hoomd/ClockSource.h"
 #include "hoomd/ExecutionConfiguration.h"
@@ -188,17 +189,22 @@ int main(int argc, char * argv[])
 
             // try with rope traversal
                 {
-                neighbor::LBVHRopeTraverser traverser(exec_conf);
-                // warmup the autotuners
-                for (unsigned int i=0; i < 200; ++i)
+                neighbor::LBVHTraverser traverser(exec_conf);
                     {
-                    traverser.traverse(hits, spheres, pdata->getN(), *lbvh, images);
-                    }
-                traverser.setAutotunerParams(false, 100000);
+                    ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
+                    neighbor::CountNeighborsOp count(d_hits.data);
 
-                for (size_t i=0; i < times.size(); ++ i)
-                    {
-                    times[i] = profile([&]{traverser.traverse(hits, spheres, pdata->getN(), *lbvh, images);},500);
+                    // warmup the autotuners
+                    for (unsigned int i=0; i < 200; ++i)
+                        {
+                        traverser.traverse(count, spheres, pdata->getN(), *lbvh, images);
+                        }
+                    traverser.setAutotunerParams(false, 100000);
+
+                    for (size_t i=0; i < times.size(); ++ i)
+                        {
+                        times[i] = profile([&]{traverser.traverse(count, spheres, pdata->getN(), *lbvh, images);},500);
+                        }
                     }
                 std::sort(times.begin(), times.end());
                 std::cout << "Median LBVH rope time: " << times[times.size()/2]<< " ms / traversal" << std::endl;

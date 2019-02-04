@@ -5,7 +5,8 @@
 
 #include "neighbor/LBVH.h"
 #include "neighbor/LBVH.cuh"
-#include "neighbor/LBVHRopeTraverser.h"
+#include "neighbor/LBVHTraverser.h"
+#include "neighbor/OutputOps.h"
 
 #include "hoomd/BoxDim.h"
 #include <random>
@@ -108,12 +109,16 @@ UP_TEST( lbvh_test )
         UP_ASSERT_CLOSE(h_hi.data[0].x, 2.5f, 1.e-6f);
         }
 
-    // test rope traverser
-    exec_conf->msg->notice(0) << "Testing rope traverser..." << std::endl;
+    // test traverser
+    exec_conf->msg->notice(0) << "Testing traverser basics..." << std::endl;
         {
-        neighbor::LBVHRopeTraverser traverser(exec_conf);
+        neighbor::LBVHTraverser traverser(exec_conf);
         GlobalArray<unsigned int> hits(spheres.getNumElements(), exec_conf);
-        traverser.traverse(hits, spheres, spheres.getNumElements(), *lbvh);
+            {
+            ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
+            neighbor::CountNeighborsOp count(d_hits.data);
+            traverser.traverse(count, spheres, spheres.getNumElements(), *lbvh);
+            }
 
         ArrayHandle<int4> h_data(traverser.getData(), access_location::host, access_mode::read);
         // Node 0
@@ -171,6 +176,54 @@ UP_TEST( lbvh_test )
         UP_ASSERT_EQUAL(h_hits.data[5], 3);
         UP_ASSERT_EQUAL(h_hits.data[6], 0);
         }
+
+    // test traverser neigh list op
+    exec_conf->msg->notice(0) << "Testing traverser neighbor list..." << std::endl;
+        {
+        neighbor::LBVHTraverser traverser(exec_conf);
+        // setup nlist data structures
+        const unsigned int max_neigh = 2;
+        GlobalArray<unsigned int> neigh_list(max_neigh*spheres.getNumElements(), exec_conf);
+        GlobalArray<unsigned int> nneigh(spheres.getNumElements(), exec_conf);
+        // generate list on gpu
+            {
+            ArrayHandle<unsigned int> d_neigh_list(neigh_list, access_location::device, access_mode::overwrite);
+            ArrayHandle<unsigned int> d_nneigh(nneigh, access_location::device, access_mode::overwrite);
+            neighbor::NeighborListOp nl_op(d_neigh_list.data, d_nneigh.data, max_neigh);
+            traverser.traverse(nl_op, spheres, spheres.getNumElements(), *lbvh);
+            }
+        // check output
+            {
+            ArrayHandle<unsigned int> h_neigh_list(neigh_list, access_location::host, access_mode::read);
+            ArrayHandle<unsigned int> h_nneigh(nneigh, access_location::host, access_mode::read);
+
+            //
+            UP_ASSERT_EQUAL(h_nneigh.data[0], 1);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*0+0], 2);
+
+            UP_ASSERT_EQUAL(h_nneigh.data[1], 1);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*1+0], 1);
+
+            UP_ASSERT_EQUAL(h_nneigh.data[2], 1);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*2+0], 0);
+
+            UP_ASSERT_EQUAL(h_nneigh.data[3], 2);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*3+0], 2);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*3+1], 1);
+
+            UP_ASSERT_EQUAL(h_nneigh.data[4], 2);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*4+0], 1);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*4+1], 0);
+
+            UP_ASSERT_EQUAL(h_nneigh.data[5], 3);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*5+0], 2);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*5+1], 1);
+            // this neighbor should be left off because it exceeds max neigh
+            //UP_ASSERT_EQUAL(h_neigh_list.data[h_head_list.data[5]+2], 0);
+
+            UP_ASSERT_EQUAL(h_nneigh.data[6], 0);
+            }
+        }
     }
 
 // Test that LBVH traverser handles images correctly
@@ -218,9 +271,13 @@ UP_TEST( lbvh_periodic_test )
         }
 
     // no hits without images
-    neighbor::LBVHRopeTraverser traverser(exec_conf);
+    neighbor::LBVHTraverser traverser(exec_conf);
     GlobalArray<unsigned int> hits(spheres.getNumElements(), exec_conf);
-    traverser.traverse(hits, spheres, spheres.getNumElements(), *lbvh);
+        {
+        ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
+        neighbor::CountNeighborsOp count(d_hits.data);
+        traverser.traverse(count, spheres, spheres.getNumElements(), *lbvh);
+        }
         {
         ArrayHandle<unsigned int> h_hits(hits, access_location::host, access_mode::read);
         UP_ASSERT_EQUAL(h_hits.data[0], 0);
@@ -228,7 +285,11 @@ UP_TEST( lbvh_periodic_test )
         }
 
     // 2 hits with images
-    traverser.traverse(hits, spheres, spheres.getNumElements(), *lbvh, images);
+        {
+        ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
+        neighbor::CountNeighborsOp count(d_hits.data);
+        traverser.traverse(count, spheres, spheres.getNumElements(), *lbvh, images);
+        }
         {
         ArrayHandle<unsigned int> h_hits(hits, access_location::host, access_mode::read);
         UP_ASSERT_EQUAL(h_hits.data[0], 2);
@@ -293,9 +354,13 @@ UP_TEST( lbvh_validate )
         }
 
     // build hit list
+    neighbor::LBVHTraverser traverser(exec_conf);
     GlobalArray<unsigned int> hits(N, exec_conf);
-    neighbor::LBVHRopeTraverser traverser(exec_conf);
-    traverser.traverse(hits, spheres, spheres.getNumElements(), *lbvh, images);
+        {
+        ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
+        neighbor::CountNeighborsOp count(d_hits.data);
+        traverser.traverse(count, spheres, spheres.getNumElements(), *lbvh, images);
+        }
 
     // generate list of reference collisions
     GlobalArray<unsigned int> ref_hits(N, exec_conf);

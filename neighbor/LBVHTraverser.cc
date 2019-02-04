@@ -3,85 +3,33 @@
 
 // Maintainer: mphoward
 
-#include "LBVHRopeTraverser.h"
-#include "LBVHRopeTraverser.cuh"
+#include "LBVHTraverser.h"
+#include "OutputOps.h"
 
 namespace neighbor
 {
-
 /*!
  * \param exec_conf HOOMD-blue execution configuration.
  */
-LBVHRopeTraverser::LBVHRopeTraverser(std::shared_ptr<const ExecutionConfiguration> exec_conf)
-    : LBVHTraverser(exec_conf), m_lbvh_lo(exec_conf), m_lbvh_hi(exec_conf), m_bins(exec_conf)
+LBVHTraverser::LBVHTraverser(std::shared_ptr<const ExecutionConfiguration> exec_conf)
+    : m_exec_conf(exec_conf), m_lbvh_lo(exec_conf), m_lbvh_hi(exec_conf), m_bins(exec_conf)
     {
-    m_exec_conf->msg->notice(4) << "Constructing LBVHRopeTraverser" << std::endl;
+    m_exec_conf->msg->notice(4) << "Constructing LBVHTraverser" << std::endl;
 
     m_tune_traverse.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_rope_traverse", m_exec_conf));
     m_tune_compress.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_rope_compress", m_exec_conf));
     }
 
-LBVHRopeTraverser::~LBVHRopeTraverser()
+LBVHTraverser::~LBVHTraverser()
     {
-    m_exec_conf->msg->notice(4) << "Destroying LBVHRopeTraverser" << std::endl;
+    m_exec_conf->msg->notice(4) << "Destroying LBVHTraverser" << std::endl;
     }
 
-/*!
- * \param out Number of overlaps per sphere.
- * \param spheres Test spheres.
- * \param N Number of test spheres.
- * \param lbvh LBVH to traverse.
- * \param images Additional images of \a spheres to test.
- *
- * The format for a \a sphere is (x,y,z,R), where R is the radius of the sphere.
- *
- * A maximum of 32 \a images are allowed due to the internal representation of the image list
- * in the traversal CUDA kernel. This is more than enough to perform traversal in 3D periodic
- * boundary conditions (26 additional images). Multiple calls to ::traverse are required if
- * more images are needed, but \a out will be overwritten each time.
- *
- * If a query sphere overlaps an internal node, the traversal should descend to the left child.
- * If the query sphere does not overlap OR it has reached a leaf node, the traversal should proceed
- * along the rope. Traversal terminates when the LBVHSentinel is reached for the rope.
- */
-void LBVHRopeTraverser::traverse(const GlobalArray<unsigned int>& out,
-                                 const GlobalArray<Scalar4>& spheres,
-                                 unsigned int N,
-                                 const LBVH& lbvh,
-                                 const GlobalArray<Scalar3>& images)
-    {
-    // kernel uses int32 bitflags for the images, so limit to 32 images
-    const unsigned int Nimages = images.getNumElements();
-    if (Nimages > 32)
-        {
-        m_exec_conf->msg->error() << "A maximum of 32 image vectors are supported by LBVH traversers." << std::endl;
-        throw std::runtime_error("Too many images (>32) in LBVH traverser.");
-        }
-
-    // compress the tree
-    compress(lbvh);
-
-    // traverse the tree
-    ArrayHandle<unsigned int> d_out(out, access_location::device, access_mode::overwrite);
-    ArrayHandle<int4> d_data(m_data, access_location::device, access_mode::read);
-    ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
-    ArrayHandle<Scalar3> d_images(images, access_location::device, access_mode::read);
-
-    m_tune_traverse->begin();
-    gpu::lbvh_traverse_ropes(d_out.data,
-                             lbvh.getRoot(),
-                             d_data.data,
-                             m_lbvh_lo.getDeviceFlags(),
-                             m_lbvh_hi.getDeviceFlags(),
-                             m_bins.getDeviceFlags(),
-                             d_spheres.data,
-                             d_images.data,
-                             Nimages,
-                             N,
-                             m_tune_traverse->getParam());
-    if (m_exec_conf->isCUDAErrorCheckingEnabled()) CHECK_CUDA_ERROR();
-    m_tune_traverse->end();
-    }
+template void LBVHTraverser::traverse(CountNeighborsOp& out,
+                                      const GlobalArray<Scalar4>& spheres,
+                                      unsigned int N,
+                                      const LBVH& lbvh,
+                                      const GlobalArray<Scalar3>& images);
 
 /*!
  * \param lbvh LBVH to compress
@@ -105,7 +53,7 @@ void LBVHRopeTraverser::traverse(const GlobalArray<unsigned int>& out,
  * to the child (node.z). If node.z < 0, the current node is actually a leaf node. In this case,
  * there is no left child. Instead, ~node.z gives the original index of the intersected primitive.
  */
-void LBVHRopeTraverser::compress(const LBVH& lbvh)
+void LBVHTraverser::compress(const LBVH& lbvh)
     {
     // resize the internal data array
     const unsigned int num_data = lbvh.getNNodes();
