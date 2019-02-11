@@ -5,6 +5,7 @@
 
 #include "LBVHTraverser.cuh"
 #include "OutputOps.h"
+#include "QueryOps.h"
 
 namespace neighbor
 {
@@ -15,10 +16,7 @@ namespace kernel
 
 //! Kernel to compress LBVH for rope traversal
 /*!
- * \param d_data Compressed LBVH.
- * \param d_lbvh_lo Lower bound of LBVH for (de)compression.
- * \param d_lbvh_hi Upper bound of LBVH for (de)compression.
- * \param d_bins Size of compressed bins.
+ * \param ctree Compressed LBVH.
  * \param tree LBVH to compress.
  * \param N_internal Number of internal nodes in LBVH.
  * \param N_nodes Number of nodes in LBVH.
@@ -32,10 +30,7 @@ namespace kernel
  * conservative way so that on decompression, the bounds of the nodes are
  * never underestimated.
  */
-__global__ void lbvh_compress_ropes(int4 *d_data,
-                                    float3 *d_lbvh_lo,
-                                    float3 *d_lbvh_hi,
-                                    float3 *d_bins,
+__global__ void lbvh_compress_ropes(LBVHCompressedData ctree,
                                     const LBVHData tree,
                                     const unsigned int N_internal,
                                     const unsigned int N_nodes)
@@ -104,24 +99,21 @@ __global__ void lbvh_compress_ropes(int4 *d_data,
     int left_flag = (idx < N_internal) ? tree.left[idx] : ~tree.primitive[idx-N_internal];
 
     // stash all the data into one int4
-    d_data[idx] = make_int4(lo_bin3, hi_bin3, left_flag, rope);
+    ctree.data[idx] = make_int4(lo_bin3, hi_bin3, left_flag, rope);
 
     // first thread writes out the compression values, rounding down bin size to ensure box bounds always expand even with floats
     if (idx == 0)
         {
-        *d_lbvh_lo = tree_lo;
-        *d_lbvh_hi = tree_hi;
-        *d_bins = make_float3(__frcp_rd(tree_bininv.x),__frcp_rd(tree_bininv.y),__frcp_rd(tree_bininv.z));
+        *ctree.lo = tree_lo;
+        *ctree.hi = tree_hi;
+        *ctree.bins = make_float3(__frcp_rd(tree_bininv.x),__frcp_rd(tree_bininv.y),__frcp_rd(tree_bininv.z));
         }
     }
 
 } // end namespace kernel
 
 /*!
- * \param d_data Compressed LBVH.
- * \param d_lbvh_lo Lower bound of LBVH for (de)compression.
- * \param d_lbvh_hi Upper bound of LBVH for (de)compression.
- * \param d_bins Size of compressed bins.
+ * \param ctree Compressed LBVH.
  * \param tree LBVH to compress.
  * \param N_internal Number of internal nodes in LBVH.
  * \param N_nodes Number of nodes in LBVH.
@@ -129,10 +121,7 @@ __global__ void lbvh_compress_ropes(int4 *d_data,
  *
  * \sa kernel::lbvh_compress_ropes
  */
-void lbvh_compress_ropes(int4 *d_data,
-                         float3 *d_lbvh_lo,
-                         float3 *d_lbvh_hi,
-                         float3 *d_bins,
+void lbvh_compress_ropes(LBVHCompressedData ctree,
                          const LBVHData tree,
                          unsigned int N_internal,
                          unsigned int N_nodes,
@@ -150,25 +139,23 @@ void lbvh_compress_ropes(int4 *d_data,
 
     const unsigned int num_blocks = (N_nodes + run_block_size - 1)/run_block_size;
     kernel::lbvh_compress_ropes<<<num_blocks, run_block_size>>>
-        (d_data, d_lbvh_lo, d_lbvh_hi, d_bins, tree, N_internal, N_nodes);
+        (ctree, tree, N_internal, N_nodes);
     }
 
 // template declaration to count neighbors
 template void lbvh_traverse_ropes(CountNeighborsOp& out,
                                   const LBVHCompressedData& lbvh,
-                                  const Scalar4 *d_spheres,
+                                  const SphereQueryOp& query,
                                   const Scalar3 *d_images,
                                   unsigned int Nimages,
-                                  unsigned int N,
                                   unsigned int block_size);
 
 // template declaration to generate neighbor list
 template void lbvh_traverse_ropes(NeighborListOp& out,
                                   const LBVHCompressedData& lbvh,
-                                  const Scalar4 *d_spheres,
+                                  const SphereQueryOp& query,
                                   const Scalar3 *d_images,
                                   unsigned int Nimages,
-                                  unsigned int N,
                                   unsigned int block_size);
 
 } // end namespace gpu

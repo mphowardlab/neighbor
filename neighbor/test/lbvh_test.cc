@@ -7,6 +7,7 @@
 #include "neighbor/LBVH.cuh"
 #include "neighbor/LBVHTraverser.h"
 #include "neighbor/OutputOps.h"
+#include "neighbor/QueryOps.h"
 
 #include "hoomd/BoxDim.h"
 #include <random>
@@ -117,7 +118,11 @@ UP_TEST( lbvh_test )
             {
             ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
             neighbor::CountNeighborsOp count(d_hits.data);
-            traverser.traverse(count, spheres, spheres.getNumElements(), *lbvh);
+
+            ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
+            neighbor::SphereQueryOp query(d_spheres.data, spheres.getNumElements());
+
+            traverser.traverse(count, query, *lbvh);
             }
 
         ArrayHandle<int4> h_data(traverser.getData(), access_location::host, access_mode::read);
@@ -190,7 +195,11 @@ UP_TEST( lbvh_test )
             ArrayHandle<unsigned int> d_neigh_list(neigh_list, access_location::device, access_mode::overwrite);
             ArrayHandle<unsigned int> d_nneigh(nneigh, access_location::device, access_mode::overwrite);
             neighbor::NeighborListOp nl_op(d_neigh_list.data, d_nneigh.data, max_neigh);
-            traverser.traverse(nl_op, spheres, spheres.getNumElements(), *lbvh);
+
+            ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
+            neighbor::SphereQueryOp query(d_spheres.data, spheres.getNumElements());
+
+            traverser.traverse(nl_op, query, *lbvh);
             }
         // check output
             {
@@ -276,7 +285,11 @@ UP_TEST( lbvh_periodic_test )
         {
         ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
         neighbor::CountNeighborsOp count(d_hits.data);
-        traverser.traverse(count, spheres, spheres.getNumElements(), *lbvh);
+
+        ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
+        neighbor::SphereQueryOp query(d_spheres.data, spheres.getNumElements());
+
+        traverser.traverse(count, query, *lbvh);
         }
         {
         ArrayHandle<unsigned int> h_hits(hits, access_location::host, access_mode::read);
@@ -288,7 +301,11 @@ UP_TEST( lbvh_periodic_test )
         {
         ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
         neighbor::CountNeighborsOp count(d_hits.data);
-        traverser.traverse(count, spheres, spheres.getNumElements(), *lbvh, images);
+
+        ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
+        neighbor::SphereQueryOp query(d_spheres.data, spheres.getNumElements());
+
+        traverser.traverse(count, query, *lbvh, images);
         }
         {
         ArrayHandle<unsigned int> h_hits(hits, access_location::host, access_mode::read);
@@ -359,7 +376,11 @@ UP_TEST( lbvh_validate )
         {
         ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
         neighbor::CountNeighborsOp count(d_hits.data);
-        traverser.traverse(count, spheres, spheres.getNumElements(), *lbvh, images);
+
+        ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
+        neighbor::SphereQueryOp query(d_spheres.data, spheres.getNumElements());
+
+        traverser.traverse(count, query, *lbvh, images);
         }
 
     // generate list of reference collisions

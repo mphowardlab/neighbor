@@ -21,11 +21,13 @@ set(_cu_sources
     )
 # headers
 set(_h_sources
+    BoundingVolumes.h
     LBVH.cuh
     LBVH.h
     LBVHTraverser.cuh
     LBVHTraverser.h
     OutputOps.h
+    QueryOps.h
     UniformGrid.cuh
     UniformGrid.h
     UniformGridTraverser.cuh

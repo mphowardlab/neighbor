@@ -5,6 +5,7 @@
 
 #include "LBVHTraverser.h"
 #include "OutputOps.h"
+#include "QueryOps.h"
 
 namespace neighbor
 {
@@ -26,8 +27,12 @@ LBVHTraverser::~LBVHTraverser()
     }
 
 template void LBVHTraverser::traverse(CountNeighborsOp& out,
-                                      const GlobalArray<Scalar4>& spheres,
-                                      unsigned int N,
+                                      const SphereQueryOp& query,
+                                      const LBVH& lbvh,
+                                      const GlobalArray<Scalar3>& images);
+
+template void LBVHTraverser::traverse(NeighborListOp& out,
+                                      const SphereQueryOp& query,
                                       const LBVH& lbvh,
                                       const GlobalArray<Scalar3>& images);
 
@@ -62,7 +67,6 @@ void LBVHTraverser::compress(const LBVH& lbvh)
         GlobalArray<int4> tmp(num_data, m_exec_conf);
         m_data.swap(tmp);
         }
-    ArrayHandle<int4> d_data(m_data, access_location::device, access_mode::overwrite);
 
     // acquire current tree data for reading
     ArrayHandle<int> d_parent(lbvh.getParents(), access_location::device, access_mode::read);
@@ -81,12 +85,18 @@ void LBVHTraverser::compress(const LBVH& lbvh)
     tree.hi = d_hi.data;
     tree.root = lbvh.getRoot();
 
+    // acquire compressed tree data for writing
+    gpu::LBVHCompressedData ctree;
+    ArrayHandle<int4> d_data(m_data, access_location::device, access_mode::overwrite);
+    ctree.root = lbvh.getRoot();
+    ctree.data = d_data.data;
+    ctree.lo = m_lbvh_lo.getDeviceFlags();
+    ctree.hi = m_lbvh_hi.getDeviceFlags();
+    ctree.bins = m_bins.getDeviceFlags();
+
     // compress the data
     m_tune_compress->begin();
-    gpu::lbvh_compress_ropes(d_data.data,
-                             m_lbvh_lo.getDeviceFlags(),
-                             m_lbvh_hi.getDeviceFlags(),
-                             m_bins.getDeviceFlags(),
+    gpu::lbvh_compress_ropes(ctree,
                              tree,
                              lbvh.getNInternal(),
                              lbvh.getNNodes(),

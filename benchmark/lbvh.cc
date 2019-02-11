@@ -6,6 +6,7 @@
 #include "neighbor/LBVH.h"
 #include "neighbor/LBVHTraverser.h"
 #include "neighbor/OutputOps.h"
+#include "neighbor/QueryOps.h"
 
 #include "hoomd/ClockSource.h"
 #include "hoomd/ExecutionConfiguration.h"
@@ -194,16 +195,19 @@ int main(int argc, char * argv[])
                     ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
                     neighbor::CountNeighborsOp count(d_hits.data);
 
+                    ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
+                    neighbor::SphereQueryOp query(d_spheres.data, pdata->getN());
+
                     // warmup the autotuners
                     for (unsigned int i=0; i < 200; ++i)
                         {
-                        traverser.traverse(count, spheres, pdata->getN(), *lbvh, images);
+                        traverser.traverse(count, query, *lbvh, images);
                         }
                     traverser.setAutotunerParams(false, 100000);
 
                     for (size_t i=0; i < times.size(); ++ i)
                         {
-                        times[i] = profile([&]{traverser.traverse(count, spheres, pdata->getN(), *lbvh, images);},500);
+                        times[i] = profile([&]{traverser.traverse(count, query, *lbvh, images);},500);
                         }
                     }
                 std::sort(times.begin(), times.end());
