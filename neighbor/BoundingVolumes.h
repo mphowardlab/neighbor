@@ -59,10 +59,20 @@ struct BoundingBox
      */
     DEVICE BoundingBox(const double3& lo_, const double3& hi_)
         {
-        lo = make_float3(__double2float_rd(lo.x), __double2float_rd(lo.y), __double2float_rd(lo.z));
-        hi = make_float3(__double2float_ru(hi.x), __double2float_ru(hi.y), __double2float_ru(hi.z));
+        lo = make_float3(__double2float_rd(lo_.x), __double2float_rd(lo_.y), __double2float_rd(lo_.z));
+        hi = make_float3(__double2float_ru(hi_.x), __double2float_ru(hi_.y), __double2float_ru(hi_.z));
         }
     #endif
+
+    DEVICE float3 getCenter() const
+        {
+        float3 c;
+        c.x = 0.5f*(lo.x+hi.x);
+        c.y = 0.5f*(lo.y+hi.y);
+        c.z = 0.5f*(lo.z+hi.z);
+
+        return c;
+        }
 
     //! Test for overlap between two bounding boxes.
     /*!

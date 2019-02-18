@@ -7,6 +7,7 @@
 #include "neighbor/LBVHTraverser.h"
 #include "neighbor/OutputOps.h"
 #include "neighbor/QueryOps.h"
+#include "neighbor/InsertOps.h"
 
 #include "hoomd/ClockSource.h"
 #include "hoomd/ExecutionConfiguration.h"
@@ -139,17 +140,27 @@ int main(int argc, char * argv[])
             const BoxDim& box = pdata->getBox();
 
             // warmup the lbvh autotuners
+            ArrayHandle<Scalar4> d_postype(pdata->getPositions(), access_location::device, access_mode::read);
+
             for (unsigned int i=0; i < 200; ++i)
                 {
-                lbvh->build(pdata->getPositions(), pdata->getN(), box.getLo(), box.getHi());
+                // warmup the lbvh autotuners
+                for (unsigned int i=0; i < 200; ++i)
+                    {
+                    lbvh->build(neighbor::PointInsertOp(d_postype.data, pdata->getN()), box.getLo(), box.getHi());
+                    }
                 }
             lbvh->setAutotunerParams(false, 100000);
 
             // profile lbvh build times
             std::vector<double> times(5);
-            for (size_t i=0; i < times.size(); ++i)
                 {
-                times[i] = profile([&]{lbvh->build(pdata->getPositions(), pdata->getN(), box.getLo(), box.getHi());}, 500);
+                ArrayHandle<Scalar4> d_postype(pdata->getPositions(), access_location::device, access_mode::read);
+
+                for (size_t i=0; i < times.size(); ++i)
+                    {
+                    times[i] = profile([&]{lbvh->build(neighbor::PointInsertOp(d_postype.data, pdata->getN()), box.getLo(), box.getHi());}, 500);
+                    }
                 }
             std::sort(times.begin(), times.end());
             std::cout << "Median LBVH build time: " << times[times.size()/2]<< " ms / build" << std::endl;

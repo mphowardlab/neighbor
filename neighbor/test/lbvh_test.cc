@@ -8,6 +8,7 @@
 #include "neighbor/LBVHTraverser.h"
 #include "neighbor/OutputOps.h"
 #include "neighbor/QueryOps.h"
+#include "neighbor/InsertOps.h"
 
 #include "hoomd/BoxDim.h"
 #include <random>
@@ -60,7 +61,11 @@ UP_TEST( lbvh_test )
      */
     const Scalar3 max = make_scalar3(1024, 1024, 1024);
     const Scalar3 min = make_scalar3(0, 0, 0);
-    lbvh->build(points, 3, min, max);
+        {
+        ArrayHandle<Scalar4> d_points(points, access_location::device, access_mode::read);
+        lbvh->build(neighbor::PointInsertOp(d_points.data, 3), min, max);
+        }
+
         {
         UP_ASSERT_EQUAL(lbvh->getN(), 3);
         UP_ASSERT_EQUAL(lbvh->getRoot(), 0);
@@ -251,7 +256,11 @@ UP_TEST( lbvh_periodic_test )
         }
     const Scalar3 max = make_scalar3( 2., 2., 2.);
     const Scalar3 min = make_scalar3(-2.,-2.,-2.);
-    lbvh->build(points, points.getNumElements(), min, max);
+
+        {
+        ArrayHandle<Scalar4> d_points(points, access_location::device, access_mode::read);
+        lbvh->build(neighbor::PointInsertOp(d_points.data, points.getNumElements()), min, max);
+        }
 
     // query spheres for tree that intersect through boundaries
     GlobalArray<Scalar4> spheres(2, exec_conf);
@@ -337,7 +346,11 @@ UP_TEST( lbvh_validate )
             h_points.data[i] = make_scalar4(L.x*U(mt), L.y*U(mt), L.z*U(mt), __int_as_scalar(0));
             }
         }
-    lbvh->build(points, N, box.getLo(), box.getHi());
+
+        {
+        ArrayHandle<Scalar4> d_points(points, access_location::device, access_mode::read);
+        lbvh->build(neighbor::PointInsertOp(d_points.data, N), box.getLo(), box.getHi());
+        }
 
     // query spheres for tree
     GlobalArray<Scalar4> spheres(N, exec_conf);

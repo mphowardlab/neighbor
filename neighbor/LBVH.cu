@@ -21,56 +21,6 @@ namespace gpu
 {
 namespace kernel
 {
-//! Expand a 10-bit integer into 30 bits by inserting 2 zeros after each bit.
-/*!
- * \param v unsigned integer with 10 bits set
- * \returns The integer expanded with two zeros interleaved between bits
- * http://devblogs.nvidia.com/parallelforall/thinking-parallel-part-iii-tree-construction-gpu/
- */
-__device__ __forceinline__ unsigned int expandBits(unsigned int v)
-{
-    v = (v * 0x00010001u) & 0xFF0000FFu;
-    v = (v * 0x00000101u) & 0x0F00F00Fu;
-    v = (v * 0x00000011u) & 0xC30C30C3u;
-    v = (v * 0x00000005u) & 0x49249249u;
-    return v;
-}
-
-//! Convert a fraction to [0,1023]
-/*
- * \param f Fractional coordinate lying in [0,1].
- * \returns Bin integer lying in [0,1023]
- *
- * The range of the binned integer corresponds to the maximum value that can be
- * stored in a 10-bit integer. When \a f lies outside [0,1], the bin is clamped to
- * the ends of the range.
- */
-__device__ __forceinline__ unsigned int fractionToBin(Scalar f)
-    {
-    #ifdef SINGLE_PRECISION
-    return static_cast<unsigned int>(fminf(fmaxf(f * 1023.f, 0.f), 1023.f));
-    #else
-    return static_cast<unsigned int>(fmin(fmax(f * 1023., 0.), 1023.));
-    #endif
-    }
-
-//! Compute the 30-bit Morton code for a tuple of binned indexes.
-/*!
- * \param point (x,y,z) tuple of bin indexes.
- * \returns 30-bit Morton code corresponding to \a point.
- *
- * The Morton code is formed by first expanding the bits of each component (see ::expandBits),
- * and then bitshifting to interleave them. The Morton code then has a representation::
- *
- *  x0y0z0x1y1z1...
- *
- * where indices refer to the bitwise representation of each component.
- */
-__device__ __forceinline__ unsigned int calcMortonCode(uint3 point)
-    {
-    return 4 * expandBits(point.x) + 2 * expandBits(point.y) + expandBits(point.z);
-    }
-
 //! Compute the number of bits shared by Morton codes for primitives \a i and \a j.
 /*!
  * \param d_codes List of Morton codes.
@@ -111,52 +61,6 @@ __device__ __forceinline__ int delta(const unsigned int *d_codes,
         {
         return __clz(code_i ^ code_j);
         }
-    }
-
-//! Kernel to generate the Morton codes
-/*!
- * \param d_codes Generated Morton codes.
- * \param d_indexes Generated index for the primitive.
- * \param d_points Point primitives.
- * \param lo Lower bound of scene.
- * \param hi Upper bound of scene.
- * \param N Number of primitives.
- *
- * One thread is used to process each primitive. The point is binned into
- * one of 2^10 bins using its fractional coordinate between \a lo and \a hi.
- * The bins are converted to a Morton code. The Morton code and corresponding
- * primitive index are stored. The reason for storing the primitive index now
- * is for subsequent sorting (see ::lbvh_sort_codes).
- */
-__global__ void lbvh_gen_codes(unsigned int *d_codes,
-                               unsigned int *d_indexes,
-                               const Scalar4 *d_points,
-                               const Scalar3 lo,
-                               const Scalar3 hi,
-                               const unsigned int N)
-    {
-    // one thread per point
-    const unsigned int idx = blockDim.x * blockIdx.x + threadIdx.x;
-    if (idx >= N)
-        return;
-
-    // real space coordinate
-    const Scalar4 r = d_points[idx];
-
-    // fractional coordinate
-    const Scalar3 f = make_scalar3((r.x - lo.x) / (hi.x - lo.x),
-                                   (r.y - lo.y) / (hi.y - lo.y),
-                                   (r.z - lo.z) / (hi.z - lo.z));
-
-    // bin fractional coordinate
-    const uint3 q = make_uint3(fractionToBin(f.x), fractionToBin(f.y), fractionToBin(f.z));
-
-    // compute morton code
-    const unsigned int code = calcMortonCode(q);
-
-    // write out morton code and primitive index
-    d_codes[idx] = code;
-    d_indexes[idx] = idx;
     }
 
 //! Kernel to generate the tree hierarchy
@@ -244,121 +148,7 @@ __global__ void lbvh_gen_tree(LBVHData tree,
         tree.parent[0] = LBVHSentinel;
         }
     }
-
-//! Bubble the bounding boxes up the tree hierarchy.
-/*!
- * \param tree LBVH tree (raw pointers).
- * \param d_locks Temporary storage for state of internal nodes.
- * \param d_points Primitives.
- * \param N Number of primitives.
- *
- * One thread originally processes each primitive. In order to support mixed precision,
- * the Scalar4 representation of the primitive is converted to two float3s that define
- * the lower and upper bounds using CUDA intrinsics to round down or up. (If Scalar = float,
- * then these bounds are equal.) This bounding box is stored for the leaf. Then, each thread
- * begins to process up the tree hierarchy.
- *
- * The second thread to reach each node processes the node, which ensures that all children
- * have already been processed. The order to reach the node is determined by an atomic
- * operation on \a d_locks. The bounding box of the node being processed is determined by
- * merging the bounding box of the child processing its parent with the bounding box of its
- * sibling. The process is then repeated until the root node is reached.
- *
- * \note
- * A __threadfence() is employed after the AABB is stored to ensure that it is visible to
- * other threads reading from global memory.
- */
-__global__ void lbvh_bubble_aabbs(const LBVHData tree,
-                                  unsigned int *d_locks,
-                                  const Scalar4 *d_points,
-                                  const unsigned int N)
-    {
-    // one thread per point
-    const unsigned int idx = blockDim.x * blockIdx.x + threadIdx.x;
-    if (idx >= N)
-        return;
-
-    // determine lower and upper bounds of the primitive, even in mixed precision
-    Scalar4 point = d_points[tree.primitive[idx]];
-    float3 lo = make_float3(__scalar2float_rd(point.x), __scalar2float_rd(point.y), __scalar2float_rd(point.z));
-    float3 hi = make_float3(__scalar2float_ru(point.x), __scalar2float_ru(point.y), __scalar2float_ru(point.z));
-    // set aabb for the leaf node
-    int last = N-1+idx;
-    tree.lo[last] = lo;
-    tree.hi[last] = hi;
-    __threadfence();
-
-    int current = tree.parent[last];
-    while (current != LBVHSentinel)
-        {
-        // parent is processed by the second thread to reach it
-        unsigned int lock = atomicAdd(d_locks + current, 1);
-        if (!lock)
-            return;
-
-        // look for the sibling of the current thread with speculation
-        int sibling = tree.left[current];
-        if (sibling == last)
-            {
-            sibling = tree.right[current];
-            }
-
-        // compute min / max bounds of the current thread with its sibling
-        const float3 sib_lo = tree.lo[sibling];
-        if (sib_lo.x < lo.x) lo.x = sib_lo.x;
-        if (sib_lo.y < lo.y) lo.y = sib_lo.y;
-        if (sib_lo.z < lo.z) lo.z = sib_lo.z;
-
-        const float3 sib_hi = tree.hi[sibling];
-        if (sib_hi.x > hi.x) hi.x = sib_hi.x;
-        if (sib_hi.y > hi.y) hi.y = sib_hi.y;
-        if (sib_hi.z > hi.z) hi.z = sib_hi.z;
-
-        // write out bounding box to global memory
-        tree.lo[current] = lo;
-        tree.hi[current] = hi;
-        __threadfence();
-
-        // move up tree
-        last = current;
-        current = tree.parent[current];
-        }
-    }
-
 } // end namespace kernel
-
-/*!
- * \param d_codes Generated Morton codes.
- * \param d_indexes Generated index for the primitive.
- * \param d_points Point primitives.
- * \param lo Lower bound of scene.
- * \param hi Upper bound of scene.
- * \param N Number of primitives.
- * \param block_size Number of CUDA threads per block.
- *
- * \sa kernel::lbvh_gen_codes
- */
-void lbvh_gen_codes(unsigned int *d_codes,
-                    unsigned int *d_indexes,
-                    const Scalar4 *d_points,
-                    const Scalar3 lo,
-                    const Scalar3 hi,
-                    const unsigned int N,
-                    const unsigned int block_size)
-    {
-    // clamp block size
-    static unsigned int max_block_size = UINT_MAX;
-    if (max_block_size == UINT_MAX)
-        {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_gen_codes);
-        max_block_size = attr.maxThreadsPerBlock;
-        }
-    const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
-
-    const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
-    kernel::lbvh_gen_codes<<<num_blocks, run_block_size>>>(d_codes, d_indexes, d_points, lo, hi, N);
-    }
 
 /*!
  * \param d_tmp Temporary storage for CUB.
@@ -433,38 +223,36 @@ void lbvh_gen_tree(const LBVHData tree,
     kernel::lbvh_gen_tree<<<num_blocks, run_block_size>>>(tree, d_codes, N);
     }
 
-/*!
- * \param tree LBVH tree (raw pointers).
- * \param d_locks Temporary storage for state of internal nodes.
- * \param d_points Primitives.
- * \param N Number of primitives.
- * \param block_size Number of CUDA threads per block.
- *
- * \sa kernel::lbvh_bubble_aabbs
- *
- * \a d_locks is overwritten before the kernel is launched.
- */
-void lbvh_bubble_aabbs(const LBVHData tree,
+//! Template declarations for lbvh_gen_codes
+template void lbvh_gen_codes(unsigned int *d_codes,
+                    unsigned int *d_indexes,
+                    const PointInsertOp& insert,
+                    const Scalar3 lo,
+                    const Scalar3 hi,
+                    const unsigned int N,
+                    const unsigned int block_size);
+
+template void lbvh_gen_codes(unsigned int *d_codes,
+                    unsigned int *d_indexes,
+                    const SphereInsertOp& insert,
+                    const Scalar3 lo,
+                    const Scalar3 hi,
+                    const unsigned int N,
+                    const unsigned int block_size);
+
+
+//! Template declarations for lbvh_bubble_aabbs
+template void lbvh_bubble_aabbs(const LBVHData tree,
+                       const PointInsertOp& insert,
                        unsigned int *d_locks,
-                       const Scalar4 *d_points,
                        const unsigned int N,
-                       const unsigned int block_size)
-    {
-    cudaMemset(d_locks, 0, (N-1)*sizeof(unsigned int));
+                       const unsigned int block_size);
 
-    // clamp block size
-    static unsigned int max_block_size = UINT_MAX;
-    if (max_block_size == UINT_MAX)
-        {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_bubble_aabbs);
-        max_block_size = attr.maxThreadsPerBlock;
-        }
-    const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
-
-    const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
-    kernel::lbvh_bubble_aabbs<<<num_blocks, run_block_size>>>(tree, d_locks, d_points, N);
-    }
+template void lbvh_bubble_aabbs(const LBVHData tree,
+                       const SphereInsertOp& insert,
+                       unsigned int *d_locks,
+                       const unsigned int N,
+                       const unsigned int block_size);
 
 } // end namespace gpu
 } // end namespace neighbor

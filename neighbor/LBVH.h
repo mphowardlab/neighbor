@@ -13,6 +13,9 @@
 #include "hoomd/HOOMDMath.h"
 #include "hoomd/GlobalArray.h"
 #include "hoomd/Autotuner.h"
+#include "hoomd/CachedAllocator.h"
+
+#include "LBVH.cuh"
 
 namespace neighbor
 {
@@ -57,7 +60,8 @@ class LBVH
         ~LBVH();
 
         //! Build the LBVH
-        void build(const GlobalArray<Scalar4>& points, unsigned int N, const Scalar3 lo, const Scalar3 hi);
+        template<class InsertOpT>
+        void build(const InsertOpT& insert, const Scalar3 lo, const Scalar3 hi);
 
         //! Get the LBVH root node
         int getRoot() const
@@ -164,6 +168,118 @@ class LBVH
         //! Allocate
         void allocate(unsigned int N);
     };
+
+/*!
+ * \param insert The insert operation determining AABB extents of primitives
+ * \param N Number of primitives
+ * \param lo Lower bound of the scene
+ * \param hi Upper bound of the scene
+ *
+ * \tparam InsertOpT the kind of insert operation
+ *
+ * The LBVH is constructed using the algorithm due to Karras using 30-bit Morton codes.
+ * The caller should ensure that all \a points lie within \a lo and \a hi for best performance.
+ * Points lying outside this range are clamped to it during the Morton code calculation, which
+ * may lead to a low quality LBVH.
+ *
+ * \note
+ * Currently, small LBVHs (`N` <= 2) are not implemented, and an error will be raised.
+ */
+template<class InsertOpT>
+void LBVH::build(const InsertOpT& insert, const Scalar3 lo, const Scalar3 hi)
+    {
+    const unsigned int N = insert.size();
+
+    if (N < 2)
+        {
+        m_exec_conf->msg->error() << "Small LBVHs (N=0,1,2) are currently not implemented." << std::endl;
+        throw std::runtime_error("Small LBVHs are not implemented.");
+        }
+    // resize memory for the tree
+    allocate(N);
+
+    // calculate morton codes
+        {
+        ArrayHandle<unsigned int> d_codes(m_codes, access_location::device, access_mode::overwrite);
+        ArrayHandle<unsigned int> d_indexes(m_indexes, access_location::device, access_mode::overwrite);
+
+        m_tune_gen_codes->begin();
+        neighbor::gpu::lbvh_gen_codes(d_codes.data, d_indexes.data, insert, lo, hi, m_N, m_tune_gen_codes->getParam());
+        if (m_exec_conf->isCUDAErrorCheckingEnabled()) CHECK_CUDA_ERROR();
+        m_tune_gen_codes->end();
+        }
+
+    // sort morton codes
+        {
+        uchar2 swap;
+            {
+            ArrayHandle<unsigned int> d_codes(m_codes, access_location::device, access_mode::readwrite);
+            ArrayHandle<unsigned int> d_sorted_codes(m_sorted_codes, access_location::device, access_mode::overwrite);
+            ArrayHandle<unsigned int> d_indexes(m_indexes, access_location::device, access_mode::readwrite);
+            ArrayHandle<unsigned int> d_sorted_indexes(m_sorted_indexes, access_location::device, access_mode::overwrite);
+
+            void *d_tmp = NULL;
+            size_t tmp_bytes = 0;
+            neighbor::gpu::lbvh_sort_codes(d_tmp,
+                                 tmp_bytes,
+                                 d_codes.data,
+                                 d_sorted_codes.data,
+                                 d_indexes.data,
+                                 d_sorted_indexes.data,
+                                 m_N);
+
+            // make requested temporary allocation (1 char = 1B)
+            size_t alloc_size = (tmp_bytes > 0) ? tmp_bytes : 4;
+            ScopedAllocation<unsigned char> d_alloc(m_exec_conf->getCachedAllocator(), alloc_size);
+            d_tmp = (void *)d_alloc();
+
+            swap = neighbor::gpu::lbvh_sort_codes(d_tmp,
+                                        tmp_bytes,
+                                        d_codes.data,
+                                        d_sorted_codes.data,
+                                        d_indexes.data,
+                                        d_sorted_indexes.data,
+                                        m_N);
+            }
+        if (swap.x) m_sorted_codes.swap(m_codes);
+        if (swap.y) m_sorted_indexes.swap(m_indexes);
+        }
+
+    // process hierarchy and bubble aabbs
+        {
+        ArrayHandle<int> d_parent(m_parent, access_location::device, access_mode::overwrite);
+        ArrayHandle<int> d_left(m_left, access_location::device, access_mode::overwrite);
+        ArrayHandle<int> d_right(m_right, access_location::device, access_mode::overwrite);
+        ArrayHandle<unsigned int> d_sorted_indexes(m_sorted_indexes, access_location::device, access_mode::read);
+        ArrayHandle<float3> d_lo(m_lo, access_location::device, access_mode::overwrite);
+        ArrayHandle<float3> d_hi(m_hi, access_location::device, access_mode::overwrite);
+
+        neighbor::gpu::LBVHData tree;
+        tree.parent = d_parent.data;
+        tree.left = d_left.data;
+        tree.right = d_right.data;
+        tree.primitive = d_sorted_indexes.data;
+        tree.lo = d_lo.data;
+        tree.hi = d_hi.data;
+        tree.root = m_root;
+
+        // generate the tree hierarchy
+        ArrayHandle<unsigned int> d_sorted_codes(m_sorted_codes, access_location::device, access_mode::read);
+
+        m_tune_gen_tree->begin();
+        neighbor::gpu::lbvh_gen_tree(tree, d_sorted_codes.data, m_N, m_tune_gen_tree->getParam());
+        if (m_exec_conf->isCUDAErrorCheckingEnabled()) CHECK_CUDA_ERROR();
+        m_tune_gen_tree->end();
+
+        // bubble up the aabbs
+        ArrayHandle<unsigned int> d_locks(m_locks, access_location::device, access_mode::overwrite);
+
+        m_tune_bubble->begin();
+        neighbor::gpu::lbvh_bubble_aabbs(tree, insert, d_locks.data, m_N, m_tune_bubble->getParam());
+        if (m_exec_conf->isCUDAErrorCheckingEnabled()) CHECK_CUDA_ERROR();
+        m_tune_bubble->end();
+        }
+    }
 
 } // end namespace neighbor
 

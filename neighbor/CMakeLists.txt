@@ -22,6 +22,7 @@ set(_cu_sources
 # headers
 set(_h_sources
     BoundingVolumes.h
+    InsertOps.h
     LBVH.cuh
     LBVH.h
     LBVHTraverser.cuh
