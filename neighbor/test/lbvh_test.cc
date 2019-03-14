@@ -8,6 +8,7 @@
 #include "neighbor/LBVHTraverser.h"
 #include "neighbor/OutputOps.h"
 #include "neighbor/QueryOps.h"
+#include "neighbor/TransformOps.h"
 #include "neighbor/InsertOps.h"
 
 #include "hoomd/BoxDim.h"
@@ -234,6 +235,71 @@ UP_TEST( lbvh_test )
             UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*5+1], 1);
             // this neighbor should be left off because it exceeds max neigh
             //UP_ASSERT_EQUAL(h_neigh_list.data[h_head_list.data[5]+2], 0);
+
+            UP_ASSERT_EQUAL(h_nneigh.data[6], 0);
+            }
+        }
+
+    // test traverser with transform op
+    exec_conf->msg->notice(0) << "Testing traverser with map transform op..." << std::endl;
+        {
+        neighbor::LBVHTraverser traverser(exec_conf);
+
+        // remap the particle tags into the order I'm expecting them
+        GlobalArray<unsigned int> map(spheres.getNumElements(), exec_conf);
+            {
+            ArrayHandle<unsigned int> h_map(map, access_location::host, access_mode::overwrite);
+            h_map.data[0] = 2;
+            h_map.data[1] = 1;
+            h_map.data[2] = 0;
+            }
+
+        // setup nlist data structures
+        const unsigned int max_neigh = 2;
+        GlobalArray<unsigned int> neigh_list(max_neigh*spheres.getNumElements(), exec_conf);
+        GlobalArray<unsigned int> nneigh(spheres.getNumElements(), exec_conf);
+        // generate list on gpu
+            {
+            ArrayHandle<unsigned int> d_neigh_list(neigh_list, access_location::device, access_mode::overwrite);
+            ArrayHandle<unsigned int> d_nneigh(nneigh, access_location::device, access_mode::overwrite);
+            neighbor::NeighborListOp nl_op(d_neigh_list.data, d_nneigh.data, max_neigh);
+
+            ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
+            neighbor::SphereQueryOp query(d_spheres.data, spheres.getNumElements());
+
+            ArrayHandle<unsigned int> d_map(map, access_location::device, access_mode::read);
+            neighbor::MapTransformOp transform(d_map.data);
+
+            traverser.traverse(nl_op, query, transform, *lbvh);
+            }
+        // check output
+            {
+            ArrayHandle<unsigned int> h_neigh_list(neigh_list, access_location::host, access_mode::read);
+            ArrayHandle<unsigned int> h_nneigh(nneigh, access_location::host, access_mode::read);
+
+            //
+            UP_ASSERT_EQUAL(h_nneigh.data[0], 1);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*0+0], 0);
+
+            UP_ASSERT_EQUAL(h_nneigh.data[1], 1);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*1+0], 1);
+
+            UP_ASSERT_EQUAL(h_nneigh.data[2], 1);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*2+0], 2);
+
+            UP_ASSERT_EQUAL(h_nneigh.data[3], 2);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*3+0], 0);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*3+1], 1);
+
+            UP_ASSERT_EQUAL(h_nneigh.data[4], 2);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*4+0], 1);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*4+1], 2);
+
+            UP_ASSERT_EQUAL(h_nneigh.data[5], 3);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*5+0], 0);
+            UP_ASSERT_EQUAL(h_neigh_list.data[max_neigh*5+1], 1);
+            // this neighbor should be left off because it exceeds max neigh
+            //UP_ASSERT_EQUAL(h_neigh_list.data[h_head_list.data[5]+2], 2);
 
             UP_ASSERT_EQUAL(h_nneigh.data[6], 0);
             }

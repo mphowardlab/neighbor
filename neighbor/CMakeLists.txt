@@ -29,6 +29,7 @@ set(_h_sources
     LBVHTraverser.h
     OutputOps.h
     QueryOps.h
+    TransformOps.h
     UniformGrid.cuh
     UniformGrid.h
     UniformGridTraverser.cuh
