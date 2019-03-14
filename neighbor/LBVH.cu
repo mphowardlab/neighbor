@@ -4,6 +4,7 @@
 // Maintainer: mphoward
 
 #include "LBVH.cuh"
+#include "InsertOps.h"
 #include "hoomd/extern/cub/cub/cub.cuh"
 
 // macros for rounding HOOMD-blue Scalar to float for mixed precision
@@ -158,6 +159,7 @@ __global__ void lbvh_gen_tree(LBVHData tree,
  * \param d_indexes Unsorted primitive indexes.
  * \param d_sorted_indexes Sorted primitive indexes.
  * \param N Number of primitives.
+ * \param stream CUDA stream for kernel execution.
  *
  * \returns Two flags (swap) with the location of the sorted codes and indexes. If swap.x
  *          is 1, then the sorted codes are in \a d_codes and need to be swapped. Similarly,
@@ -178,13 +180,14 @@ uchar2 lbvh_sort_codes(void *d_tmp,
                        unsigned int *d_sorted_codes,
                        unsigned int *d_indexes,
                        unsigned int *d_sorted_indexes,
-                       const unsigned int N)
+                       const unsigned int N,
+                       cudaStream_t stream)
     {
 
     cub::DoubleBuffer<unsigned int> d_keys(d_codes, d_sorted_codes);
     cub::DoubleBuffer<unsigned int> d_vals(d_indexes, d_sorted_indexes);
 
-    cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N);
+    cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, sizeof(unsigned int)*8, stream);
 
     uchar2 swap = make_uchar2(0,0);
     if (d_tmp != NULL)
@@ -201,13 +204,15 @@ uchar2 lbvh_sort_codes(void *d_tmp,
  * \param d_codes Sorted Morton codes for the primitives.
  * \param N Number of primitives.
  * \param block_size Number of CUDA threads per block.
+ * \param stream CUDA stream for kernel execution.
  *
  * \sa kernel::lbvh_gen_tree
  */
 void lbvh_gen_tree(const LBVHData tree,
                    const unsigned int *d_codes,
                    const unsigned int N,
-                   const unsigned int block_size)
+                   const unsigned int block_size,
+                   cudaStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
@@ -220,39 +225,42 @@ void lbvh_gen_tree(const LBVHData tree,
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = ((N-1) + run_block_size - 1)/run_block_size;
-    kernel::lbvh_gen_tree<<<num_blocks, run_block_size>>>(tree, d_codes, N);
+    kernel::lbvh_gen_tree<<<num_blocks, run_block_size, 0, stream>>>(tree, d_codes, N);
     }
 
 //! Template declarations for lbvh_gen_codes
 template void lbvh_gen_codes(unsigned int *d_codes,
-                    unsigned int *d_indexes,
-                    const PointInsertOp& insert,
-                    const Scalar3 lo,
-                    const Scalar3 hi,
-                    const unsigned int N,
-                    const unsigned int block_size);
+                             unsigned int *d_indexes,
+                             const PointInsertOp& insert,
+                             const Scalar3 lo,
+                             const Scalar3 hi,
+                             const unsigned int N,
+                             const unsigned int block_size,
+                             cudaStream_t stream);
 
 template void lbvh_gen_codes(unsigned int *d_codes,
-                    unsigned int *d_indexes,
-                    const SphereInsertOp& insert,
-                    const Scalar3 lo,
-                    const Scalar3 hi,
-                    const unsigned int N,
-                    const unsigned int block_size);
-
+                             unsigned int *d_indexes,
+                             const SphereInsertOp& insert,
+                             const Scalar3 lo,
+                             const Scalar3 hi,
+                             const unsigned int N,
+                             const unsigned int block_size,
+                             cudaStream_t stream);
 
 //! Template declarations for lbvh_bubble_aabbs
 template void lbvh_bubble_aabbs(const LBVHData tree,
-                       const PointInsertOp& insert,
-                       unsigned int *d_locks,
-                       const unsigned int N,
-                       const unsigned int block_size);
+                                const PointInsertOp& insert,
+                                unsigned int *d_locks,
+                                const unsigned int N,
+                                const unsigned int block_size,
+                                cudaStream_t stream);
 
 template void lbvh_bubble_aabbs(const LBVHData tree,
-                       const SphereInsertOp& insert,
-                       unsigned int *d_locks,
-                       const unsigned int N,
-                       const unsigned int block_size);
+                                const SphereInsertOp& insert,
+                                unsigned int *d_locks,
+                                const unsigned int N,
+                                const unsigned int block_size,
+                                cudaStream_t stream);
 
 } // end namespace gpu
 } // end namespace neighbor

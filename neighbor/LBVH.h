@@ -54,7 +54,8 @@ class LBVH
     {
     public:
         //! Setup an unallocated LBVH
-        LBVH(std::shared_ptr<const ExecutionConfiguration> exec_conf);
+        LBVH(std::shared_ptr<const ExecutionConfiguration> exec_conf,
+             cudaStream_t stream = 0);
 
         //! Destroy an LBVH
         ~LBVH();
@@ -141,7 +142,8 @@ class LBVH
             }
 
     private:
-        std::shared_ptr<const ExecutionConfiguration> m_exec_conf;
+        std::shared_ptr<const ExecutionConfiguration> m_exec_conf;  //!< HOOMD execution configuration
+        cudaStream_t m_stream;  //! CUDA stream to build in
 
         int m_root;                 //!< Root index
         unsigned int m_N;           //!< Number of primitives in the tree
@@ -204,7 +206,7 @@ void LBVH::build(const InsertOpT& insert, const Scalar3 lo, const Scalar3 hi)
         ArrayHandle<unsigned int> d_indexes(m_indexes, access_location::device, access_mode::overwrite);
 
         m_tune_gen_codes->begin();
-        neighbor::gpu::lbvh_gen_codes(d_codes.data, d_indexes.data, insert, lo, hi, m_N, m_tune_gen_codes->getParam());
+        neighbor::gpu::lbvh_gen_codes(d_codes.data, d_indexes.data, insert, lo, hi, m_N, m_tune_gen_codes->getParam(), m_stream);
         if (m_exec_conf->isCUDAErrorCheckingEnabled()) CHECK_CUDA_ERROR();
         m_tune_gen_codes->end();
         }
@@ -226,7 +228,8 @@ void LBVH::build(const InsertOpT& insert, const Scalar3 lo, const Scalar3 hi)
                                  d_sorted_codes.data,
                                  d_indexes.data,
                                  d_sorted_indexes.data,
-                                 m_N);
+                                 m_N,
+                                 m_stream);
 
             // make requested temporary allocation (1 char = 1B)
             size_t alloc_size = (tmp_bytes > 0) ? tmp_bytes : 4;
@@ -239,7 +242,8 @@ void LBVH::build(const InsertOpT& insert, const Scalar3 lo, const Scalar3 hi)
                                         d_sorted_codes.data,
                                         d_indexes.data,
                                         d_sorted_indexes.data,
-                                        m_N);
+                                        m_N,
+                                        m_stream);
             }
         if (swap.x) m_sorted_codes.swap(m_codes);
         if (swap.y) m_sorted_indexes.swap(m_indexes);
@@ -267,7 +271,7 @@ void LBVH::build(const InsertOpT& insert, const Scalar3 lo, const Scalar3 hi)
         ArrayHandle<unsigned int> d_sorted_codes(m_sorted_codes, access_location::device, access_mode::read);
 
         m_tune_gen_tree->begin();
-        neighbor::gpu::lbvh_gen_tree(tree, d_sorted_codes.data, m_N, m_tune_gen_tree->getParam());
+        neighbor::gpu::lbvh_gen_tree(tree, d_sorted_codes.data, m_N, m_tune_gen_tree->getParam(), m_stream);
         if (m_exec_conf->isCUDAErrorCheckingEnabled()) CHECK_CUDA_ERROR();
         m_tune_gen_tree->end();
 
@@ -275,7 +279,7 @@ void LBVH::build(const InsertOpT& insert, const Scalar3 lo, const Scalar3 hi)
         ArrayHandle<unsigned int> d_locks(m_locks, access_location::device, access_mode::overwrite);
 
         m_tune_bubble->begin();
-        neighbor::gpu::lbvh_bubble_aabbs(tree, insert, d_locks.data, m_N, m_tune_bubble->getParam());
+        neighbor::gpu::lbvh_bubble_aabbs(tree, insert, d_locks.data, m_N, m_tune_bubble->getParam(), m_stream);
         if (m_exec_conf->isCUDAErrorCheckingEnabled()) CHECK_CUDA_ERROR();
         m_tune_bubble->end();
         }

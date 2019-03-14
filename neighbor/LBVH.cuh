@@ -8,7 +8,7 @@
 
 #include "hoomd/HOOMDMath.h"
 
-#include "InsertOps.h"
+#include "BoundingVolumes.h"
 
 namespace neighbor
 {
@@ -33,6 +33,43 @@ struct LBVHData
     float3* hi;                         //!< Upper bound of AABB
     int root;                           //!< Root index
     };
+
+//! Generate the Morton codes
+template<class InsertOpT>
+void lbvh_gen_codes(unsigned int *d_codes,
+                    unsigned int *d_indexes,
+                    const InsertOpT& insert,
+                    const Scalar3 lo,
+                    const Scalar3 hi,
+                    const unsigned int N,
+                    const unsigned int block_size,
+                    cudaStream_t stream = 0);
+
+//! Sort the Morton codes.
+uchar2 lbvh_sort_codes(void *d_tmp,
+                       size_t &tmp_bytes,
+                       unsigned int *d_codes,
+                       unsigned int *d_sorted_codes,
+                       unsigned int *d_indexes,
+                       unsigned int *d_sorted_indexes,
+                       const unsigned int N,
+                       cudaStream_t stream = 0);
+
+//! Generate the tree hierarchy
+void lbvh_gen_tree(const LBVHData tree,
+                   const unsigned int *d_codes,
+                   const unsigned int N,
+                   const unsigned int block_size,
+                   cudaStream_t stream = 0);
+
+//! Bubble the bounding boxes up the tree hierarchy.
+template<class InsertOpT>
+void lbvh_bubble_aabbs(const LBVHData tree,
+                       const InsertOpT& insert,
+                       unsigned int *d_locks,
+                       const unsigned int N,
+                       const unsigned int block_size,
+                       cudaStream_t stream = 0);
 
 #ifdef NVCC
 namespace kernel
@@ -220,42 +257,7 @@ __global__ void lbvh_bubble_aabbs(const LBVHData tree,
     }
 
 } // end namespace kernel
-#endif //NVCC
 
-//! Generate the Morton codes
-template<class InsertOpT>
-void lbvh_gen_codes(unsigned int *d_codes,
-                    unsigned int *d_indexes,
-                    const InsertOpT& insert,
-                    const Scalar3 lo,
-                    const Scalar3 hi,
-                    const unsigned int N,
-                    const unsigned int block_size);
-
-//! Sort the Morton codes.
-uchar2 lbvh_sort_codes(void *d_tmp,
-                       size_t &tmp_bytes,
-                       unsigned int *d_codes,
-                       unsigned int *d_sorted_codes,
-                       unsigned int *d_indexes,
-                       unsigned int *d_sorted_indexes,
-                       const unsigned int N);
-
-//! Generate the tree hierarchy
-void lbvh_gen_tree(const LBVHData tree,
-                   const unsigned int *d_codes,
-                   const unsigned int N,
-                   const unsigned int block_size);
-
-//! Bubble the bounding boxes up the tree hierarchy.
-template<class InsertOpT>
-void lbvh_bubble_aabbs(const LBVHData tree,
-                       const InsertOpT& insert,
-                       unsigned int *d_locks,
-                       const unsigned int N,
-                       const unsigned int block_size);
-
-#ifdef NVCC
 /*!
  * \param d_codes Generated Morton codes.
  * \param d_indexes Generated index for the primitive.
@@ -264,6 +266,7 @@ void lbvh_bubble_aabbs(const LBVHData tree,
  * \param hi Upper bound of scene.
  * \param N Number of primitives.
  * \param block_size Number of CUDA threads per block.
+ * \param stream CUDA stream for kernel execution.
  *
  * \tparam InsertOpT the kind of insert operation
  *
@@ -276,7 +279,8 @@ void lbvh_gen_codes(unsigned int *d_codes,
                     const Scalar3 lo,
                     const Scalar3 hi,
                     const unsigned int N,
-                    const unsigned int block_size)
+                    const unsigned int block_size,
+                    cudaStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
@@ -289,7 +293,7 @@ void lbvh_gen_codes(unsigned int *d_codes,
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
-    kernel::lbvh_gen_codes<<<num_blocks, run_block_size>>>(d_codes, d_indexes, insert, lo, hi, N);
+    kernel::lbvh_gen_codes<<<num_blocks, run_block_size, 0, stream>>>(d_codes, d_indexes, insert, lo, hi, N);
     }
 
 /*!
@@ -298,6 +302,7 @@ void lbvh_gen_codes(unsigned int *d_codes,
  * \param insert The insert operation to obtain the aabbs
  * \param N Number of primitives.
  * \param block_size Number of CUDA threads per block.
+ * \param stream CUDA stream for kernel execution.
  *
  * \tparam InsertOpT the kind of insert operation
  *
@@ -310,7 +315,8 @@ void lbvh_bubble_aabbs(const LBVHData tree,
                        const InsertOpT& insert,
                        unsigned int *d_locks,
                        const unsigned int N,
-                       const unsigned int block_size)
+                       const unsigned int block_size,
+                       cudaStream_t stream)
     {
     cudaMemset(d_locks, 0, (N-1)*sizeof(unsigned int));
 
@@ -325,7 +331,7 @@ void lbvh_bubble_aabbs(const LBVHData tree,
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
-    kernel::lbvh_bubble_aabbs<InsertOpT><<<num_blocks, run_block_size>>>(tree, insert, d_locks, N);
+    kernel::lbvh_bubble_aabbs<InsertOpT><<<num_blocks, run_block_size, 0, stream>>>(tree, insert, d_locks, N);
     }
 #endif // NVCC
 

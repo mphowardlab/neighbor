@@ -21,7 +21,13 @@ HOOMD_UP_MAIN()
 UP_TEST( lbvh_test )
     {
     auto exec_conf = std::make_shared<const ExecutionConfiguration>(ExecutionConfiguration::GPU);
-    auto lbvh = std::make_shared<neighbor::LBVH>(exec_conf);
+    std::shared_ptr<neighbor::LBVH> lbvh;
+
+    // make some cuda streams to test with
+    cudaStream_t streams[2];
+    cudaStreamCreate(&streams[0]); // different stream
+    streams[1] = 0; // default stream
+
 
     // points for tree
     GlobalArray<Scalar4> points(3, exec_conf);
@@ -62,12 +68,16 @@ UP_TEST( lbvh_test )
      */
     const Scalar3 max = make_scalar3(1024, 1024, 1024);
     const Scalar3 min = make_scalar3(0, 0, 0);
-        {
-        ArrayHandle<Scalar4> d_points(points, access_location::device, access_mode::read);
-        lbvh->build(neighbor::PointInsertOp(d_points.data, 3), min, max);
-        }
 
+    for (unsigned int i=0; i < 2; ++i)
         {
+        lbvh = std::make_shared<neighbor::LBVH>(exec_conf, streams[i]);
+            {
+            ArrayHandle<Scalar4> d_points(points, access_location::device, access_mode::read);
+            lbvh->build(neighbor::PointInsertOp(d_points.data, 3), min, max);
+            cudaStreamSynchronize(streams[i]);
+            }
+
         UP_ASSERT_EQUAL(lbvh->getN(), 3);
         UP_ASSERT_EQUAL(lbvh->getRoot(), 0);
 
@@ -190,8 +200,9 @@ UP_TEST( lbvh_test )
 
     // test traverser neigh list op
     exec_conf->msg->notice(0) << "Testing traverser neighbor list..." << std::endl;
+    for (unsigned int i=0; i < 2; ++i)
         {
-        neighbor::LBVHTraverser traverser(exec_conf);
+        neighbor::LBVHTraverser traverser(exec_conf, streams[i]);
         // setup nlist data structures
         const unsigned int max_neigh = 2;
         GlobalArray<unsigned int> neigh_list(max_neigh*spheres.getNumElements(), exec_conf);
@@ -206,6 +217,7 @@ UP_TEST( lbvh_test )
             neighbor::SphereQueryOp query(d_spheres.data, spheres.getNumElements());
 
             traverser.traverse(nl_op, query, *lbvh);
+            cudaStreamSynchronize(streams[i]);
             }
         // check output
             {
@@ -304,6 +316,7 @@ UP_TEST( lbvh_test )
             UP_ASSERT_EQUAL(h_nneigh.data[6], 0);
             }
         }
+    cudaStreamDestroy(streams[0]);
     }
 
 // Test that LBVH traverser handles images correctly

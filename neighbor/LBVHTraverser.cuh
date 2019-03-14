@@ -32,7 +32,8 @@ void lbvh_compress_ropes(LBVHCompressedData ctree,
                          const LBVHData tree,
                          unsigned int N_internal,
                          unsigned int N_nodes,
-                         unsigned int block_size);
+                         unsigned int block_size,
+                         cudaStream_t stream = 0);
 
 //! Traverse the LBVH using ropes.
 template<class OutputOpT, class QueryOpT>
@@ -41,7 +42,8 @@ void lbvh_traverse_ropes(OutputOpT& out,
                          const QueryOpT& query,
                          const Scalar3 *d_images,
                          unsigned int Nimages,
-                         unsigned int block_size);
+                         unsigned int block_size,
+                         cudaStream_t stream = 0);
 
 /*
  * Templated function definitions should only be available in NVCC.
@@ -293,6 +295,7 @@ __global__ void lbvh_traverse_ropes(OutputOpT out,
  * \param N_internal Number of internal nodes in LBVH.
  * \param N_nodes Number of nodes in LBVH.
  * \param block_size Number of CUDA threads per block.
+ * \param stream CUDA stream for kernel execution.
  *
  * \tparam TransformOpT Type of operation for transforming cached primitive index.
  *
@@ -305,7 +308,8 @@ void lbvh_compress_ropes(LBVHCompressedData ctree,
                          const LBVHData tree,
                          unsigned int N_internal,
                          unsigned int N_nodes,
-                         unsigned int block_size)
+                         unsigned int block_size,
+                         cudaStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
@@ -318,7 +322,7 @@ void lbvh_compress_ropes(LBVHCompressedData ctree,
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = (N_nodes + run_block_size - 1)/run_block_size;
-    kernel::lbvh_compress_ropes<<<num_blocks, run_block_size>>>
+    kernel::lbvh_compress_ropes<<<num_blocks, run_block_size, 0, stream>>>
         (ctree, transform, tree, N_internal, N_nodes);
     }
 
@@ -330,6 +334,7 @@ void lbvh_compress_ropes(LBVHCompressedData ctree,
  * \param Nimages Number of image vectors.
  * \param N Number of test spheres.
  * \param block_size Number of CUDA threads per block.
+ * \param stream CUDA stream for kernel execution.
  *
  * \tparam OutputOpT The type of output operation.
  * \tparam QueryOpT The type of query operation.
@@ -342,7 +347,8 @@ void lbvh_traverse_ropes(OutputOpT& out,
                          const QueryOpT& query,
                          const Scalar3 *d_images,
                          unsigned int Nimages,
-                         unsigned int block_size)
+                         unsigned int block_size,
+                         cudaStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
@@ -355,7 +361,7 @@ void lbvh_traverse_ropes(OutputOpT& out,
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = (query.size() + run_block_size - 1)/run_block_size;
-    kernel::lbvh_traverse_ropes<<<num_blocks, run_block_size>>>
+    kernel::lbvh_traverse_ropes<<<num_blocks, run_block_size, 0, stream>>>
         (out, lbvh, query, d_images, Nimages);
     }
 #endif
