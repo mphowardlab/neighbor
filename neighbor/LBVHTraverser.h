@@ -60,9 +60,12 @@ class LBVHTraverser
         //! Constructor
         /*!
          * \param exec_conf HOOMD-blue execution configuration.
+         * \param stream CUDA stream for kernel execution.
          */
-        LBVHTraverser(std::shared_ptr<const ExecutionConfiguration> exec_conf)
-            : m_exec_conf(exec_conf), m_lbvh_lo(exec_conf), m_lbvh_hi(exec_conf), m_bins(exec_conf)
+        LBVHTraverser(std::shared_ptr<const ExecutionConfiguration> exec_conf,
+                      cudaStream_t stream = 0)
+            : m_exec_conf(exec_conf), m_stream(stream),
+              m_lbvh_lo(exec_conf), m_lbvh_hi(exec_conf), m_bins(exec_conf)
             {
             m_exec_conf->msg->notice(4) << "Constructing LBVHTraverser" << std::endl;
 
@@ -116,11 +119,12 @@ class LBVHTraverser
 
     private:
         std::shared_ptr<const ExecutionConfiguration> m_exec_conf;  //!< Execution configuration
+        cudaStream_t m_stream;  //!< CUDA stream for traversals
 
-        GlobalArray<int4> m_data;        //!< Internal representation of the LBVH for traversal
-        GPUFlags<float3> m_lbvh_lo;   //!< Lower bound of tree
-        GPUFlags<float3> m_lbvh_hi;   //!< Upper bound of tree
-        GPUFlags<float3> m_bins;      //!< Bin size for compression
+        GlobalArray<int4> m_data;   //!< Internal representation of the LBVH for traversal
+        GPUFlags<float3> m_lbvh_lo; //!< Lower bound of tree
+        GPUFlags<float3> m_lbvh_hi; //!< Upper bound of tree
+        GPUFlags<float3> m_bins;    //!< Bin size for compression
 
         std::unique_ptr<Autotuner> m_tune_traverse; //!< Autotuner for traversal kernel
         std::unique_ptr<Autotuner> m_tune_compress; //!< Autotuner for compression kernel
@@ -186,7 +190,8 @@ void LBVHTraverser::traverse(OutputOpT& out,
                              query,
                              d_images.data,
                              Nimages,
-                             m_tune_traverse->getParam());
+                             m_tune_traverse->getParam(),
+                             m_stream);
     if (m_exec_conf->isCUDAErrorCheckingEnabled()) CHECK_CUDA_ERROR();
     m_tune_traverse->end();
     }
@@ -263,7 +268,8 @@ void LBVHTraverser::compress(const LBVH& lbvh, const TransformOpT& transform)
                              tree,
                              lbvh.getNInternal(),
                              lbvh.getNNodes(),
-                             m_tune_compress->getParam());
+                             m_tune_compress->getParam(),
+                             m_stream);
     if (m_exec_conf->isCUDAErrorCheckingEnabled()) CHECK_CUDA_ERROR();
     m_tune_compress->end();
     }
