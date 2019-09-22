@@ -6,6 +6,10 @@
 #include "neighbor/UniformGrid.h"
 #include "neighbor/UniformGrid.cuh"
 #include "neighbor/UniformGridTraverser.h"
+#include "neighbor/OutputOps.h"
+#include "neighbor/QueryOps.h"
+#include "neighbor/TransformOps.h"
+#include "neighbor/InsertOps.h"
 
 #include "hoomd/GlobalArray.h"
 
@@ -30,7 +34,8 @@ UP_TEST( uniform_grid_test )
         }
 
     // width of 1.9 will be rounded up to 2
-    auto grid = std::make_shared<neighbor::UniformGrid>(exec_conf, lo, hi, 1.9);
+    auto grid = std::make_shared<neighbor::UniformGrid>(exec_conf, 1.9);
+    grid->setup(4, lo, hi);
 
     // check read in
         {
@@ -66,13 +71,18 @@ UP_TEST( uniform_grid_test )
         UP_ASSERT_EQUAL(grid->getSizes().getNumElements(), 2*3*4);
         }
 
-    // build grid from points
-    grid->build(points, 4);
     // check allocation
         {
         UP_ASSERT_EQUAL(grid->getN(), 4);
         UP_ASSERT_EQUAL(grid->getCells().getNumElements(), 4);
         UP_ASSERT_EQUAL(grid->getPrimitives().getNumElements(), 4);
+        }
+
+    // build grid from points
+        {
+        ArrayHandle<Scalar4> d_points(points, access_location::device, access_mode::read);
+        neighbor::GridPointOp op(d_points.data, 4);
+        grid->build(op, lo, hi);
         }
 
     /* Check values
@@ -139,10 +149,15 @@ UP_TEST( uniform_grid_traverser_test )
         }
 
     const Scalar rcut = 1.0;
-    auto grid = std::make_shared<neighbor::UniformGrid>(exec_conf, lo, hi, rcut);
-    grid->build(points, 9);
+    auto grid = std::make_shared<neighbor::UniformGrid>(exec_conf, rcut);
+        {
+        ArrayHandle<Scalar4> d_points(points, access_location::device, access_mode::read);
+        neighbor::GridPointOp op(d_points.data, 9);
+        grid->build(op, lo, hi);
+        }
 
     GlobalArray<Scalar4> spheres(4, exec_conf);
+    GlobalArray<Scalar3> images(26, exec_conf);
     GlobalArray<unsigned int> hits(spheres.getNumElements(), exec_conf);
         {
         ArrayHandle<Scalar4> h_spheres(spheres, access_location::host, access_mode::overwrite);
@@ -150,31 +165,42 @@ UP_TEST( uniform_grid_traverser_test )
         h_spheres.data[1] = make_scalar4( 1.6, 1.6, 1.6, 0.1);
         h_spheres.data[2] = make_scalar4(-2.,-2.,-2., rcut);
         h_spheres.data[3] = make_scalar4( 2., 2., 2., rcut);
+
+        // generate 3d image list
+        ArrayHandle<Scalar3> h_images(images, access_location::host, access_mode::overwrite);
+        Scalar3 L = hi-lo;
+        unsigned int idx=0;
+        for (int k=-1; k <= 1; ++k)
+            {
+            for (int j=-1; j <= 1; ++j)
+                {
+                for (int i=-1; i <= 1; ++i)
+                    {
+                    // self-image is always included
+                    if (i == 0 && j == 0 && k == 0) continue;
+                    h_images.data[idx++] = make_scalar3(i*L.x, j*L.y, k*L.z);
+                    }
+                }
+            }
         }
 
     // check that correct numbers of neighbors are obtained with different thread configs
-    BoxDim box(lo, hi, make_uchar3(1,1,1));
     neighbor::UniformGridTraverser traverser(exec_conf);
-    for (unsigned int num_threads=1; num_threads <= 32; num_threads *=2)
         {
-        // reset to 0s
-            {
-            ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
-            cudaMemset(d_hits.data, 0, sizeof(unsigned int)*hits.getNumElements());
-            }
-        exec_conf->msg->notice(1) << "Testing grid traverser with " << num_threads << " threads" << std::endl;
-        traverser.setThreads(num_threads);
-        traverser.traverse(hits, spheres, spheres.getNumElements(), *grid, box);
-        ArrayHandle<unsigned int> h_hits(hits, access_location::host, access_mode::read);
-        UP_ASSERT_EQUAL(h_hits.data[0], 1);
-        UP_ASSERT_EQUAL(h_hits.data[1], 2);
-        UP_ASSERT_EQUAL(h_hits.data[2], 9);
-        UP_ASSERT_EQUAL(h_hits.data[3], 9);
-        }
-    // check that invalid thread number errors out
-    exec_conf->msg->notice(1) << "Testing grid traverser with invalid (3) threads" << std::endl;
-    UP_ASSERT_EXCEPTION(std::runtime_error, [&]{ traverser.setThreads(3); });
+        ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
+        neighbor::CountNeighborsOp count(d_hits.data);
 
+        ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
+        neighbor::SphereQueryOp query(d_spheres.data, spheres.getNumElements());
+
+        traverser.traverse(count, query, *grid, images);
+        }
+
+    ArrayHandle<unsigned int> h_hits(hits, access_location::host, access_mode::read);
+    UP_ASSERT_EQUAL(h_hits.data[0], 1);
+    UP_ASSERT_EQUAL(h_hits.data[1], 2);
+    UP_ASSERT_EQUAL(h_hits.data[2], 9);
+    UP_ASSERT_EQUAL(h_hits.data[3], 9);
     }
 
 // Test that UniformGrid counts at least the same number of neighbors in an ideal gas as brute force
@@ -187,7 +213,7 @@ UP_TEST( uniform_grid_validate )
     const Scalar3 L = box.getL();
     const unsigned int N = static_cast<unsigned int>(1.0*L.x*L.y*L.z);
     const Scalar rcut = 1.0;
-    auto grid = std::make_shared<neighbor::UniformGrid>(exec_conf, box.getLo(), box.getHi(), rcut);
+    auto grid = std::make_shared<neighbor::UniformGrid>(exec_conf, rcut);
 
     // generate random points in the box
     GlobalArray<Scalar4> points(N, exec_conf);
@@ -200,10 +226,14 @@ UP_TEST( uniform_grid_validate )
             h_points.data[i] = make_scalar4(L.x*U(mt), L.y*U(mt), L.z*U(mt), __int_as_scalar(0));
             }
         }
-    grid->build(points, N);
+        {
+        ArrayHandle<Scalar4> d_points(points, access_location::device, access_mode::read);
+        grid->build(neighbor::GridPointOp(d_points.data, N), box.getLo(), box.getHi());
+        }
 
     // query spheres for grid
     GlobalArray<Scalar4> spheres(N, exec_conf);
+    GlobalArray<Scalar3> images(26, exec_conf);
         {
         ArrayHandle<Scalar4> h_points(points, access_location::host, access_mode::read);
         ArrayHandle<Scalar4> h_spheres(spheres, access_location::host, access_mode::overwrite);
@@ -212,12 +242,36 @@ UP_TEST( uniform_grid_validate )
             const Scalar4 point = h_points.data[i];
             h_spheres.data[i] = make_scalar4(point.x, point.y, point.z, rcut);
             }
+
+        // generate 3d image list
+        ArrayHandle<Scalar3> h_images(images, access_location::host, access_mode::overwrite);
+        unsigned int idx=0;
+        for (int k=-1; k <= 1; ++k)
+            {
+            for (int j=-1; j <= 1; ++j)
+                {
+                for (int i=-1; i <= 1; ++i)
+                    {
+                    // self-image is always included
+                    if (i == 0 && j == 0 && k == 0) continue;
+                    h_images.data[idx++] = make_scalar3(i*L.x, j*L.y, k*L.z);
+                    }
+                }
+            }
         }
 
     // build hit list
-    GlobalArray<unsigned int> hits(N, exec_conf);
     neighbor::UniformGridTraverser traverser(exec_conf);
-    traverser.traverse(hits, spheres, spheres.getNumElements(), *grid, box);
+    GlobalArray<unsigned int> hits(N, exec_conf);
+        {
+        ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
+        neighbor::CountNeighborsOp count(d_hits.data);
+
+        ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
+        neighbor::SphereQueryOp query(d_spheres.data, spheres.getNumElements());
+
+        traverser.traverse(count, query, *grid, images);
+        }
 
     // generate list of reference collisions
     GlobalArray<unsigned int> ref_hits(N, exec_conf);

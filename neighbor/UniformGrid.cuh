@@ -9,19 +9,56 @@
 #include "hoomd/HOOMDMath.h"
 #include "hoomd/Index1D.h"
 
-namespace neighbor
-{
-namespace gpu
-{
-
-// UniformGrid sentinel has value of max unsigned int
-const unsigned int UniformGridSentinel=0xffffffff;
-
 #ifdef NVCC
 #define HOSTDEVICE __host__ __device__ __forceinline__
 #else
 #define HOSTDEVICE inline
 #endif
+
+namespace neighbor
+{
+
+struct GridPointOp
+    {
+    //! Constructor
+    /*!
+     * \param points_ Points array (x,y,z,_)
+     * \param N_ The number of points
+     */
+    GridPointOp(const Scalar4 *points_, unsigned int N_)
+        : points(points_), N(N_)
+        {}
+
+    //! Get the point
+    /*!
+     * \param idx the index of the primitive
+     *
+     * \returns The point
+     */
+    HOSTDEVICE Scalar3 get(const unsigned int idx) const
+        {
+        const Scalar4 point = points[idx];
+        return make_scalar3(point.x, point.y, point.z);
+        }
+
+    //! Get the number of leaf node bounding volumes
+    /*!
+     * \returns The initial number of leaf nodes
+     */
+    HOSTDEVICE unsigned int size() const
+        {
+        return N;
+        }
+
+    const Scalar4 *points;
+    unsigned int N;
+    };
+
+namespace gpu
+{
+
+// UniformGrid sentinel has value of max unsigned int
+const unsigned int UniformGridSentinel=0xffffffff;
 
 //! Uniform grid raw data
 /*!
@@ -36,8 +73,9 @@ struct UniformGridData
     {
     unsigned int* first;    //!< First primitive index for the cell
     unsigned int* size;     //!< Number of primitives in the cell
-    Scalar4* point;         //!< Sorted points
+    Scalar4* points;        //!< Points data
     Scalar3 lo;             //!< Lower bound of grid
+    Scalar3 hi;             //!< Upper bound of grid
     Scalar3 L;              //!< Size of grid
     Scalar3 width;          //!< Width of bins
     Index3D indexer;        //!< 3D indexer into the grid memory
@@ -49,41 +87,19 @@ struct UniformGridData
         int3 bin = make_int3(static_cast<int>(f.x * indexer.getW()),
                              static_cast<int>(f.y * indexer.getH()),
                              static_cast<int>(f.z * indexer.getD()));
-
-        // this is forced binning on the edges to handle roundoff, it
-        // is the caller's responsibility to make sure this is reasonable.
-        if (bin.x >= (int)indexer.getW()) bin.x = indexer.getW() - 1;
-        if (bin.x < 0) bin.x = 0;
-        if (bin.y >= (int)indexer.getH()) bin.y = indexer.getH() - 1;
-        if (bin.y < 0) bin.y = 0;
-        if (bin.z >= (int)indexer.getD()) bin.z = indexer.getD() - 1;
-        if (bin.z < 0) bin.z = 0;
-
         return bin;
         }
-
-    HOSTDEVICE int3 wrap(const int3& bin) const
-        {
-        int3 wrap = bin;
-        if (wrap.x >= (int)indexer.getW()) wrap.x -= indexer.getW();
-        if (wrap.x < 0) wrap.x += indexer.getW();
-        if (wrap.y >= (int)indexer.getH()) wrap.y -= indexer.getH();
-        if (wrap.y < 0) wrap.y += indexer.getH();
-        if (wrap.z >= (int)indexer.getD()) wrap.z -= indexer.getD();
-        if (wrap.z < 0) wrap.z += indexer.getD();
-
-        return wrap;
-        }
     };
+
 #undef HOSTDEVICE
 
 //! Bin points into the grid
 void uniform_grid_bin_points(unsigned int *d_cells,
                              unsigned int *d_primitives,
-                             const Scalar4 *d_points,
+                             const GridPointOp& insert,
                              const UniformGridData grid,
-                             const unsigned int N,
-                             const unsigned int block_size);
+                             const unsigned int block_size,
+                             cudaStream_t stream = 0);
 
 //! Sort points by bin assignment
 uchar2 uniform_grid_sort_points(void *d_tmp,
@@ -92,9 +108,14 @@ uchar2 uniform_grid_sort_points(void *d_tmp,
                                 unsigned int *d_sorted_cells,
                                 unsigned int *d_indexes,
                                 unsigned int *d_sorted_indexes,
-                                const Scalar4 *d_points,
-                                Scalar4 *d_sorted_points,
-                                const unsigned int N);
+                                const unsigned int N,
+                                cudaStream_t stream = 0);
+
+void uniform_grid_move_points(Scalar4 *d_sorted_points,
+                              const GridPointOp& insert,
+                              const unsigned int *d_sorted_indexes,
+                              const unsigned int block_size,
+                              cudaStream_t stream = 0);
 
 //! Find the first point and size of each bin
 void uniform_grid_find_cells(unsigned int *d_first,
@@ -102,7 +123,8 @@ void uniform_grid_find_cells(unsigned int *d_first,
                              const unsigned int *d_cells,
                              const unsigned int N,
                              const unsigned int Ncells,
-                             const unsigned int block_size);
+                             const unsigned int block_size,
+                             cudaStream_t stream = 0);
 
 } // end namespace gpu
 } // end namespace neighbor

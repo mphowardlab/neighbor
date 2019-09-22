@@ -5,6 +5,8 @@
 
 #include "neighbor/UniformGrid.h"
 #include "neighbor/UniformGridTraverser.h"
+#include "neighbor/OutputOps.h"
+#include "neighbor/QueryOps.h"
 
 #include "hoomd/ClockSource.h"
 #include "hoomd/ExecutionConfiguration.h"
@@ -150,11 +152,12 @@ int main(int argc, char * argv[])
 
             // uniform grid
             const BoxDim& box = pdata->getBox();
-            auto grid = std::make_shared<neighbor::UniformGrid>(exec_conf, box.getLo(), box.getHi(), rcut);
+            auto grid = std::make_shared<neighbor::UniformGrid>(exec_conf, rcut);
             // warmup the lbvh autotuners
+            ArrayHandle<Scalar4> d_postype(pdata->getPositions(), access_location::device, access_mode::read);
             for (unsigned int i=0; i < 200; ++i)
                 {
-                grid->build(pdata->getPositions(), pdata->getN());
+                grid->build(neighbor::GridPointOp(d_postype.data, pdata->getN()), box.getLo(), box.getHi());
                 }
             grid->setAutotunerParams(false, 100000);
 
@@ -162,7 +165,7 @@ int main(int argc, char * argv[])
             std::vector<double> times(5);
             for (size_t i=0; i < times.size(); ++i)
                 {
-                times[i] = profile([&]{grid->build(pdata->getPositions(), pdata->getN());}, 500);
+                times[i] = profile([&]{grid->build(neighbor::GridPointOp(d_postype.data, pdata->getN()), box.getLo(), box.getHi());}, 500);
                 }
             std::sort(times.begin(), times.end());
             std::cout << "Median grid build time: " << times[times.size()/2]<< " ms / build" << std::endl;
@@ -176,6 +179,7 @@ int main(int argc, char * argv[])
             output << std::setw(8) << frame << " " << std::setw(16) << std::fixed << std::setprecision(5) << times[times.size()/2];
 
             GlobalArray<Scalar4> spheres(pdata->getN(), exec_conf);
+            GlobalArray<Scalar3> images(26, exec_conf);
             GlobalArray<unsigned int> hits(pdata->getN(), exec_conf);
                 {
                 ArrayHandle<Scalar4> h_spheres(spheres, access_location::host, access_mode::overwrite);
@@ -188,26 +192,48 @@ int main(int argc, char * argv[])
                     const Scalar3 pos = make_scalar3(postype.x, postype.y, postype.z);
                     h_spheres.data[i] = make_scalar4(pos.x, pos.y, pos.z, rcut);
                     }
+
+                // 26 periodic image vectors
+                ArrayHandle<Scalar3> h_images(images, access_location::host, access_mode::overwrite);
+                Scalar3 L = pdata->getBox().getL();
+                unsigned int idx=0;
+                for (int ix=-1; ix <= 1; ++ix)
+                    {
+                    for (int iy=-1; iy <= 1; ++iy)
+                        {
+                        for (int iz=-1; iz <= 1; ++iz)
+                            {
+                            if (ix == 0 && iy == 0 && iz == 0) continue;
+                            h_images.data[idx++] = make_scalar3(L.x*ix, L.y*iy, L.z*iz);
+                            }
+                        }
+                    }
                 }
 
-            // profile traversal for different number of threads per particle
-            for (unsigned int num_threads=1; num_threads <= max_threads; num_threads *= 2)
+            // profile traversal
                 {
                 neighbor::UniformGridTraverser traverser(exec_conf);
-                traverser.setThreads(num_threads);
-                // warmup the autotuners
-                for (unsigned int i=0; i < 200; ++i)
                     {
-                    traverser.traverse(hits, spheres, pdata->getN(), *grid, box);
-                    }
-                traverser.setAutotunerParams(false, 100000);
+                    ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
+                    neighbor::CountNeighborsOp count(d_hits.data);
 
-                for (size_t i=0; i < times.size(); ++ i)
-                    {
-                    times[i] = profile([&]{traverser.traverse(hits, spheres, pdata->getN(), *grid, box);},500);
+                    ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
+                    neighbor::SphereQueryOp query(d_spheres.data, pdata->getN());
+
+                    // warmup the autotuners
+                    for (unsigned int i=0; i < 200; ++i)
+                        {
+                        traverser.traverse(count, query, *grid, images);
+                        }
+                    traverser.setAutotunerParams(false, 100000);
+
+                    for (size_t i=0; i < times.size(); ++ i)
+                        {
+                        times[i] = profile([&]{traverser.traverse(count, query, *grid, images);},500);
+                        }
                     }
                 std::sort(times.begin(), times.end());
-                std::cout << "Median grid traverser time (" << num_threads << " threads) : " << times[times.size()/2]<< " ms / traversal" << std::endl;
+                std::cout << "Median grid traverser time : " << times[times.size()/2]<< " ms / traversal" << std::endl;
 
                 ArrayHandle<unsigned int> h_hits(hits, access_location::host, access_mode::read);
                 unsigned int min = *std::min_element(h_hits.data, h_hits.data + pdata->getN());
