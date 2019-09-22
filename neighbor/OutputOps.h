@@ -70,7 +70,8 @@ struct CountNeighborsOp
      *
      * Setup functions may do additional processing of variables if needed.
      */
-    HOSTDEVICE ThreadData setup(const unsigned int idx) const
+    template<class QueryDataT>
+    HOSTDEVICE ThreadData setup(const unsigned int idx, const QueryDataT& q) const
         {
         return ThreadData(idx);
         }
@@ -138,7 +139,8 @@ struct NeighborListOp
     /*!
      * \param idx Index of search sphere.
      */
-    HOSTDEVICE ThreadData setup(const unsigned int idx) const
+    template<class QueryDataT>
+    HOSTDEVICE ThreadData setup(const unsigned int idx, const QueryDataT& q) const
         {
         return ThreadData(idx, max_neigh*idx);
         }

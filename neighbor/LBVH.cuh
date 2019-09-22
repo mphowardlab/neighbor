@@ -71,6 +71,11 @@ void lbvh_bubble_aabbs(const LBVHData tree,
                        const unsigned int block_size,
                        cudaStream_t stream = 0);
 
+template<class InsertOpT>
+void lbvh_one_primitive(const LBVHData tree,
+                        const InsertOpT& insert,
+                        cudaStream_t stream = 0);
+
 #ifdef NVCC
 namespace kernel
 {
@@ -256,6 +261,22 @@ __global__ void lbvh_bubble_aabbs(const LBVHData tree,
         }
     }
 
+template<class InsertOpT>
+__global__ void lbvh_one_primitive(const LBVHData tree,
+                                   const InsertOpT insert)
+    {
+    // one thread only
+    const unsigned int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    if (idx >= 1)
+        return;
+
+    const BoundingBox b = insert.get(0);
+
+    tree.parent[0] = LBVHSentinel;
+    tree.lo[0] = b.lo;
+    tree.hi[0] = b.hi;
+    }
+
 } // end namespace kernel
 
 /*!
@@ -318,7 +339,7 @@ void lbvh_bubble_aabbs(const LBVHData tree,
                        const unsigned int block_size,
                        cudaStream_t stream)
     {
-    cudaMemset(d_locks, 0, (N-1)*sizeof(unsigned int));
+    cudaMemsetAsync(d_locks, 0, (N-1)*sizeof(unsigned int), stream);
 
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
@@ -331,7 +352,15 @@ void lbvh_bubble_aabbs(const LBVHData tree,
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
-    kernel::lbvh_bubble_aabbs<InsertOpT><<<num_blocks, run_block_size, 0, stream>>>(tree, insert, d_locks, N);
+    kernel::lbvh_bubble_aabbs<<<num_blocks, run_block_size, 0, stream>>>(tree, insert, d_locks, N);
+    }
+
+template<class InsertOpT>
+void lbvh_one_primitive(const LBVHData tree,
+                        const InsertOpT& insert,
+                        cudaStream_t stream)
+    {
+    kernel::lbvh_one_primitive<<<1, 1, 0, stream>>>(tree, insert);
     }
 #endif // NVCC
 

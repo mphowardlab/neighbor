@@ -187,11 +187,14 @@ uchar2 lbvh_sort_codes(void *d_tmp,
     cub::DoubleBuffer<unsigned int> d_keys(d_codes, d_sorted_codes);
     cub::DoubleBuffer<unsigned int> d_vals(d_indexes, d_sorted_indexes);
 
-    cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, sizeof(unsigned int)*8, stream);
+    cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, 30, stream);
 
     uchar2 swap = make_uchar2(0,0);
     if (d_tmp != NULL)
         {
+        // force the stream to synchronize before checking result (in case CUB doesn't, not documented)
+        cudaStreamSynchronize(stream);
+
         // mark that the gpu arrays should be flipped if the final result is not in the sorted array (1)
         swap.x = (d_keys.selector == 0);
         swap.y = (d_vals.selector == 0);
@@ -261,6 +264,13 @@ template void lbvh_bubble_aabbs(const LBVHData tree,
                                 const unsigned int N,
                                 const unsigned int block_size,
                                 cudaStream_t stream);
+
+template void lbvh_one_primitive(const LBVHData tree,
+                                 const PointInsertOp& insert,
+                                 cudaStream_t stream);
+template void lbvh_one_primitive(const LBVHData tree,
+                                 const SphereInsertOp& insert,
+                                 cudaStream_t stream);
 
 } // end namespace gpu
 } // end namespace neighbor
