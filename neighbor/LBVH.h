@@ -164,6 +164,7 @@ class LBVH
         GlobalArray<unsigned int> m_indexes;           //!< Primitive indexes
         GlobalArray<unsigned int> m_sorted_codes;      //!< Sorted morton codes
         GlobalArray<unsigned int> m_sorted_indexes;    //!< Sorted primitive indexes
+        GlobalArray<unsigned char> m_tmp;              //!< Temporary memory for sorting
 
         GlobalArray<unsigned int> m_locks; //!< Node locks for generating aabb hierarchy
 
@@ -239,41 +240,32 @@ void LBVH::build(const InsertOpT& insert, const Scalar3 lo, const Scalar3 hi, cu
 
     // sort morton codes
         {
-        uchar2 swap;
-            {
-            ArrayHandle<unsigned int> d_codes(m_codes, access_location::device, access_mode::readwrite);
-            ArrayHandle<unsigned int> d_sorted_codes(m_sorted_codes, access_location::device, access_mode::overwrite);
-            ArrayHandle<unsigned int> d_indexes(m_indexes, access_location::device, access_mode::readwrite);
-            ArrayHandle<unsigned int> d_sorted_indexes(m_sorted_indexes, access_location::device, access_mode::overwrite);
+        ArrayHandle<unsigned int> d_codes(m_codes, access_location::device, access_mode::readwrite);
+        ArrayHandle<unsigned int> d_sorted_codes(m_sorted_codes, access_location::device, access_mode::overwrite);
+        ArrayHandle<unsigned int> d_indexes(m_indexes, access_location::device, access_mode::readwrite);
+        ArrayHandle<unsigned int> d_sorted_indexes(m_sorted_indexes, access_location::device, access_mode::overwrite);
 
-            void *d_tmp = NULL;
-            size_t tmp_bytes = 0;
-            neighbor::gpu::lbvh_sort_codes(d_tmp,
-                                           tmp_bytes,
-                                           d_codes.data,
-                                           d_sorted_codes.data,
-                                           d_indexes.data,
-                                           d_sorted_indexes.data,
-                                           m_N,
-                                           stream);
+        size_t tmp_bytes = 0;
+        neighbor::gpu::lbvh_sort_codes(NULL,
+                                       tmp_bytes,
+                                       d_codes.data,
+                                       d_sorted_codes.data,
+                                       d_indexes.data,
+                                       d_sorted_indexes.data,
+                                       m_N,
+                                       stream);
 
-            // make requested temporary allocation (1 char = 1B)
-            size_t alloc_size = (tmp_bytes > 0) ? tmp_bytes : 4;
-            ScopedAllocation<unsigned char> d_alloc(m_exec_conf->getCachedAllocator(), alloc_size);
-            d_tmp = (void *)d_alloc();
+        assert(tmp_bytes > m_tmp.getNumElements());
+        ArrayHandle<unsigned char> d_tmp(m_tmp, access_location::device, access_mode::overwrite);
 
-            swap = neighbor::gpu::lbvh_sort_codes(d_tmp,
-                                                  tmp_bytes,
-                                                  d_codes.data,
-                                                  d_sorted_codes.data,
-                                                  d_indexes.data,
-                                                  d_sorted_indexes.data,
-                                                  m_N,
-                                                  stream);
-            }
-        // sorting will synchronize the stream before returning, so this unfortunately blocks concurrent execution of builds
-        if (swap.x) m_sorted_codes.swap(m_codes);
-        if (swap.y) m_sorted_indexes.swap(m_indexes);
+        neighbor::gpu::lbvh_sort_codes((void*)d_tmp.data,
+                                       tmp_bytes,
+                                       d_codes.data,
+                                       d_sorted_codes.data,
+                                       d_indexes.data,
+                                       d_sorted_indexes.data,
+                                       m_N,
+                                       stream);
         }
 
     // process hierarchy and bubble aabbs

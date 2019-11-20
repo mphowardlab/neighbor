@@ -161,45 +161,24 @@ __global__ void lbvh_gen_tree(LBVHData tree,
  * \param N Number of primitives.
  * \param stream CUDA stream for kernel execution.
  *
- * \returns Two flags (swap) with the location of the sorted codes and indexes. If swap.x
- *          is 1, then the sorted codes are in \a d_codes and need to be swapped. Similarly,
- *          if swap.y is 1, then the sorted indexes are in \a d_indexes.
- *
  * The Morton codes are sorted in ascending order using radix sort in the CUB library.
  * This function must be called twice in order for the sort to occur. When \a d_tmp is NULL
  * on the first call, CUB sizes the temporary storage that is required and sets it in \a tmp_bytes.
  * Usually, this is a small amount and can be allocated from a buffer (e.g., a HOOMD-blue
  * CachedAllocator). Some versions of CUB were buggy and required \a d_tmp be allocated even
  * when \a tmp_bytes was 0. To bypass this, allocate a small amount (say, 4B) when \a tmp_bytes is 0.
- * The second call will then sort the Morton codes and indexes. The sorted data will be in the
- * appropriate buffer, which can be determined by the returned flags.
+ * The second call will then sort the Morton codes and indexes.
  */
-uchar2 lbvh_sort_codes(void *d_tmp,
-                       size_t &tmp_bytes,
-                       unsigned int *d_codes,
-                       unsigned int *d_sorted_codes,
-                       unsigned int *d_indexes,
-                       unsigned int *d_sorted_indexes,
-                       const unsigned int N,
-                       cudaStream_t stream)
+void lbvh_sort_codes(void *d_tmp,
+                     size_t &tmp_bytes,
+                     unsigned int *d_codes,
+                     unsigned int *d_sorted_codes,
+                     unsigned int *d_indexes,
+                     unsigned int *d_sorted_indexes,
+                     const unsigned int N,
+                     cudaStream_t stream)
     {
-
-    cub::DoubleBuffer<unsigned int> d_keys(d_codes, d_sorted_codes);
-    cub::DoubleBuffer<unsigned int> d_vals(d_indexes, d_sorted_indexes);
-
-    cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, 30, stream);
-
-    uchar2 swap = make_uchar2(0,0);
-    if (d_tmp != NULL)
-        {
-        // force the stream to synchronize before checking result (in case CUB doesn't, not documented)
-        cudaStreamSynchronize(stream);
-
-        // mark that the gpu arrays should be flipped if the final result is not in the sorted array (1)
-        swap.x = (d_keys.selector == 0);
-        swap.y = (d_vals.selector == 0);
-        }
-    return swap;
+    cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_codes, d_sorted_codes, d_indexes, d_sorted_indexes, N, 0, 30, stream);
     }
 
 /*!
