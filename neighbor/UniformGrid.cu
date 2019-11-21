@@ -221,6 +221,9 @@ uchar2 uniform_grid_sort_points(void *d_tmp,
     uchar2 swap = make_uchar2(0,0);
     if (d_tmp != NULL)
         {
+        // synchronize first to make sure active selection is known
+        cudaStreamSynchronize(stream);
+
         // mark that the gpu arrays should be flipped if the final result is not in the sorted array (1)
         swap.x = (d_keys.selector == 0);
         swap.y = (d_vals.selector == 0);

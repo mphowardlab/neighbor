@@ -12,8 +12,6 @@
 #include "hoomd/BoxDim.h"
 #include "hoomd/HOOMDMath.h"
 
-#include <stdio.h>
-
 namespace neighbor
 {
 namespace gpu
