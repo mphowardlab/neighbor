@@ -23,11 +23,11 @@ else()
     include(FindHOOMD.cmake)
     # try to deduce the hoomd version, since FindHOOMD does not support versioning now.
     set(find_hoomd_version "
-    from __future__ import print_function
-    import sys,os
-    sys.stdout = open(os.devnull, 'w')
-    import hoomd
-    print(hoomd.__version__, file=sys.stderr, end='')")
+from __future__ import print_function
+import sys,os
+sys.stdout = open(os.devnull, 'w')
+import hoomd
+print(hoomd.__version__, file=sys.stderr, end='')")
     execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "${find_hoomd_version}" ERROR_VARIABLE hoomd_version)
     if(hoomd_version MATCHES "^Traceback*")
         message(STATUS "HOOMD version: not deduced, ensure that it is >= 2.4.1.")
