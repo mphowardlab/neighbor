@@ -90,6 +90,11 @@ struct BoundingBox
                  hi.z < box.lo.z || lo.z > box.hi.z);
         }
 
+    HOSTDEVICE BoundingBox asBox() const
+        {
+        return *this;
+        }
+
     float3 lo;  //!< Lower bound of box
     float3 hi;  //!< Upper bound of box
     };
@@ -168,6 +173,14 @@ struct BoundingSphere
         const float dr2 = __fmaf_rd(dr.x, dr.x, __fmaf_rd(dr.y, dr.y, __fmul_rd(dr.z,dr.z)));
 
         return (dr2 <= Rsq);
+        }
+
+    DEVICE BoundingBox asBox() const
+        {
+        const float R = __fsqrt_ru(Rsq);
+        const float3 lo = make_float3(__fsub_rd(origin.x,R),__fsub_rd(origin.y,R),__fsub_rd(origin.z,R));
+        const float3 hi = make_float3(__fadd_ru(origin.x,R),__fadd_ru(origin.y,R),__fadd_ru(origin.z,R));
+        return BoundingBox(lo,hi);
         }
     #endif
 

@@ -10,6 +10,8 @@
 #error This header cannot be compiled by nvcc
 #endif
 
+#include "UniformGrid.cuh"
+
 #include "hoomd/HOOMDMath.h"
 #include "hoomd/GlobalArray.h"
 #include "hoomd/Index1D.h"
@@ -42,18 +44,31 @@ class UniformGrid
     {
     public:
         //! Setup a UniformGrid
-        UniformGrid(std::shared_ptr<const ExecutionConfiguration> exec_conf, const Scalar3 lo, const Scalar3 hi, Scalar width);
+        UniformGrid(std::shared_ptr<const ExecutionConfiguration> exec_conf, Scalar width);
 
         //! Destroy a UniformGrid
         ~UniformGrid();
 
         //! Build the UniformGrid
-        void build(const GlobalArray<Scalar4>& points, unsigned int N);
+        void build(const GridPointOp& insert, const Scalar3 lo, const Scalar3 hi, cudaStream_t stream = 0);
+
+        //! Pre-setup function
+        void setup(unsigned int N, const Scalar3 lo, const Scalar3 hi)
+            {
+            sizeGrid(lo,hi);
+            allocate(N);
+            }
 
         //! Get lower bound of grid
         Scalar3 getLo() const
             {
             return m_lo;
+            }
+
+        //! Get upper bound of grid
+        Scalar3 getHi() const
+            {
+            return m_hi;
             }
 
         //! Get extent of grid
@@ -131,6 +146,9 @@ class UniformGrid
             m_tune_bin->setEnabled(enable);
             m_tune_bin->setPeriod(period);
 
+            m_tune_move->setEnabled(enable);
+            m_tune_move->setPeriod(period);
+
             m_tune_cells->setEnabled(enable);
             m_tune_cells->setPeriod(period);
             }
@@ -139,7 +157,9 @@ class UniformGrid
         std::shared_ptr<const ExecutionConfiguration> m_exec_conf;
 
         Scalar3 m_lo;           //!< Lower bound of grid
+        Scalar3 m_hi;           //!< Upper bound of grid
         Scalar3 m_L;            //!< Length of grid
+        Scalar m_min_width;     //!< Minimum width for grid cells
         Scalar3 m_width;        //!< Actual bin width in each dimension
         uint3 m_dim;            //!< Number of bins in each dimension
         Index3D m_indexer;      //!< Indexer into the cell list
@@ -154,15 +174,15 @@ class UniformGrid
         GlobalArray<Scalar4> m_points;                 //!< Sorted points
 
         std::unique_ptr<Autotuner> m_tune_bin;      //!< Autotuner for binning kernel
+        std::unique_ptr<Autotuner> m_tune_move;     //!< Autotuner for moving kernel
         std::unique_ptr<Autotuner> m_tune_cells;    //!< Autotuner for cell search kernel
 
         //! Size the grid
-        void sizeGrid(const Scalar3 lo, const Scalar3 hi, Scalar width);
+        void sizeGrid(const Scalar3 lo, const Scalar3 hi);
 
         //! Allocate UniformGrid
         void allocate(unsigned int N);
     };
-
 } // end namespace neighbor
 
 #endif // NEIGHBOR_UNIFORM_GRID_H_

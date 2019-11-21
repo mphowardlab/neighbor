@@ -30,18 +30,15 @@ namespace kernel
  */
 __global__ void uniform_grid_bin_points(unsigned int *d_cells,
                                         unsigned int *d_primitives,
-                                        const Scalar4 *d_points,
-                                        const UniformGridData grid,
-                                        const unsigned int N)
+                                        const GridPointOp insert,
+                                        const UniformGridData grid)
     {
     // one thread per point
     const unsigned int idx = blockDim.x * blockIdx.x + threadIdx.x;
-    if (idx >= N)
+    if (idx >= insert.size())
         return;
 
-    const Scalar4 point = d_points[idx];
-    const Scalar3 r = make_scalar3(point.x, point.y, point.z);
-
+    const Scalar3 r = insert.get(idx);
     const int3 bin = grid.toCell(r);
 
     d_cells[idx] = grid.indexer(bin.x, bin.y, bin.z);
@@ -59,22 +56,19 @@ __global__ void uniform_grid_bin_points(unsigned int *d_cells,
  * w component of the sorted points stores the original index of the point
  * for cache-friendly loads by traversal schemes.
  */
-__global__ void uniform_grid_sort_points(Scalar4 *d_sorted_points,
-                                         const Scalar4 *d_points,
-                                         const unsigned int *d_sorted_indexes,
-                                         const unsigned int N)
+__global__ void uniform_grid_move_points(Scalar4 *d_sorted_points,
+                                         const GridPointOp insert,
+                                         const unsigned int *d_sorted_indexes)
     {
     // one thread per point
     const unsigned int idx = blockDim.x * blockIdx.x + threadIdx.x;
-    if (idx >= N)
+    if (idx >= insert.size())
         return;
 
     const unsigned int tag = d_sorted_indexes[idx];
-    Scalar4 point = d_points[tag];
-    point.w = __int_as_scalar(tag);
+    const Scalar3 r = insert.get(tag);
 
-
-    d_sorted_points[idx] = point;
+    d_sorted_points[idx] = make_scalar4(r.x, r.y, r.z, __int_as_scalar(tag));
     }
 
 //! Kernel to find the first point and last point in each bin.
@@ -166,10 +160,10 @@ __global__ void uniform_grid_size_cells(unsigned int *d_size,
  */
 void uniform_grid_bin_points(unsigned int *d_cells,
                              unsigned int *d_primitives,
-                             const Scalar4 *d_points,
+                             const GridPointOp& insert,
                              const UniformGridData grid,
-                             const unsigned int N,
-                             const unsigned int block_size)
+                             const unsigned int block_size,
+                             cudaStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
@@ -181,8 +175,8 @@ void uniform_grid_bin_points(unsigned int *d_cells,
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
-    const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
-    kernel::uniform_grid_bin_points<<<num_blocks, run_block_size>>>(d_cells, d_primitives, d_points, grid, N);
+    const unsigned int num_blocks = (insert.size() + run_block_size - 1)/run_block_size;
+    kernel::uniform_grid_bin_points<<<num_blocks, run_block_size, 0, stream>>>(d_cells, d_primitives, insert, grid);
     }
 
 /*!
@@ -215,29 +209,46 @@ uchar2 uniform_grid_sort_points(void *d_tmp,
                                 unsigned int *d_sorted_cells,
                                 unsigned int *d_indexes,
                                 unsigned int *d_sorted_indexes,
-                                const Scalar4 *d_points,
-                                Scalar4 *d_sorted_points,
-                                const unsigned int N)
+                                const unsigned int N,
+                                cudaStream_t stream)
     {
 
     cub::DoubleBuffer<unsigned int> d_keys(d_cells, d_sorted_cells);
     cub::DoubleBuffer<unsigned int> d_vals(d_indexes, d_sorted_indexes);
 
-    cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N);
+    cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, 8*sizeof(unsigned int), stream);
 
     uchar2 swap = make_uchar2(0,0);
     if (d_tmp != NULL)
         {
+        // synchronize first to make sure active selection is known
+        cudaStreamSynchronize(stream);
+
         // mark that the gpu arrays should be flipped if the final result is not in the sorted array (1)
         swap.x = (d_keys.selector == 0);
         swap.y = (d_vals.selector == 0);
-
-        // sort the points
-        const unsigned int block_size = 128;
-        const unsigned int num_blocks = (N + block_size - 1)/block_size;
-        kernel::uniform_grid_sort_points<<<num_blocks, block_size>>>(d_sorted_points, d_points, d_vals.Current(), N);
         }
     return swap;
+    }
+
+void uniform_grid_move_points(Scalar4 *d_sorted_points,
+                              const GridPointOp& insert,
+                              const unsigned int *d_sorted_indexes,
+                              const unsigned int block_size,
+                              cudaStream_t stream)
+    {
+    // clamp block size
+    static unsigned int max_block_size = UINT_MAX;
+    if (max_block_size == UINT_MAX)
+        {
+        cudaFuncAttributes attr;
+        cudaFuncGetAttributes(&attr, (const void*)kernel::uniform_grid_move_points);
+        max_block_size = attr.maxThreadsPerBlock;
+        }
+    const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
+
+    const unsigned int num_blocks = (insert.size() + run_block_size - 1)/run_block_size;
+    kernel::uniform_grid_move_points<<<num_blocks, run_block_size, 0, stream>>>(d_sorted_points, insert, d_sorted_indexes);
     }
 
 /*!
@@ -256,11 +267,12 @@ void uniform_grid_find_cells(unsigned int *d_first,
                              const unsigned int *d_cells,
                              const unsigned int N,
                              const unsigned int Ncells,
-                             const unsigned int block_size)
+                             const unsigned int block_size,
+                             cudaStream_t stream)
     {
     // initially, fill all cells as empty
-    thrust::fill(thrust::device, d_first, d_first+Ncells, UniformGridSentinel);
-    cudaMemset(d_size, 0, sizeof(unsigned int)*Ncells);
+    thrust::fill(thrust::cuda::par.on(stream), d_first, d_first+Ncells, UniformGridSentinel);
+    cudaMemsetAsync(d_size, 0, sizeof(unsigned int)*Ncells, stream);
 
     // get the range of primitives covered by each cell
         {
@@ -275,7 +287,7 @@ void uniform_grid_find_cells(unsigned int *d_first,
         const unsigned int run_block_size = (block_size < max_block_size_find) ? block_size : max_block_size_find;
 
         const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
-        kernel::uniform_grid_find_ends<<<num_blocks, run_block_size>>>(d_first, d_size, d_cells, N);
+        kernel::uniform_grid_find_ends<<<num_blocks, run_block_size, 0, stream>>>(d_first, d_size, d_cells, N);
         }
 
     // compute the number of primitives in each cell
@@ -291,9 +303,8 @@ void uniform_grid_find_cells(unsigned int *d_first,
         const unsigned int run_block_size = (block_size < max_block_size_size) ? block_size : max_block_size_size;
 
         const unsigned int num_blocks = (Ncells + run_block_size - 1)/run_block_size;
-        kernel::uniform_grid_size_cells<<<num_blocks, run_block_size>>>(d_size, d_first, Ncells);
+        kernel::uniform_grid_size_cells<<<num_blocks, run_block_size, 0, stream>>>(d_size, d_first, Ncells);
         }
     }
-
 } // end namespace gpu
 } // end namespace neighbor
