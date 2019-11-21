@@ -4,6 +4,13 @@ A library of CUDA implementations of neighbor search algorithms.
 Currently, the compressed LBVH and uniform grid are implemented.
 For additional details, please refer to the following publications:
 
+* M.P. Howard et al. "Efficient neighbor list calculation for molecular
+  simulation of colloidal systems using graphics processing units".
+  [Comput. Phys. Commun. 203, 45-52 (2016)](https://doi.org/10.1016/j.cpc.2016.02.003).
+* M.P. Howard et al. "Quantized bounding volume hierarchies for neighbor
+  search in molecular simulations on graphics processing units".
+  [Comput. Mater. Sci. 164, 139-146 (2019)](https://doi.org/10.1016/j.cpc.2016.02.003).
+
 ## Dependencies
 
 * [HOOMD-blue](http://bitbucket.org/glotzer/hoomd-blue) >= 2.4.1
@@ -51,3 +58,8 @@ and then run
 make test
 ```
 or a specific test using `ctest`.
+
+## Versioning
+This library is currently under development, so APIs may change between
+all minor versions in 0.x. Stability of the API will be guaranteed between
+minor versions beginning with 1.x.
