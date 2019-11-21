@@ -1,4 +1,4 @@
-// Copyright (c) 2018, Michael P. Howard.
+// Copyright (c) 2018-2019, Michael P. Howard.
 // This file is released under the Modified BSD License.
 
 // Maintainer: mphoward
