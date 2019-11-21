@@ -44,29 +44,29 @@ else()
     endif(ENABLE_STATIC)
     set(BUILD_SHARED_LIBS on)
 
+    # CUDA is required to build this module
+    if(NOT ENABLE_CUDA)
+        message(FATAL_ERROR "Plugins require CUDA-enabled hoomd")
+    endif(NOT ENABLE_CUDA)
+
     # setup unit tests
     enable_testing()
     option(BUILD_TESTING "Build unit tests" ON)
     if(BUILD_TESTING)
         add_custom_target(test_all ALL)
     endif(BUILD_TESTING)
-endif ()
 
-# CUDA is required to build this module
-if(NOT ENABLE_CUDA)
-    message(FATAL_ERROR "Plugins require CUDA-enabled hoomd")
-endif(NOT ENABLE_CUDA)
-
-# use full rpath on targets, regardless of installation location
-# https://gitlab.kitware.com/cmake/community/wikis/doc/cmake/RPATH-handling
-set(CMAKE_SKIP_BUILD_RPATH FALSE)
-set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
-set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
-if("${isSystemDir}" STREQUAL "-1")
+    # use full rpath on targets, regardless of installation location
+    # https://gitlab.kitware.com/cmake/community/wikis/doc/cmake/RPATH-handling
+    set(CMAKE_SKIP_BUILD_RPATH FALSE)
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
     set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-endif("${isSystemDir}" STREQUAL "-1")
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+    list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
+    if("${isSystemDir}" STREQUAL "-1")
+        set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+    endif("${isSystemDir}" STREQUAL "-1")
+endif ()
 
 # add the base directory as an include source (for executables / tests)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
