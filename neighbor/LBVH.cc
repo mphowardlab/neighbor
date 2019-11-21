@@ -93,27 +93,6 @@ void LBVH::allocate(unsigned int N)
         GlobalArray<unsigned int> sorted_indexes(m_N, m_exec_conf);
         m_sorted_indexes.swap(sorted_indexes);
         }
-
-    // presize the sorting tmp memory
-        {
-        size_t tmp_bytes = 0;
-        neighbor::gpu::lbvh_sort_codes(NULL,
-                                       tmp_bytes,
-                                       NULL,
-                                       NULL,
-                                       NULL,
-                                       NULL,
-                                       m_N,
-                                       0);
-
-        // expand temporary allocation if needed (will block stream if size is growing)
-        unsigned int alloc_size = (tmp_bytes > 0) ? tmp_bytes : 4;
-        if (alloc_size > m_tmp.getNumElements())
-            {
-            GlobalArray<unsigned char> tmp(4, m_exec_conf);
-            m_tmp.swap(tmp);
-            }
-        }
     }
 
 } // end namespace neighbor

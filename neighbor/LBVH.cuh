@@ -46,14 +46,14 @@ void lbvh_gen_codes(unsigned int *d_codes,
                     cudaStream_t stream = 0);
 
 //! Sort the Morton codes.
-void lbvh_sort_codes(void *d_tmp,
-                     size_t &tmp_bytes,
-                     unsigned int *d_codes,
-                     unsigned int *d_sorted_codes,
-                     unsigned int *d_indexes,
-                     unsigned int *d_sorted_indexes,
-                     const unsigned int N,
-                     cudaStream_t stream = 0);
+uchar2 lbvh_sort_codes(void *d_tmp,
+                       size_t &tmp_bytes,
+                       unsigned int *d_codes,
+                       unsigned int *d_sorted_codes,
+                       unsigned int *d_indexes,
+                       unsigned int *d_sorted_indexes,
+                       const unsigned int N,
+                       cudaStream_t stream = 0);
 
 //! Generate the tree hierarchy
 void lbvh_gen_tree(const LBVHData tree,
