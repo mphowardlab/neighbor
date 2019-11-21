@@ -141,8 +141,7 @@ __global__ void uniform_grid_traverse(const OutputOpT out,
 
     // query thread data
     const typename QueryOpT::ThreadData qdata = query.setup(idx);
-//     typename OutputOpT::ThreadData result = out.setup(idx, qdata);
-    typename OutputOpT::ThreadData result = out.setup(idx);
+    typename OutputOpT::ThreadData result = out.setup(idx, qdata);
 
     // find image flags against grid box before divergence
     unsigned int flags = 0;

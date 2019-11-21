@@ -1,7 +1,7 @@
 // Copyright (c) 2018, Michael P. Howard.
 // This file is released under the Modified BSD License.
 
-// Maintainer: jglaser
+// Maintainer: mphoward
 
 #ifndef NEIGHBOR_INSERT_OPS_H_
 #define NEIGHBOR_INSERT_OPS_H_
