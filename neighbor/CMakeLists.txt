@@ -63,6 +63,7 @@ fix_cudart_rpath(_${COMPONENT_NAME})
 
 # install the library
 install(TARGETS _${COMPONENT_NAME}
+        EXPORT HOOMDTargets
         LIBRARY DESTINATION ${PYTHON_SITE_INSTALL_DIR}/${COMPONENT_NAME}
         )
 
