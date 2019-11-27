@@ -5,16 +5,18 @@
 
 CMAKE_MINIMUM_REQUIRED(VERSION 3.9 FATAL_ERROR)
 
-# check for internal hoomd project
-set(HOOMD_INTERNAL OFF)
+IF(NOT NEIGHBOR_HOOMD_INTERNAL)
+    # check for internal hoomd project
+    set(HOOMD_INTERNAL OFF)
 
-# Name the plugin project
-project(neighbor LANGUAGES C CXX CUDA)
+    # Name the plugin project
+    project(neighbor LANGUAGES C CXX CUDA)
 
-# Find the installed HOOMD
-find_package(HOOMD 2.6.0 REQUIRED)
+    # Find the installed HOOMD
+    find_package(HOOMD 2.6.0 REQUIRED)
 
-message(STATUS "Found HOOMD ${HOOMD_VERSION}: ${HOOMD_INSTALL_PREFIX}/${PYTHON_SITE_INSTALL_DIR}")
+    message(STATUS "Found HOOMD ${HOOMD_VERSION}: ${HOOMD_INSTALL_PREFIX}/${PYTHON_SITE_INSTALL_DIR}")
+endif()
 
 # Force installation to the HOOMD installation location
 set(CMAKE_INSTALL_PREFIX ${HOOMD_INSTALL_PREFIX} CACHE PATH "Installation prefix" FORCE)
@@ -37,7 +39,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 # add subdirectories
 add_subdirectory(${PROJECT_NAME})
 
-if (NOT HOOMD_INTERNAL)
+if (NOT NEIGHBOR_HOOMD_INTERNAL)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR})
     add_subdirectory(benchmark)
 endif()
