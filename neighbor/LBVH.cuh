@@ -38,7 +38,8 @@ struct LBVHData
 
 //! Generate the Morton codes
 template<class InsertOpT>
-void lbvh_gen_codes(unsigned int *d_codes,
+void __attribute__((visibility("default")))
+lbvh_gen_codes(unsigned int *d_codes,
                     unsigned int *d_indexes,
                     const InsertOpT& insert,
                     const Scalar3 lo,
@@ -48,7 +49,8 @@ void lbvh_gen_codes(unsigned int *d_codes,
                     hipStream_t stream = 0);
 
 //! Sort the Morton codes.
-uchar2 lbvh_sort_codes(void *d_tmp,
+uchar2 __attribute__((visibility("default")))
+lbvh_sort_codes(void *d_tmp,
                        size_t &tmp_bytes,
                        unsigned int *d_codes,
                        unsigned int *d_sorted_codes,
@@ -58,7 +60,8 @@ uchar2 lbvh_sort_codes(void *d_tmp,
                        hipStream_t stream = 0);
 
 //! Generate the tree hierarchy
-void lbvh_gen_tree(const LBVHData tree,
+void __attribute__((visibility("default")))
+lbvh_gen_tree(const LBVHData tree,
                    const unsigned int *d_codes,
                    const unsigned int N,
                    const unsigned int block_size,
@@ -66,7 +69,8 @@ void lbvh_gen_tree(const LBVHData tree,
 
 //! Bubble the bounding boxes up the tree hierarchy.
 template<class InsertOpT>
-void lbvh_bubble_aabbs(const LBVHData tree,
+void __attribute__((visibility("default")))
+lbvh_bubble_aabbs(const LBVHData tree,
                        const InsertOpT& insert,
                        unsigned int *d_locks,
                        const unsigned int N,
@@ -74,6 +78,7 @@ void lbvh_bubble_aabbs(const LBVHData tree,
                        hipStream_t stream = 0);
 
 template<class InsertOpT>
+__attribute__((visibility("default")))
 void lbvh_one_primitive(const LBVHData tree,
                         const InsertOpT& insert,
                         hipStream_t stream = 0);
@@ -296,7 +301,8 @@ __global__ void lbvh_one_primitive(const LBVHData tree,
  * \sa kernel::lbvh_gen_codes
  */
 template<class InsertOpT>
-void lbvh_gen_codes(unsigned int *d_codes,
+void __attribute__((visibility("default")))
+lbvh_gen_codes(unsigned int *d_codes,
                     unsigned int *d_indexes,
                     const InsertOpT& insert,
                     const Scalar3 lo,
@@ -334,7 +340,8 @@ void lbvh_gen_codes(unsigned int *d_codes,
  * \a d_locks is overwritten before the kernel is launched.
  */
 template<class InsertOpT>
-void lbvh_bubble_aabbs(const LBVHData tree,
+void __attribute__((visibility("default")))
+lbvh_bubble_aabbs(const LBVHData tree,
                        const InsertOpT& insert,
                        unsigned int *d_locks,
                        const unsigned int N,
@@ -358,7 +365,8 @@ void lbvh_bubble_aabbs(const LBVHData tree,
     }
 
 template<class InsertOpT>
-void lbvh_one_primitive(const LBVHData tree,
+void __attribute__((visibility("default")))
+lbvh_one_primitive(const LBVHData tree,
                         const InsertOpT& insert,
                         hipStream_t stream)
     {

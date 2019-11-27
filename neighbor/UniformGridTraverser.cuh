@@ -43,7 +43,8 @@ struct UniformGridCompressedData
     };
 
 template<class TransformOpT>
-void uniform_grid_compress(const UniformGridCompressedData& cgrid,
+void __attribute__((visibility("default"))) 
+uniform_grid_compress(const UniformGridCompressedData& cgrid,
                            const TransformOpT& transform,
                            const UniformGridData& grid,
                            const unsigned int N,
@@ -53,7 +54,8 @@ void uniform_grid_compress(const UniformGridCompressedData& cgrid,
 
 //! Traverse the UniformGrid
 template<class OutputOpT, class QueryOpT>
-void uniform_grid_traverse(const OutputOpT& out,
+void __attribute__((visibility("default"))) 
+uniform_grid_traverse(const OutputOpT& out,
                            const UniformGridCompressedData& grid,
                            const QueryOpT& query,
                            const Scalar3 *d_images,
