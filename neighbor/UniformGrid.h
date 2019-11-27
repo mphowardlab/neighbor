@@ -50,7 +50,7 @@ class PYBIND11_EXPORT UniformGrid
         ~UniformGrid();
 
         //! Build the UniformGrid
-        void build(const GridPointOp& insert, const Scalar3 lo, const Scalar3 hi, cudaStream_t stream = 0);
+        void build(const GridPointOp& insert, const Scalar3 lo, const Scalar3 hi, hipStream_t stream = 0);
 
         //! Pre-setup function
         void setup(unsigned int N, const Scalar3 lo, const Scalar3 hi)

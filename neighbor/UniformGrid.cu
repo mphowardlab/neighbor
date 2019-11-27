@@ -6,7 +6,7 @@
 #include "UniformGrid.cuh"
 #include <thrust/execution_policy.h>
 #include <thrust/fill.h>
-#include "hoomd/extern/cub/cub/cub.cuh"
+#include "hoomd/extern/cub/hipcub/hipcub.hpp"
 
 namespace neighbor
 {
@@ -163,20 +163,20 @@ void uniform_grid_bin_points(unsigned int *d_cells,
                              const GridPointOp& insert,
                              const UniformGridData grid,
                              const unsigned int block_size,
-                             cudaStream_t stream)
+                             hipStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::uniform_grid_bin_points);
+        hipFuncAttributes attr;
+        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::uniform_grid_bin_points);
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = (insert.size() + run_block_size - 1)/run_block_size;
-    kernel::uniform_grid_bin_points<<<num_blocks, run_block_size, 0, stream>>>(d_cells, d_primitives, insert, grid);
+    hipLaunchKernelGGL(kernel::uniform_grid_bin_points, dim3(num_blocks), dim3(run_block_size), 0, stream, d_cells, d_primitives, insert, grid);
     }
 
 /*!
@@ -210,19 +210,19 @@ uchar2 uniform_grid_sort_points(void *d_tmp,
                                 unsigned int *d_indexes,
                                 unsigned int *d_sorted_indexes,
                                 const unsigned int N,
-                                cudaStream_t stream)
+                                hipStream_t stream)
     {
 
-    cub::DoubleBuffer<unsigned int> d_keys(d_cells, d_sorted_cells);
-    cub::DoubleBuffer<unsigned int> d_vals(d_indexes, d_sorted_indexes);
+    hipcub::DoubleBuffer<unsigned int> d_keys(d_cells, d_sorted_cells);
+    hipcub::DoubleBuffer<unsigned int> d_vals(d_indexes, d_sorted_indexes);
 
-    cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, 8*sizeof(unsigned int), stream);
+    hipcub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, 8*sizeof(unsigned int), stream);
 
     uchar2 swap = make_uchar2(0,0);
     if (d_tmp != NULL)
         {
         // synchronize first to make sure active selection is known
-        cudaStreamSynchronize(stream);
+        hipStreamSynchronize(stream);
 
         // mark that the gpu arrays should be flipped if the final result is not in the sorted array (1)
         swap.x = (d_keys.selector == 0);
@@ -235,20 +235,20 @@ void uniform_grid_move_points(Scalar4 *d_sorted_points,
                               const GridPointOp& insert,
                               const unsigned int *d_sorted_indexes,
                               const unsigned int block_size,
-                              cudaStream_t stream)
+                              hipStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::uniform_grid_move_points);
+        hipFuncAttributes attr;
+        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::uniform_grid_move_points);
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = (insert.size() + run_block_size - 1)/run_block_size;
-    kernel::uniform_grid_move_points<<<num_blocks, run_block_size, 0, stream>>>(d_sorted_points, insert, d_sorted_indexes);
+    hipLaunchKernelGGL(kernel::uniform_grid_move_points, dim3(num_blocks), dim3(run_block_size), 0, stream, d_sorted_points, insert, d_sorted_indexes);
     }
 
 /*!
@@ -268,11 +268,19 @@ void uniform_grid_find_cells(unsigned int *d_first,
                              const unsigned int N,
                              const unsigned int Ncells,
                              const unsigned int block_size,
-                             cudaStream_t stream)
+                             hipStream_t stream)
     {
     // initially, fill all cells as empty
-    thrust::fill(thrust::cuda::par.on(stream), d_first, d_first+Ncells, UniformGridSentinel);
-    cudaMemsetAsync(d_size, 0, sizeof(unsigned int)*Ncells, stream);
+    #ifdef __HIP_PLATFORM_HCC__
+    thrust::fill(thrust::hip::par.on(stream),
+    #else
+    thrust::fill(thrust::cuda::par.on(stream),
+    #endif
+        d_first,
+        d_first+Ncells,
+        UniformGridSentinel);
+
+    hipMemsetAsync(d_size, 0, sizeof(unsigned int)*Ncells, stream);
 
     // get the range of primitives covered by each cell
         {
@@ -280,14 +288,14 @@ void uniform_grid_find_cells(unsigned int *d_first,
         static unsigned int max_block_size_find = UINT_MAX;
         if (max_block_size_find == UINT_MAX)
             {
-            cudaFuncAttributes attr;
-            cudaFuncGetAttributes(&attr, (const void*)kernel::uniform_grid_find_ends);
+            hipFuncAttributes attr;
+            hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::uniform_grid_find_ends);
             max_block_size_find = attr.maxThreadsPerBlock;
             }
         const unsigned int run_block_size = (block_size < max_block_size_find) ? block_size : max_block_size_find;
 
         const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
-        kernel::uniform_grid_find_ends<<<num_blocks, run_block_size, 0, stream>>>(d_first, d_size, d_cells, N);
+        hipLaunchKernelGGL(kernel::uniform_grid_find_ends, dim3(num_blocks), dim3(run_block_size), 0, stream, d_first, d_size, d_cells, N);
         }
 
     // compute the number of primitives in each cell
@@ -296,14 +304,14 @@ void uniform_grid_find_cells(unsigned int *d_first,
         static unsigned int max_block_size_size = UINT_MAX;
         if (max_block_size_size == UINT_MAX)
             {
-            cudaFuncAttributes attr;
-            cudaFuncGetAttributes(&attr, (const void*)kernel::uniform_grid_size_cells);
+            hipFuncAttributes attr;
+            hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::uniform_grid_size_cells);
             max_block_size_size = attr.maxThreadsPerBlock;
             }
         const unsigned int run_block_size = (block_size < max_block_size_size) ? block_size : max_block_size_size;
 
         const unsigned int num_blocks = (Ncells + run_block_size - 1)/run_block_size;
-        kernel::uniform_grid_size_cells<<<num_blocks, run_block_size, 0, stream>>>(d_size, d_first, Ncells);
+        hipLaunchKernelGGL(kernel::uniform_grid_size_cells, dim3(num_blocks), dim3(run_block_size), 0, stream, d_size, d_first, Ncells);
         }
     }
 } // end namespace gpu

@@ -53,7 +53,7 @@ UniformGrid::~UniformGrid()
  * used to construct the UniformGrid. An error will not be raised. Instead, points will simply be
  * clamped into the box.
  */
-void UniformGrid::build(const GridPointOp& insert, const Scalar3 lo, const Scalar3 hi, cudaStream_t stream)
+void UniformGrid::build(const GridPointOp& insert, const Scalar3 lo, const Scalar3 hi, hipStream_t stream)
     {
     // attempt to setup (should be mostly free to call multiple times, other than a few math ops)
     setup(insert.size(), lo, hi);

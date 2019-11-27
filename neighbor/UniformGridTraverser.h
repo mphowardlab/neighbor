@@ -55,10 +55,10 @@ class PYBIND11_EXPORT UniformGridTraverser
 
         //! Setup uniform grid for traversal
         template<class TransformOpT>
-        void setup(const TransformOpT& transform, const UniformGrid& grid, cudaStream_t stream = 0);
+        void setup(const TransformOpT& transform, const UniformGrid& grid, hipStream_t stream = 0);
 
         //! Setup uniform grid for traversal
-        void setup(const UniformGrid& grid, cudaStream_t stream = 0)
+        void setup(const UniformGrid& grid, hipStream_t stream = 0)
             {
             setup(NullTransformOp(), grid, stream);
             }
@@ -76,14 +76,14 @@ class PYBIND11_EXPORT UniformGridTraverser
                       const TransformOpT& transform,
                       const UniformGrid& grid,
                       const GlobalArray<Scalar3>& images = GlobalArray<Scalar3>(),
-                      cudaStream_t stream = 0);
+                      hipStream_t stream = 0);
 
         template<class OutputOpT, class QueryOpT>
         void traverse(OutputOpT& out,
                       const QueryOpT& query,
                       const UniformGrid& grid,
                       const GlobalArray<Scalar3>& images = GlobalArray<Scalar3>(),
-                      cudaStream_t stream = 0)
+                      hipStream_t stream = 0)
             {
             traverse(out, query, NullTransformOp(), grid, images, stream);
             }
@@ -112,7 +112,7 @@ class PYBIND11_EXPORT UniformGridTraverser
         std::unique_ptr<Autotuner> m_tune_traverse; //!< Autotuner for traversal kernel
 
         template<class TransformOpT>
-        void compress(const UniformGrid& grid, const TransformOpT& transform, cudaStream_t stream);
+        void compress(const UniformGrid& grid, const TransformOpT& transform, hipStream_t stream);
 
         bool m_replay;  //!< If true, the compressed structure has already been set explicitly
     };
@@ -132,7 +132,7 @@ class PYBIND11_EXPORT UniformGridTraverser
  * To clear a setup, call reset().
  */
 template<class TransformOpT>
-void UniformGridTraverser::setup(const TransformOpT& transform, const UniformGrid& grid, cudaStream_t stream)
+void UniformGridTraverser::setup(const TransformOpT& transform, const UniformGrid& grid, hipStream_t stream)
     {
     if (grid.getN() == 0) return;
 
@@ -159,7 +159,7 @@ void UniformGridTraverser::traverse(OutputOpT& out,
                                     const TransformOpT& transform,
                                     const UniformGrid& grid,
                                     const GlobalArray<Scalar3>& images,
-                                    cudaStream_t stream)
+                                    hipStream_t stream)
     {
     // don't traverse empty grid
     if (grid.getN() == 0) return;
@@ -207,7 +207,7 @@ void UniformGridTraverser::traverse(OutputOpT& out,
     }
 
 template<class TransformOpT>
-void UniformGridTraverser::compress(const UniformGrid& grid, const TransformOpT& transform, cudaStream_t stream)
+void UniformGridTraverser::compress(const UniformGrid& grid, const TransformOpT& transform, hipStream_t stream)
     {
     if (grid.getN() > m_data.getNumElements())
         {

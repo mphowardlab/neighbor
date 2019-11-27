@@ -9,6 +9,7 @@
 #include "hoomd/HOOMDMath.h"
 #include "LBVH.cuh"
 #include "BoundingVolumes.h"
+#include "hip/hip_runtime.h"
 
 namespace neighbor
 {
@@ -33,7 +34,7 @@ void lbvh_compress_ropes(LBVHCompressedData ctree,
                          unsigned int N_internal,
                          unsigned int N_nodes,
                          unsigned int block_size,
-                         cudaStream_t stream = 0);
+                         hipStream_t stream = 0);
 
 //! Traverse the LBVH using ropes.
 template<class OutputOpT, class QueryOpT>
@@ -43,7 +44,7 @@ void lbvh_traverse_ropes(OutputOpT& out,
                          const Scalar3 *d_images,
                          unsigned int Nimages,
                          unsigned int block_size,
-                         cudaStream_t stream = 0);
+                         hipStream_t stream = 0);
 
 /*
  * Templated function definitions should only be available in NVCC.
@@ -309,21 +310,20 @@ void lbvh_compress_ropes(LBVHCompressedData ctree,
                          unsigned int N_internal,
                          unsigned int N_nodes,
                          unsigned int block_size,
-                         cudaStream_t stream)
+                         hipStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_compress_ropes<TransformOpT>);
+        hipFuncAttributes attr;
+        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::lbvh_compress_ropes<TransformOpT>);
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = (N_nodes + run_block_size - 1)/run_block_size;
-    kernel::lbvh_compress_ropes<<<num_blocks, run_block_size, 0, stream>>>
-        (ctree, transform, tree, N_internal, N_nodes);
+    hipLaunchKernelGGL(kernel::lbvh_compress_ropes, dim3(num_blocks), dim3(run_block_size), 0, stream, ctree, transform, tree, N_internal, N_nodes);
     }
 
 /*!
@@ -348,21 +348,20 @@ void lbvh_traverse_ropes(OutputOpT& out,
                          const Scalar3 *d_images,
                          unsigned int Nimages,
                          unsigned int block_size,
-                         cudaStream_t stream)
+                         hipStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_traverse_ropes<OutputOpT,QueryOpT>);
+        hipFuncAttributes attr;
+        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::lbvh_traverse_ropes<OutputOpT,QueryOpT>);
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = (query.size() + run_block_size - 1)/run_block_size;
-    kernel::lbvh_traverse_ropes<<<num_blocks, run_block_size, 0, stream>>>
-        (out, lbvh, query, d_images, Nimages);
+    hipLaunchKernelGGL(kernel::lbvh_traverse_ropes, dim3(num_blocks), dim3(run_block_size), 0, stream, out, lbvh, query, d_images, Nimages);
     }
 #endif
 

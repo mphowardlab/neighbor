@@ -12,6 +12,8 @@
 #include "hoomd/BoxDim.h"
 #include "hoomd/HOOMDMath.h"
 
+#include "hip/hip_runtime.h"
+
 namespace neighbor
 {
 namespace gpu
@@ -47,7 +49,7 @@ void uniform_grid_compress(const UniformGridCompressedData& cgrid,
                            const unsigned int N,
                            const unsigned int Ncell,
                            const unsigned int block_size,
-                           cudaStream_t stream = 0);
+                           hipStream_t stream = 0);
 
 //! Traverse the UniformGrid
 template<class OutputOpT, class QueryOpT>
@@ -57,7 +59,7 @@ void uniform_grid_traverse(const OutputOpT& out,
                            const Scalar3 *d_images,
                            unsigned int Nimages,
                            const unsigned int block_size,
-                           cudaStream_t stream = 0);
+                           hipStream_t stream = 0);
 
 #ifdef NVCC
 namespace kernel
@@ -230,22 +232,21 @@ void uniform_grid_compress(const UniformGridCompressedData& cgrid,
                            const unsigned int N,
                            const unsigned int Ncell,
                            const unsigned int block_size,
-                           cudaStream_t stream)
+                           hipStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::uniform_grid_compress<TransformOpT>);
+        hipFuncAttributes attr;
+        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::uniform_grid_compress<TransformOpT>);
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int Nthread = (N > Ncell) ? N : Ncell;
     const unsigned int num_blocks = (Nthread + run_block_size - 1)/run_block_size;
-    kernel::uniform_grid_compress<<<num_blocks, run_block_size, 0, stream>>>
-        (cgrid, transform, grid, N, Ncell);
+    hipLaunchKernelGGL(kernel::uniform_grid_compress, dim3(num_blocks), dim3(run_block_size), 0, stream, cgrid, transform, grid, N, Ncell);
     }
 
 //! Traverse the UniformGrid
@@ -256,21 +257,20 @@ void uniform_grid_traverse(const OutputOpT& out,
                            const Scalar3 *d_images,
                            unsigned int Nimages,
                            const unsigned int block_size,
-                           cudaStream_t stream)
+                           hipStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::uniform_grid_traverse<OutputOpT,QueryOpT>);
+        hipFuncAttributes attr;
+        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::uniform_grid_traverse<OutputOpT,QueryOpT>);
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = (query.size() + run_block_size - 1)/run_block_size;
-    kernel::uniform_grid_traverse<<<num_blocks, run_block_size, 0, stream>>>
-        (out, grid, query, d_images, Nimages);
+    hipLaunchKernelGGL(kernel::uniform_grid_traverse, dim3(num_blocks), dim3(run_block_size), 0, stream, out, grid, query, d_images, Nimages);
     }
 #endif
 

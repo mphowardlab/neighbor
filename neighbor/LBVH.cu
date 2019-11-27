@@ -5,7 +5,7 @@
 
 #include "LBVH.cuh"
 #include "InsertOps.h"
-#include "hoomd/extern/cub/cub/cub.cuh"
+#include "hoomd/extern/cub/hipcub/hipcub.hpp"
 
 // macros for rounding HOOMD-blue Scalar to float for mixed precision
 #ifdef SINGLE_PRECISION
@@ -182,19 +182,19 @@ uchar2 lbvh_sort_codes(void *d_tmp,
                        unsigned int *d_indexes,
                        unsigned int *d_sorted_indexes,
                        const unsigned int N,
-                       cudaStream_t stream)
+                       hipStream_t stream)
     {
 
-    cub::DoubleBuffer<unsigned int> d_keys(d_codes, d_sorted_codes);
-    cub::DoubleBuffer<unsigned int> d_vals(d_indexes, d_sorted_indexes);
+    hipcub::DoubleBuffer<unsigned int> d_keys(d_codes, d_sorted_codes);
+    hipcub::DoubleBuffer<unsigned int> d_vals(d_indexes, d_sorted_indexes);
 
-    cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, 30, stream);
+    hipcub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, 30, stream);
 
     uchar2 swap = make_uchar2(0,0);
     if (d_tmp != NULL)
         {
         // force the stream to synchronize before checking result (in case CUB doesn't, not documented)
-        cudaStreamSynchronize(stream);
+        hipStreamSynchronize(stream);
 
         // mark that the gpu arrays should be flipped if the final result is not in the sorted array (1)
         swap.x = (d_keys.selector == 0);
@@ -217,20 +217,20 @@ void lbvh_gen_tree(const LBVHData tree,
                    const unsigned int *d_codes,
                    const unsigned int N,
                    const unsigned int block_size,
-                   cudaStream_t stream)
+                   hipStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_gen_tree);
+        hipFuncAttributes attr;
+        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::lbvh_gen_tree);
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = ((N-1) + run_block_size - 1)/run_block_size;
-    kernel::lbvh_gen_tree<<<num_blocks, run_block_size, 0, stream>>>(tree, d_codes, N);
+    hipLaunchKernelGGL(kernel::lbvh_gen_tree, dim3(num_blocks), dim3(run_block_size), 0, stream, tree, d_codes, N);
     }
 
 //! Template declarations for lbvh_gen_codes
@@ -242,7 +242,7 @@ lbvh_gen_codes(unsigned int *d_codes,
                              const Scalar3 hi,
                              const unsigned int N,
                              const unsigned int block_size,
-                             cudaStream_t stream);
+                             hipStream_t stream);
 
 template void __attribute__((visibility("default")))
 lbvh_gen_codes(unsigned int *d_codes,
@@ -252,7 +252,7 @@ lbvh_gen_codes(unsigned int *d_codes,
                              const Scalar3 hi,
                              const unsigned int N,
                              const unsigned int block_size,
-                             cudaStream_t stream);
+                             hipStream_t stream);
 
 //! Template declarations for lbvh_bubble_aabbs
 template void __attribute__((visibility("default")))
@@ -261,7 +261,7 @@ lbvh_bubble_aabbs(const LBVHData tree,
                                 unsigned int *d_locks,
                                 const unsigned int N,
                                 const unsigned int block_size,
-                                cudaStream_t stream);
+                                hipStream_t stream);
 
 template void __attribute__((visibility("default")))
 lbvh_bubble_aabbs(const LBVHData tree,
@@ -269,16 +269,16 @@ lbvh_bubble_aabbs(const LBVHData tree,
                                 unsigned int *d_locks,
                                 const unsigned int N,
                                 const unsigned int block_size,
-                                cudaStream_t stream);
+                                hipStream_t stream);
 
 template void __attribute__((visibility("default")))
  lbvh_one_primitive(const LBVHData tree,
                                  const PointInsertOp& insert,
-                                 cudaStream_t stream);
+                                 hipStream_t stream);
 template void __attribute__((visibility("default")))
 lbvh_one_primitive(const LBVHData tree,
                                  const SphereInsertOp& insert,
-                                 cudaStream_t stream);
+                                 hipStream_t stream);
 
 } // end namespace gpu
 } // end namespace neighbor

@@ -78,10 +78,10 @@ class PYBIND11_EXPORT LBVHTraverser
 
         //! Setup LBVH for traversal
         template<class TransformOpT>
-        void setup(const TransformOpT& transform, const LBVH& lbvh, cudaStream_t stream = 0);
+        void setup(const TransformOpT& transform, const LBVH& lbvh, hipStream_t stream = 0);
 
         //! Setup LBVH for traversal
-        void setup(const LBVH& lbvh, cudaStream_t stream = 0)
+        void setup(const LBVH& lbvh, hipStream_t stream = 0)
             {
             setup(NullTransformOp(), lbvh, stream);
             }
@@ -99,7 +99,7 @@ class PYBIND11_EXPORT LBVHTraverser
                       const TransformOpT& transform,
                       const LBVH& lbvh,
                       const GlobalArray<Scalar3>& images = GlobalArray<Scalar3>(),
-                      cudaStream_t stream = 0);
+                      hipStream_t stream = 0);
 
         //! Traverse the LBVH.
         template<class OutputOpT, class QueryOpT>
@@ -107,7 +107,7 @@ class PYBIND11_EXPORT LBVHTraverser
                       const QueryOpT& query,
                       const LBVH& lbvh,
                       const GlobalArray<Scalar3>& images = GlobalArray<Scalar3>(),
-                      cudaStream_t stream = 0)
+                      hipStream_t stream = 0)
             {
             traverse(out, query, NullTransformOp(), lbvh, images, stream);
             }
@@ -145,7 +145,7 @@ class PYBIND11_EXPORT LBVHTraverser
 
         //! Compresses the lbvh into internal representation
         template<class TransformOpT>
-        void compress(const LBVH& lbvh, const TransformOpT& transform, cudaStream_t stream);
+        void compress(const LBVH& lbvh, const TransformOpT& transform, hipStream_t stream);
 
         bool m_replay;  //!< If true, the compressed structure has already been set explicitly
     };
@@ -165,7 +165,7 @@ class PYBIND11_EXPORT LBVHTraverser
  * To clear a setup, call reset().
  */
 template<class TransformOpT>
-void LBVHTraverser::setup(const TransformOpT& transform, const LBVH& lbvh, cudaStream_t stream)
+void LBVHTraverser::setup(const TransformOpT& transform, const LBVH& lbvh, hipStream_t stream)
     {
     if (lbvh.getN() == 0) return;
 
@@ -200,7 +200,7 @@ void LBVHTraverser::traverse(OutputOpT& out,
                              const TransformOpT& transform,
                              const LBVH& lbvh,
                              const GlobalArray<Scalar3>& images,
-                             cudaStream_t stream)
+                             hipStream_t stream)
     {
     // don't traverse with empty lbvh
     if (lbvh.getN() == 0) return;
@@ -271,7 +271,7 @@ void LBVHTraverser::traverse(OutputOpT& out,
  * index to save indirection when the index itself is not of interest.
  */
 template<class TransformOpT>
-void LBVHTraverser::compress(const LBVH& lbvh, const TransformOpT& transform, cudaStream_t stream)
+void LBVHTraverser::compress(const LBVH& lbvh, const TransformOpT& transform, hipStream_t stream)
     {
     // resize the internal data array
     const unsigned int num_data = lbvh.getNNodes();

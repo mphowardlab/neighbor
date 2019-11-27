@@ -8,6 +8,7 @@
 
 #include "hoomd/HOOMDMath.h"
 #include "hoomd/Index1D.h"
+#include <hip/hip_runtime.h>
 
 #ifdef NVCC
 #define HOSTDEVICE __host__ __device__ __forceinline__
@@ -99,7 +100,7 @@ void uniform_grid_bin_points(unsigned int *d_cells,
                              const GridPointOp& insert,
                              const UniformGridData grid,
                              const unsigned int block_size,
-                             cudaStream_t stream = 0);
+                             hipStream_t stream = 0);
 
 //! Sort points by bin assignment
 uchar2 uniform_grid_sort_points(void *d_tmp,
@@ -109,13 +110,13 @@ uchar2 uniform_grid_sort_points(void *d_tmp,
                                 unsigned int *d_indexes,
                                 unsigned int *d_sorted_indexes,
                                 const unsigned int N,
-                                cudaStream_t stream = 0);
+                                hipStream_t stream = 0);
 
 void uniform_grid_move_points(Scalar4 *d_sorted_points,
                               const GridPointOp& insert,
                               const unsigned int *d_sorted_indexes,
                               const unsigned int block_size,
-                              cudaStream_t stream = 0);
+                              hipStream_t stream = 0);
 
 //! Find the first point and size of each bin
 void uniform_grid_find_cells(unsigned int *d_first,
@@ -124,7 +125,7 @@ void uniform_grid_find_cells(unsigned int *d_first,
                              const unsigned int N,
                              const unsigned int Ncells,
                              const unsigned int block_size,
-                             cudaStream_t stream = 0);
+                             hipStream_t stream = 0);
 
 } // end namespace gpu
 } // end namespace neighbor

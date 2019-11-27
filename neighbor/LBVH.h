@@ -61,7 +61,7 @@ class PYBIND11_EXPORT LBVH
 
         //! Build the LBVH
         template<class InsertOpT>
-        void build(const InsertOpT& insert, const Scalar3 lo, const Scalar3 hi, cudaStream_t stream = 0);
+        void build(const InsertOpT& insert, const Scalar3 lo, const Scalar3 hi, hipStream_t stream = 0);
 
         //! Pre-setup function
         void setup(unsigned int N)
@@ -193,7 +193,7 @@ class PYBIND11_EXPORT LBVH
  * Currently, small LBVHs (`N` <= 2) are not implemented, and an error will be raised.
  */
 template<class InsertOpT>
-void LBVH::build(const InsertOpT& insert, const Scalar3 lo, const Scalar3 hi, cudaStream_t stream)
+void LBVH::build(const InsertOpT& insert, const Scalar3 lo, const Scalar3 hi, hipStream_t stream)
     {
     const unsigned int N = insert.size();
 

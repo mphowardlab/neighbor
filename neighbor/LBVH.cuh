@@ -10,6 +10,8 @@
 
 #include "BoundingVolumes.h"
 
+#include "hip/hip_runtime.h"
+
 namespace neighbor
 {
 namespace gpu
@@ -43,7 +45,7 @@ void lbvh_gen_codes(unsigned int *d_codes,
                     const Scalar3 hi,
                     const unsigned int N,
                     const unsigned int block_size,
-                    cudaStream_t stream = 0);
+                    hipStream_t stream = 0);
 
 //! Sort the Morton codes.
 uchar2 lbvh_sort_codes(void *d_tmp,
@@ -53,14 +55,14 @@ uchar2 lbvh_sort_codes(void *d_tmp,
                        unsigned int *d_indexes,
                        unsigned int *d_sorted_indexes,
                        const unsigned int N,
-                       cudaStream_t stream = 0);
+                       hipStream_t stream = 0);
 
 //! Generate the tree hierarchy
 void lbvh_gen_tree(const LBVHData tree,
                    const unsigned int *d_codes,
                    const unsigned int N,
                    const unsigned int block_size,
-                   cudaStream_t stream = 0);
+                   hipStream_t stream = 0);
 
 //! Bubble the bounding boxes up the tree hierarchy.
 template<class InsertOpT>
@@ -69,12 +71,12 @@ void lbvh_bubble_aabbs(const LBVHData tree,
                        unsigned int *d_locks,
                        const unsigned int N,
                        const unsigned int block_size,
-                       cudaStream_t stream = 0);
+                       hipStream_t stream = 0);
 
 template<class InsertOpT>
 void lbvh_one_primitive(const LBVHData tree,
                         const InsertOpT& insert,
-                        cudaStream_t stream = 0);
+                        hipStream_t stream = 0);
 
 #ifdef NVCC
 namespace kernel
@@ -301,20 +303,20 @@ void lbvh_gen_codes(unsigned int *d_codes,
                     const Scalar3 hi,
                     const unsigned int N,
                     const unsigned int block_size,
-                    cudaStream_t stream)
+                    hipStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_gen_codes<InsertOpT>);
+        hipFuncAttributes attr;
+        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::lbvh_gen_codes<InsertOpT>);
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
-    kernel::lbvh_gen_codes<<<num_blocks, run_block_size, 0, stream>>>(d_codes, d_indexes, insert, lo, hi, N);
+    hipLaunchKernelGGL(kernel::lbvh_gen_codes, dim3(num_blocks), dim3(run_block_size), 0, stream, d_codes, d_indexes, insert, lo, hi, N);
     }
 
 /*!
@@ -337,30 +339,30 @@ void lbvh_bubble_aabbs(const LBVHData tree,
                        unsigned int *d_locks,
                        const unsigned int N,
                        const unsigned int block_size,
-                       cudaStream_t stream)
+                       hipStream_t stream)
     {
-    cudaMemsetAsync(d_locks, 0, (N-1)*sizeof(unsigned int), stream);
+    hipMemsetAsync(d_locks, 0, (N-1)*sizeof(unsigned int), stream);
 
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_bubble_aabbs<InsertOpT>);
+        hipFuncAttributes attr;
+        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::lbvh_bubble_aabbs<InsertOpT>);
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
-    kernel::lbvh_bubble_aabbs<<<num_blocks, run_block_size, 0, stream>>>(tree, insert, d_locks, N);
+    hipLaunchKernelGGL(kernel::lbvh_bubble_aabbs, dim3(num_blocks), dim3(run_block_size), 0, stream, tree, insert, d_locks, N);
     }
 
 template<class InsertOpT>
 void lbvh_one_primitive(const LBVHData tree,
                         const InsertOpT& insert,
-                        cudaStream_t stream)
+                        hipStream_t stream)
     {
-    kernel::lbvh_one_primitive<<<1, 1, 0, stream>>>(tree, insert);
+    hipLaunchKernelGGL(kernel::lbvh_one_primitive, dim3(1), dim3(1), 0, stream, tree, insert);
     }
 #endif // NVCC
 

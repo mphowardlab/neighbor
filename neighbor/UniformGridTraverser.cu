@@ -21,7 +21,7 @@ uniform_grid_compress(const UniformGridCompressedData&,
                                     const unsigned int,
                                     const unsigned int,
                                     const unsigned int,
-                                    cudaStream_t);
+                                    hipStream_t);
 
 // template declaration for compressing with map transformation of primitives
 template void __attribute__((visibility("default")))
@@ -31,7 +31,7 @@ uniform_grid_compress(const UniformGridCompressedData&,
                                     const unsigned int,
                                     const unsigned int,
                                     const unsigned int,
-                                    cudaStream_t);
+                                    hipStream_t);
 
 // template declaration to count neighbors
 template void __attribute__((visibility("default")))
@@ -41,7 +41,7 @@ template void __attribute__((visibility("default")))
                                     const Scalar3 *d_images,
                                     unsigned int Nimages,
                                     unsigned int block_size,
-                                    cudaStream_t stream);
+                                    hipStream_t stream);
 
 // template declaration to generate neighbor list
 template void __attribute__((visibility("default")))
@@ -51,7 +51,7 @@ uniform_grid_traverse(const NeighborListOp& out,
                                     const Scalar3 *d_images,
                                     unsigned int Nimages,
                                     unsigned int block_size,
-                                    cudaStream_t stream);
+                                    hipStream_t stream);
 
 } // end namespace gpu
 } // end namespace neighbor

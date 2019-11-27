@@ -14,12 +14,12 @@ template void LBVHTraverser::traverse(CountNeighborsOp&,
                                       const SphereQueryOp&,
                                       const LBVH&,
                                       const GlobalArray<Scalar3>&,
-                                      cudaStream_t);
+                                      hipStream_t);
 
 template void LBVHTraverser::traverse(NeighborListOp&,
                                       const SphereQueryOp&,
                                       const LBVH&,
                                       const GlobalArray<Scalar3>&,
-                                      cudaStream_t);
+                                      hipStream_t);
 
 } // end namespace neighbor

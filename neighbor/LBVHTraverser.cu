@@ -21,7 +21,7 @@ lbvh_compress_ropes(LBVHCompressedData ctree,
                                   unsigned int N_internal,
                                   unsigned int N_nodes,
                                   unsigned int block_size,
-                                  cudaStream_t stream);
+                                  hipStream_t stream);
 
 // template declaration for compressing with map transformation of primitives
 template void __attribute__((visibility("default")))
@@ -31,7 +31,7 @@ lbvh_compress_ropes(LBVHCompressedData ctree,
                                   unsigned int N_internal,
                                   unsigned int N_nodes,
                                   unsigned int block_size,
-                                  cudaStream_t stream);
+                                  hipStream_t stream);
 
 // template declaration to count neighbors
 template void __attribute__((visibility("default")))
@@ -41,7 +41,7 @@ lbvh_traverse_ropes(CountNeighborsOp& out,
                                   const Scalar3 *d_images,
                                   unsigned int Nimages,
                                   unsigned int block_size,
-                                  cudaStream_t stream);
+                                  hipStream_t stream);
 
 // template declaration to generate neighbor list
 template void __attribute__((visibility("default")))
@@ -51,7 +51,7 @@ template void __attribute__((visibility("default")))
                                   const Scalar3 *d_images,
                                   unsigned int Nimages,
                                   unsigned int block_size,
-                                  cudaStream_t stream);
+                                  hipStream_t stream);
 
 } // end namespace gpu
 } // end namespace neighbor

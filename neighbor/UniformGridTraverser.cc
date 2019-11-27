@@ -14,12 +14,12 @@ template void UniformGridTraverser::traverse(CountNeighborsOp&,
                                              const SphereQueryOp&,
                                              const UniformGrid&,
                                              const GlobalArray<Scalar3>&,
-                                             cudaStream_t);
+                                             hipStream_t);
 
 template void UniformGridTraverser::traverse(NeighborListOp&,
                                              const SphereQueryOp&,
                                              const UniformGrid&,
                                              const GlobalArray<Scalar3>&,
-                                             cudaStream_t);
+                                             hipStream_t);
 
 } // end namespace neighbor
