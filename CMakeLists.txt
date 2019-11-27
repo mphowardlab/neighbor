@@ -16,17 +16,17 @@ IF(NOT NEIGHBOR_HOOMD_INTERNAL)
     find_package(HOOMD 2.6.0 REQUIRED)
 
     message(STATUS "Found HOOMD ${HOOMD_VERSION}: ${HOOMD_INSTALL_PREFIX}/${PYTHON_SITE_INSTALL_DIR}")
+
+    # Force installation to the HOOMD installation location
+    set(CMAKE_INSTALL_PREFIX ${HOOMD_INSTALL_PREFIX} CACHE PATH "Installation prefix" FORCE)
+
+    # setup unit tests
+    enable_testing()
+    option(BUILD_TESTING "Build unit tests" ON)
+    if(BUILD_TESTING)
+        add_custom_target(test_all ALL)
+    endif(BUILD_TESTING)
 endif()
-
-# Force installation to the HOOMD installation location
-set(CMAKE_INSTALL_PREFIX ${HOOMD_INSTALL_PREFIX} CACHE PATH "Installation prefix" FORCE)
-
-# setup unit tests
-enable_testing()
-option(BUILD_TESTING "Build unit tests" ON)
-if(BUILD_TESTING)
-    add_custom_target(test_all ALL)
-endif(BUILD_TESTING)
 
 # CUDA is required to build this module
 if(NOT ENABLE_CUDA AND NOT ENABLE_HIP)
