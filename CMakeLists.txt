@@ -37,7 +37,7 @@ endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # add subdirectories
-add_subdirectory(${PROJECT_NAME})
+add_subdirectory(neighbor)
 
 if (NOT NEIGHBOR_HOOMD_INTERNAL)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR})
