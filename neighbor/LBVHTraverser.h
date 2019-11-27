@@ -54,7 +54,7 @@ namespace neighbor
  * image list can be specified for ::traverse. The image list specifies *additional* translations
  * to consider, beyond the original volume.
  */
-class LBVHTraverser
+class PYBIND11_EXPORT LBVHTraverser
     {
     public:
         //! Constructor

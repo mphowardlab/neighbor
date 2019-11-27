@@ -18,18 +18,9 @@ macro(compile_test TEST_EXE TEST_SRC)
     # add and link the unit test executable
     add_executable(${TEST_EXE} EXCLUDE_FROM_ALL ${TEST_SRC})
     add_dependencies(test_all ${TEST_EXE})
-    target_link_libraries(${TEST_EXE} neighbor ${HOOMD_LIBRARIES} ${PYTHON_LIBRARIES})
-    fix_cudart_rpath(${TEST_EXE})
+    target_link_libraries(${TEST_EXE} PUBLIC _neighbor HOOMD::_hoomd pybind11::embed)
 
-    if(ENABLE_MPI)
-        # set appropriate compiler/linker flags
-        if(MPI_CXX_COMPILE_FLAGS)
-            set_target_properties(${TEST_EXE} PROPERTIES COMPILE_FLAGS "${MPI_CXX_COMPILE_FLAGS}")
-        endif(MPI_CXX_COMPILE_FLAGS)
-        if(MPI_CXX_LINK_FLAGS)
-            set_target_properties(${TEST_EXE} PROPERTIES LINK_FLAGS "${MPI_CXX_LINK_FLAGS}")
-        endif(MPI_CXX_LINK_FLAGS)
-    endif(ENABLE_MPI)
+    fix_cudart_rpath(${TEST_EXE})
 endmacro(compile_test)
 
 # add tests

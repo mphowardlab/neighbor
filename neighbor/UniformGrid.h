@@ -40,7 +40,7 @@ namespace neighbor
  * construct such an object due to the multitude of different access modes that are possible
  * for the GPU data.
  */
-class UniformGrid
+class PYBIND11_EXPORT UniformGrid
     {
     public:
         //! Setup a UniformGrid

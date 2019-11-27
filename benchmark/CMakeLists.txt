@@ -10,18 +10,8 @@ set(BENCH_LIST
 
 macro(compile_benchmark BENCH_EXE BENCH_SRC)
     add_executable(${BENCH_EXE} ${BENCH_SRC})
-    target_link_libraries(${BENCH_EXE} ${HOOMD_LIBRARIES} ${PROJECT_NAME} ${PYTHON_LIBRARIES})
+    target_link_libraries(${BENCH_EXE} PUBLIC HOOMD::_hoomd _${PROJECT_NAME} pybind11::embed)
     fix_cudart_rpath(${BENCH_EXE})
-
-    if(ENABLE_MPI)
-        # set appropriate compiler/linker flags
-        if(MPI_CXX_COMPILE_FLAGS)
-            set_target_properties(${BENCH_EXE} PROPERTIES COMPILE_FLAGS "${MPI_CXX_COMPILE_FLAGS}")
-        endif(MPI_CXX_COMPILE_FLAGS)
-        if(MPI_CXX_LINK_FLAGS)
-            set_target_properties(${BENCH_EXE} PROPERTIES LINK_FLAGS "${MPI_CXX_LINK_FLAGS}")
-        endif(MPI_CXX_LINK_FLAGS)
-    endif(ENABLE_MPI)
 
     install(TARGETS ${BENCH_EXE} DESTINATION bin)
 endmacro(compile_benchmark)

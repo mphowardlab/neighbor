@@ -14,7 +14,8 @@ namespace gpu
 {
 
 // template declaration for compressing without transforming primitives
-template void lbvh_compress_ropes(LBVHCompressedData ctree,
+template void __attribute__((visibility("default")))
+lbvh_compress_ropes(LBVHCompressedData ctree,
                                   const NullTransformOp& transform,
                                   const LBVHData tree,
                                   unsigned int N_internal,
@@ -23,7 +24,8 @@ template void lbvh_compress_ropes(LBVHCompressedData ctree,
                                   cudaStream_t stream);
 
 // template declaration for compressing with map transformation of primitives
-template void lbvh_compress_ropes(LBVHCompressedData ctree,
+template void __attribute__((visibility("default")))
+lbvh_compress_ropes(LBVHCompressedData ctree,
                                   const MapTransformOp& transform,
                                   const LBVHData tree,
                                   unsigned int N_internal,
@@ -32,7 +34,8 @@ template void lbvh_compress_ropes(LBVHCompressedData ctree,
                                   cudaStream_t stream);
 
 // template declaration to count neighbors
-template void lbvh_traverse_ropes(CountNeighborsOp& out,
+template void __attribute__((visibility("default")))
+lbvh_traverse_ropes(CountNeighborsOp& out,
                                   const LBVHCompressedData& lbvh,
                                   const SphereQueryOp& query,
                                   const Scalar3 *d_images,
@@ -41,7 +44,8 @@ template void lbvh_traverse_ropes(CountNeighborsOp& out,
                                   cudaStream_t stream);
 
 // template declaration to generate neighbor list
-template void lbvh_traverse_ropes(NeighborListOp& out,
+template void __attribute__((visibility("default")))
+ lbvh_traverse_ropes(NeighborListOp& out,
                                   const LBVHCompressedData& lbvh,
                                   const SphereQueryOp& query,
                                   const Scalar3 *d_images,
