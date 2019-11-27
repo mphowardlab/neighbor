@@ -6,7 +6,7 @@
 #include "UniformGrid.cuh"
 #include <thrust/execution_policy.h>
 #include <thrust/fill.h>
-#include "hoomd/extern/cub/hipcub/hipcub.hpp"
+#include <hipcub/hipcub.hpp>
 
 namespace neighbor
 {

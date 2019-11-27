@@ -5,7 +5,7 @@
 
 #include "LBVH.cuh"
 #include "InsertOps.h"
-#include "hoomd/extern/cub/hipcub/hipcub.hpp"
+#include <hipcub/hipcub.hpp>
 
 // macros for rounding HOOMD-blue Scalar to float for mixed precision
 #ifdef SINGLE_PRECISION

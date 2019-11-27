@@ -12,7 +12,7 @@
 #include "hoomd/BoxDim.h"
 #include "hoomd/HOOMDMath.h"
 
-#include "hip/hip_runtime.h"
+#include <hip/hip_runtime.h>
 
 namespace neighbor
 {
