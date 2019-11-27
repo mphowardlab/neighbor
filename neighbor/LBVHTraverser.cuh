@@ -40,7 +40,7 @@ lbvh_compress_ropes(LBVHCompressedData ctree,
 //! Traverse the LBVH using ropes.
 template<class OutputOpT, class QueryOpT>
 void __attribute__((visibility("default"))) 
-void lbvh_traverse_ropes(OutputOpT& out,
+lbvh_traverse_ropes(OutputOpT& out,
                          const LBVHCompressedData& lbvh,
                          const QueryOpT& query,
                          const Scalar3 *d_images,
