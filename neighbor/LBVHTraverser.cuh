@@ -28,8 +28,7 @@ struct LBVHCompressedData
 
 //! Compress LBVH for rope traversal.
 template<class TransformOpT>
-void __attribute__((visibility("default"))) 
-lbvh_compress_ropes(LBVHCompressedData ctree,
+void lbvh_compress_ropes(LBVHCompressedData ctree,
                          const TransformOpT& transform,
                          const LBVHData tree,
                          unsigned int N_internal,
@@ -39,7 +38,6 @@ lbvh_compress_ropes(LBVHCompressedData ctree,
 
 //! Traverse the LBVH using ropes.
 template<class OutputOpT, class QueryOpT>
-void __attribute__((visibility("default"))) 
 void lbvh_traverse_ropes(OutputOpT& out,
                          const LBVHCompressedData& lbvh,
                          const QueryOpT& query,
