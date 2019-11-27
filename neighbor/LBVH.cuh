@@ -78,7 +78,7 @@ void lbvh_one_primitive(const LBVHData tree,
                         const InsertOpT& insert,
                         hipStream_t stream = 0);
 
-#ifdef NVCC
+#ifdef __HIPCC__
 namespace kernel
 {
 //! Expand a 10-bit integer into 30 bits by inserting 2 zeros after each bit.

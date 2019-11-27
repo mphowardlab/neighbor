@@ -8,7 +8,7 @@
 
 #include "hoomd/HOOMDMath.h"
 
-#ifdef NVCC
+#ifdef __HIPCC__
 #define DEVICE __device__ __forceinline__
 #define HOSTDEVICE __host__ __device__ __forceinline__
 #else
@@ -47,7 +47,7 @@ struct BoundingBox
         : lo(lo_), hi(hi_)
         {}
 
-    #ifdef NVCC
+    #ifdef __HIPCC__
     //! Double-precision constructor
     /*!
      * \param lo_ Lower bound of box.
@@ -111,7 +111,7 @@ struct BoundingSphere
     {
     BoundingSphere() {}
 
-    #ifdef NVCC
+    #ifdef __HIPCC__
     //! Single-precision constructor.
     /*!
      * \param o Center of sphere.

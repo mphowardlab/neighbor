@@ -9,7 +9,7 @@
 #include "hoomd/HOOMDMath.h"
 #include "BoundingVolumes.h"
 
-#ifdef NVCC
+#ifdef __HIPCC__
 #define DEVICE __device__ __forceinline__
 #define HOSTDEVICE __host__ __device__ __forceinline__
 #else
@@ -52,7 +52,7 @@ struct SphereQueryOp
      * Many of these methods only have __device__ implementations, and so only compile
      * them in NVCC.
      */
-    #ifdef NVCC
+    #ifdef __HIPCC__
     typedef Scalar4 ThreadData;
     typedef BoundingSphere Volume;
 

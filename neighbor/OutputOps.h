@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_OUTPUT_OPS_H_
 #define NEIGHBOR_OUTPUT_OPS_H_
 
-#ifdef NVCC
+#ifdef __HIPCC__
 #define HOSTDEVICE __host__ __device__ __forceinline__
 #else
 #define HOSTDEVICE

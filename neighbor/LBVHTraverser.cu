@@ -15,7 +15,7 @@ namespace gpu
 
 // template declaration for compressing without transforming primitives
 template void __attribute__((visibility("default")))
-lbvh_compress_ropes(LBVHCompressedData ctree,
+lbvh_compress_ropes<NullTransformOp>(LBVHCompressedData ctree,
                                   const NullTransformOp& transform,
                                   const LBVHData tree,
                                   unsigned int N_internal,

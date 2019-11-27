@@ -49,7 +49,7 @@ void lbvh_traverse_ropes(OutputOpT& out,
 /*
  * Templated function definitions should only be available in NVCC.
  */
-#ifdef NVCC
+#ifdef __HIPCC__
 namespace kernel
 {
 //! Kernel to compress LBVH for rope traversal
