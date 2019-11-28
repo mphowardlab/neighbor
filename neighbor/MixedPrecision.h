@@ -43,7 +43,7 @@ typedef Scalar3 NeighborReal3;
 #define REAL_SUB_RU(x,y) (x-y)
 #define REAL_MUL_RD(x,y) (x*y)
 #define REAL_MUL_RU(x,y) (x*y)
-#define REAL_DIV_RD(x,y) (x*y)
+#define REAL_DIV_RD(x,y) (x/y)
 #define REAL_RCP_RD(x) (Scalar(1.0)/x)
 
 #ifdef SINGLE_PRECISION
