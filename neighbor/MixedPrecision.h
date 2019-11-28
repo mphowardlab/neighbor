@@ -30,7 +30,7 @@ typedef float3 NeighborReal3;
 #else
 
 // No need to have higher precision than the input data types
-typedef Scalar NeigbhorReal;
+typedef Scalar NeighhorReal;
 typedef Scalar3 NeighborReal3;
 
 #define make_neighbor_real3(x,y,z) make_scalar3(x,y,z)
