@@ -49,7 +49,7 @@ struct BoundingBox
         {}
 
     #ifdef __HIPCC__
-    #if !defined(DISABLE_MIXED_PRECISION) || defined(SINGLE_PRECISION)
+    #if !defined(NEIGHBOR_DISABLE_MIXED) || defined(SINGLE_PRECISION)
     //! Double-precision constructor
     /*!
      * \param lo_ Lower bound of box.
