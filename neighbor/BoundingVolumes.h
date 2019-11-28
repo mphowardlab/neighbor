@@ -6,6 +6,7 @@
 #ifndef NEIGHBOR_BOUNDING_VOLUMES_H_
 #define NEIGHBOR_BOUNDING_VOLUMES_H_
 
+#include "MixedPrecision.h"
 #include "hoomd/HOOMDMath.h"
 
 #ifdef __HIPCC__
@@ -43,7 +44,7 @@ struct BoundingBox
      * \param lo_ Lower bound of box.
      * \param hi_ Upper bound of box.
      */
-    HOSTDEVICE BoundingBox(const float3& lo_, const float3& hi_)
+    HOSTDEVICE BoundingBox(const NeighborReal3& lo_, const NeighborReal3& hi_)
         : lo(lo_), hi(hi_)
         {}
 
@@ -59,14 +60,14 @@ struct BoundingBox
      */
     DEVICE BoundingBox(const double3& lo_, const double3& hi_)
         {
-        lo = make_float3(__double2float_rd(lo_.x), __double2float_rd(lo_.y), __double2float_rd(lo_.z));
-        hi = make_float3(__double2float_ru(hi_.x), __double2float_ru(hi_.y), __double2float_ru(hi_.z));
+        lo = make_neighbor_real3(DOUBLE2REAL_RD(lo_.x), DOUBLE2REAL_RD(lo_.y), DOUBLE2REAL_RD(lo_.z));
+        hi = make_neighbor_real3(DOUBLE2REAL_RU(hi_.x), DOUBLE2REAL_RU(hi_.y), DOUBLE2REAL_RU(hi_.z));
         }
     #endif
 
-    DEVICE float3 getCenter() const
+    DEVICE NeighborReal3 getCenter() const
         {
-        float3 c;
+        NeighborReal3 c;
         c.x = 0.5f*(lo.x+hi.x);
         c.y = 0.5f*(lo.y+hi.y);
         c.z = 0.5f*(lo.z+hi.z);
@@ -95,8 +96,8 @@ struct BoundingBox
         return *this;
         }
 
-    float3 lo;  //!< Lower bound of box
-    float3 hi;  //!< Upper bound of box
+    NeighborReal3 lo;  //!< Lower bound of box
+    NeighborReal3 hi;  //!< Upper bound of box
     };
 
 //! Bounding sphere
@@ -121,10 +122,10 @@ struct BoundingSphere
      *
      * \todo This needs a __host__ implementation.
      */
-    DEVICE BoundingSphere(const float3& o, const float r)
+    DEVICE BoundingSphere(const NeighborReal3& o, const NeighborReal r)
         {
         origin = o;
-        Rsq = __fmul_ru(r,r);
+        Rsq = REAL_MUL_RU(r,r);
         }
 
     //! Double-precision constructor.
@@ -139,16 +140,16 @@ struct BoundingSphere
      */
     DEVICE BoundingSphere(const double3& o, const double r)
         {
-        const float3 lo = make_float3(__double2float_rd(o.x),
-                                      __double2float_rd(o.y),
-                                      __double2float_rd(o.z));
-        const float3 hi = make_float3(__double2float_ru(o.x),
-                                      __double2float_ru(o.y),
-                                      __double2float_ru(o.z));
-        const float delta = fmaxf(fmaxf(__fsub_ru(hi.x,lo.x),__fsub_ru(hi.y,lo.y)),__fsub_ru(hi.z,lo.z));
-        const float R = __fadd_ru(__double2float_ru(r),delta);
-        origin = make_float3(lo.x, lo.y, lo.z);
-        Rsq = __fmul_ru(R,R);
+        const NeighborReal3 lo = make_neighbor_real3(DOUBLE2REAL_RD(o.x),
+                                      DOUBLE2REAL_RD(o.y),
+                                      DOUBLE2REAL_RD(o.z));
+        const float3 hi = make_neighbor_real3(DOUBLE2REAL_RU(o.x),
+                                      DOUBLE2REAL_RU(o.y),
+                                      DOUBLE2REAL_RU(o.z));
+        const NeighborReal delta = REAL_MAX(REAL_MAX(REAL_SUB_RU(hi.x,lo.x),REAL_SUB_RU(hi.y,lo.y)),REAL_SUB_RU(hi.z,lo.z));
+        const NeighborReal R = REAL_ADD_RU(DOUBLE2REAL_RU(r),delta);
+        origin = make_neighbor_real3(lo.x, lo.y, lo.z);
+        Rsq = REAL_MUL_RU(R,R);
         }
 
     //! Test for overlap between a sphere and a BoundingBox.
@@ -167,25 +168,25 @@ struct BoundingSphere
      */
     DEVICE bool overlap(const BoundingBox& box) const
         {
-        const float3 dr = make_float3(__fsub_rd(fminf(fmaxf(origin.x, box.lo.x), box.hi.x), origin.x),
-                                      __fsub_rd(fminf(fmaxf(origin.y, box.lo.y), box.hi.y), origin.y),
-                                      __fsub_rd(fminf(fmaxf(origin.z, box.lo.z), box.hi.z), origin.z));
-        const float dr2 = __fmaf_rd(dr.x, dr.x, __fmaf_rd(dr.y, dr.y, __fmul_rd(dr.z,dr.z)));
+        const NeighborReal3 dr = make_neighbor_real3(REAL_SUB_RD(REAL_MIN(REAL_MAX(origin.x, box.lo.x), box.hi.x), origin.x),
+                                      REAL_SUB_RD(REAL_MIN(REAL_MAX(origin.y, box.lo.y), box.hi.y), origin.y),
+                                      REAL_SUB_RD(REAL_MIN(REAL_MAX(origin.z, box.lo.z), box.hi.z), origin.z));
+        const NeighborReal dr2 = REAL_MAF_RD(dr.x, dr.x, REAL_MAF_RD(dr.y, dr.y, REAL_MUL_RD(dr.z,dr.z)));
 
         return (dr2 <= Rsq);
         }
 
     DEVICE BoundingBox asBox() const
         {
-        const float R = __fsqrt_ru(Rsq);
-        const float3 lo = make_float3(__fsub_rd(origin.x,R),__fsub_rd(origin.y,R),__fsub_rd(origin.z,R));
-        const float3 hi = make_float3(__fadd_ru(origin.x,R),__fadd_ru(origin.y,R),__fadd_ru(origin.z,R));
+        const NeighborReal R = REAL_SQRT_RU(Rsq);
+        const NeighborReal3 lo = make_neighbor_real3(REAL_SUB_RD(origin.x,R),REAL_SUB_RD(origin.y,R),REAL_SUB_RD(origin.z,R));
+        const NeighborReal3 hi = make_neighbor_real3(REAL_ADD_RU(origin.x,R),REAL_ADD_RU(origin.y,R),REAL_ADD_RU(origin.z,R));
         return BoundingBox(lo,hi);
         }
     #endif
 
-    float3 origin;  //!< Center of the sphere
-    float Rsq;      //!< Squared radius of the sphere
+    NeighborReal3 origin;  //!< Center of the sphere
+    NeighborReal Rsq;      //!< Squared radius of the sphere
     };
 
 } // end namespace neighbor

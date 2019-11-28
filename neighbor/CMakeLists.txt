@@ -29,6 +29,7 @@ set(_h_sources
     LBVH.h
     LBVHTraverser.cuh
     LBVHTraverser.h
+    MixedPrecision.h
     OutputOps.h
     QueryOps.h
     TransformOps.h
@@ -44,6 +45,10 @@ pybind11_add_module(_${COMPONENT_NAME} SHARED ${_cu_sources} ${_cc_sources} ${_h
 
 # alias into the HOOMD namespace so that plugins and symlinked components both work
 add_library(HOOMD::_${COMPONENT_NAME} ALIAS _${COMPONENT_NAME})
+
+if (NEIGHBOR_DISABLE_MIXED)
+    target_compile_definitions(_${COMPONENT_NAME} PUBLIC NEIGHBOR_DISABLED_MIXED) 
+endif()
 
 target_link_libraries(_${COMPONENT_NAME} PUBLIC HOOMD::_hoomd pybind11::pybind11)
 
