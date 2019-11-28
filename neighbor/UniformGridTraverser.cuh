@@ -6,6 +6,7 @@
 #ifndef NEIGHBOR_UNIFORM_GRID_TRAVERSER_CUH_
 #define NEIGHBOR_UNIFORM_GRID_TRAVERSER_CUH_
 
+#include "MixedPrecision.h"
 #include "UniformGrid.cuh"
 #include "BoundingVolumes.h"
 
@@ -30,7 +31,7 @@ struct UniformGridCompressedData
     Index3D indexer;        //!< 3D indexer into the grid memory
 
     #ifdef NVCC
-    __device__ __forceinline__ int3 toCell(const float3& r) const
+    __device__ __forceinline__ int3 toCell(const NeighborReal3& r) const
         {
         // convert position into fraction, then bin
         const Scalar3 f = make_scalar3(r.x-lo.x, r.y-lo.y, r.z-lo.z)/L;

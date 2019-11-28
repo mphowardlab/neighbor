@@ -7,15 +7,6 @@
 #include "InsertOps.h"
 #include <hipcub/hipcub.hpp>
 
-// macros for rounding HOOMD-blue Scalar to float for mixed precision
-#ifdef SINGLE_PRECISION
-#define __scalar2float_ru(x) (x)
-#define __scalar2float_rd(x) (x)
-#else
-#define __scalar2float_ru(x) __double2float_ru((x))
-#define __scalar2float_rd(x) __double2float_rd((x))
-#endif
-
 namespace neighbor
 {
 namespace gpu

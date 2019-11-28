@@ -72,10 +72,10 @@ void LBVH::allocate(unsigned int N)
 
     if (m_N_nodes > m_lo.getNumElements())
         {
-        GlobalArray<float3> lo(m_N_nodes, m_exec_conf);
+        GlobalArray<NeighborReal3> lo(m_N_nodes, m_exec_conf);
         m_lo.swap(lo);
 
-        GlobalArray<float3> hi(m_N_nodes, m_exec_conf);
+        GlobalArray<NeighborReal3> hi(m_N_nodes, m_exec_conf);
         m_hi.swap(hi);
         }
 

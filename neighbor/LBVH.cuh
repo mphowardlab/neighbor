@@ -6,6 +6,7 @@
 #ifndef NEIGHBOR_LBVH_CUH_
 #define NEIGHBOR_LBVH_CUH_
 
+#include "MixedPrecision.h"
 #include "hoomd/HOOMDMath.h"
 
 #include "BoundingVolumes.h"
@@ -31,8 +32,8 @@ struct LBVHData
     int* left;                          //!< Left child
     int* right;                         //!< Right child
     const unsigned int* primitive;      //!< Primitives
-    float3* lo;                         //!< Lower bound of AABB
-    float3* hi;                         //!< Upper bound of AABB
+    NeighborReal3* lo;                         //!< Lower bound of AABB
+    NeighborReal3* hi;                         //!< Upper bound of AABB
     int root;                           //!< Root index
     };
 
@@ -122,7 +123,7 @@ __device__ __forceinline__ unsigned int calcMortonCode(uint3 point)
  * stored in a 10-bit integer. When \a f lies outside [0,1], the bin is clamped to
  * the ends of the range.
  */
-__device__ __forceinline__ unsigned int fractionToBin(float f)
+__device__ __forceinline__ unsigned int fractionToBin(NeighborReal f)
     {
     return static_cast<unsigned int>(fminf(fmaxf(f * 1023.f, 0.f), 1023.f));
     }
@@ -159,10 +160,10 @@ __global__ void lbvh_gen_codes(unsigned int *d_codes,
 
     // real space coordinate of aabb center
     const BoundingBox b = insert.get(idx);
-    const float3 r = b.getCenter();
+    const NeighborReal3 r = b.getCenter();
 
     // fractional coordinate
-    const float3 f = make_float3((r.x - lo.x) / (hi.x - lo.x),
+    const NeighborReal3 f = make_neighbor_real3((r.x - lo.x) / (hi.x - lo.x),
                                  (r.y - lo.y) / (hi.y - lo.y),
                                  (r.z - lo.z) / (hi.z - lo.z));
 
@@ -217,8 +218,8 @@ __global__ void lbvh_bubble_aabbs(const LBVHData tree,
 
     // determine lower and upper bounds of the primitive, even in mixed precision
     BoundingBox b = insert.get(tree.primitive[idx]);
-    float3 lo = b.lo;
-    float3 hi = b.hi;
+    NeighborReal3 lo = b.lo;
+    NeighborReal3 hi = b.hi;
 
     // set aabb for the leaf node
     int last = N-1+idx;
@@ -242,12 +243,12 @@ __global__ void lbvh_bubble_aabbs(const LBVHData tree,
             }
 
         // compute min / max bounds of the current thread with its sibling
-        const float3 sib_lo = tree.lo[sibling];
+        const NeighborReal3 sib_lo = tree.lo[sibling];
         if (sib_lo.x < lo.x) lo.x = sib_lo.x;
         if (sib_lo.y < lo.y) lo.y = sib_lo.y;
         if (sib_lo.z < lo.z) lo.z = sib_lo.z;
 
-        const float3 sib_hi = tree.hi[sibling];
+        const NeighborReal3 sib_hi = tree.hi[sibling];
         if (sib_hi.x > hi.x) hi.x = sib_hi.x;
         if (sib_hi.y > hi.y) hi.y = sib_hi.y;
         if (sib_hi.z > hi.z) hi.z = sib_hi.z;

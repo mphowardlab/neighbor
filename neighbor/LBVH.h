@@ -10,6 +10,7 @@
 #error This header cannot be compiled by nvcc
 #endif
 
+#include "MixedPrecision.h"
 #include "hoomd/HOOMDMath.h"
 #include "hoomd/GlobalArray.h"
 #include "hoomd/Autotuner.h"
@@ -112,13 +113,13 @@ class PYBIND11_EXPORT LBVH
             }
 
         //! Get the lower bounds of the boxes enclosing a node
-        const GlobalArray<float3>& getLowerBounds() const
+        const GlobalArray<NeighborReal3>& getLowerBounds() const
             {
             return m_lo;
             }
 
         //! Get the upper bounds of the boxes enclosing a node
-        const GlobalArray<float3>& getUpperBounds() const
+        const GlobalArray<NeighborReal3>& getUpperBounds() const
             {
             return m_hi;
             }
@@ -157,8 +158,8 @@ class PYBIND11_EXPORT LBVH
         GlobalArray<int> m_parent; //!< Parent node
         GlobalArray<int> m_left;   //!< Left child
         GlobalArray<int> m_right;  //!< Right child
-        GlobalArray<float3> m_lo;  //!< Lower bound of AABB
-        GlobalArray<float3> m_hi;  //!< Upper bound of AABB
+        GlobalArray<NeighborReal3> m_lo;  //!< Lower bound of AABB
+        GlobalArray<NeighborReal3> m_hi;  //!< Upper bound of AABB
 
         GlobalArray<unsigned int> m_codes;             //!< Morton codes
         GlobalArray<unsigned int> m_indexes;           //!< Primitive indexes
@@ -208,8 +209,8 @@ void LBVH::build(const InsertOpT& insert, const Scalar3 lo, const Scalar3 hi, hi
         {
         ArrayHandle<int> d_parent(m_parent, access_location::device, access_mode::overwrite);
         ArrayHandle<unsigned int> d_sorted_indexes(m_sorted_indexes, access_location::device, access_mode::overwrite);
-        ArrayHandle<float3> d_lo(m_lo, access_location::device, access_mode::overwrite);
-        ArrayHandle<float3> d_hi(m_hi, access_location::device, access_mode::overwrite);
+        ArrayHandle<NeighborReal3> d_lo(m_lo, access_location::device, access_mode::overwrite);
+        ArrayHandle<NeighborReal3> d_hi(m_hi, access_location::device, access_mode::overwrite);
 
         neighbor::gpu::LBVHData tree;
         tree.parent = d_parent.data;
@@ -282,8 +283,8 @@ void LBVH::build(const InsertOpT& insert, const Scalar3 lo, const Scalar3 hi, hi
         ArrayHandle<int> d_left(m_left, access_location::device, access_mode::overwrite);
         ArrayHandle<int> d_right(m_right, access_location::device, access_mode::overwrite);
         ArrayHandle<unsigned int> d_sorted_indexes(m_sorted_indexes, access_location::device, access_mode::read);
-        ArrayHandle<float3> d_lo(m_lo, access_location::device, access_mode::overwrite);
-        ArrayHandle<float3> d_hi(m_hi, access_location::device, access_mode::overwrite);
+        ArrayHandle<NeighborReal3> d_lo(m_lo, access_location::device, access_mode::overwrite);
+        ArrayHandle<NeighborReal3> d_hi(m_hi, access_location::device, access_mode::overwrite);
 
         neighbor::gpu::LBVHData tree;
         tree.parent = d_parent.data;

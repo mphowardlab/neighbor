@@ -44,8 +44,15 @@ typedef Scalar3 NeighborReal3;
 #define REAL_MUL_RU(x,y) (x*y)
 #define REAL_DIV_RD(x,y) (x*y)
 #define REAL_RCP_RD(x) (Scalar(1.0)/x)
-#define REAL_MIN(x) (fmin(x,y)) // use double version
-#define REAL_MAX(x) (fmaxn(x,y)) // use double version
+
+#ifdef SINGLE_PRECISION
+#define REAL_MIN(x) (fminf(x,y)) 
+#define REAL_MAX(x) (fmaxf(x,y))
+#else
+#define REAL_MIN(x) (fmin(x,y)) 
+#define REAL_MAX(x) (fmax(x,y))
+#endif
+
 #define REAL_MAF_RD(x,y,z) (x*y+z)
 #define REAL_SQRT_RU(x) (fast::sqrt(x))
 #endif

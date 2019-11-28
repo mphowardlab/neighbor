@@ -3,6 +3,7 @@
 
 // Maintainer: mphoward
 
+#include "neighbor/MixedPrecision.h"
 #include "neighbor/LBVH.h"
 #include "neighbor/LBVH.cuh"
 #include "neighbor/LBVHTraverser.h"
@@ -107,8 +108,8 @@ UP_TEST( lbvh_test )
 
         UP_ASSERT_EQUAL(lbvh->getLowerBounds().getNumElements(), 5);
         UP_ASSERT_EQUAL(lbvh->getUpperBounds().getNumElements(), 5);
-        ArrayHandle<float3> h_lo(lbvh->getLowerBounds(), access_location::host, access_mode::read);
-        ArrayHandle<float3> h_hi(lbvh->getUpperBounds(), access_location::host, access_mode::read);
+        ArrayHandle<NeighborReal3> h_lo(lbvh->getLowerBounds(), access_location::host, access_mode::read);
+        ArrayHandle<NeighborReal3> h_hi(lbvh->getUpperBounds(), access_location::host, access_mode::read);
 
         // check leafs first
         UP_ASSERT_CLOSE(h_lo.data[2].x, 0.5f, 1.e-6f);
@@ -564,8 +565,8 @@ UP_TEST( lbvh_small_test )
 
         UP_ASSERT_EQUAL(lbvh->getLowerBounds().getNumElements(), 1);
         UP_ASSERT_EQUAL(lbvh->getUpperBounds().getNumElements(), 1);
-        ArrayHandle<float3> h_lo(lbvh->getLowerBounds(), access_location::host, access_mode::read);
-        ArrayHandle<float3> h_hi(lbvh->getUpperBounds(), access_location::host, access_mode::read);
+        ArrayHandle<NeighborReal3> h_lo(lbvh->getLowerBounds(), access_location::host, access_mode::read);
+        ArrayHandle<NeighborReal3> h_hi(lbvh->getUpperBounds(), access_location::host, access_mode::read);
 
         // check leafs first
         UP_ASSERT_CLOSE(h_lo.data[0].x, 2.5f, 1.e-6f);

@@ -143,7 +143,7 @@ struct BoundingSphere
         const NeighborReal3 lo = make_neighbor_real3(DOUBLE2REAL_RD(o.x),
                                       DOUBLE2REAL_RD(o.y),
                                       DOUBLE2REAL_RD(o.z));
-        const float3 hi = make_neighbor_real3(DOUBLE2REAL_RU(o.x),
+        const NeighborReal3 hi = make_neighbor_real3(DOUBLE2REAL_RU(o.x),
                                       DOUBLE2REAL_RU(o.y),
                                       DOUBLE2REAL_RU(o.z));
         const NeighborReal delta = REAL_MAX(REAL_MAX(REAL_SUB_RU(hi.x,lo.x),REAL_SUB_RU(hi.y,lo.y)),REAL_SUB_RU(hi.z,lo.z));

@@ -136,9 +136,9 @@ class PYBIND11_EXPORT LBVHTraverser
         std::shared_ptr<const ExecutionConfiguration> m_exec_conf;  //!< Execution configuration
 
         GlobalArray<int4> m_data;   //!< Internal representation of the LBVH for traversal
-        GPUFlags<float3> m_lbvh_lo; //!< Lower bound of tree
-        GPUFlags<float3> m_lbvh_hi; //!< Upper bound of tree
-        GPUFlags<float3> m_bins;    //!< Bin size for compression
+        GPUFlags<NeighborReal3> m_lbvh_lo; //!< Lower bound of tree
+        GPUFlags<NeighborReal3> m_lbvh_hi; //!< Upper bound of tree
+        GPUFlags<NeighborReal3> m_bins;    //!< Bin size for compression
 
         std::unique_ptr<Autotuner> m_tune_traverse; //!< Autotuner for traversal kernel
         std::unique_ptr<Autotuner> m_tune_compress; //!< Autotuner for compression kernel
@@ -286,8 +286,8 @@ void LBVHTraverser::compress(const LBVH& lbvh, const TransformOpT& transform, hi
     ArrayHandle<int> d_left(lbvh.getLeftChildren(), access_location::device, access_mode::read);
     ArrayHandle<int> d_right(lbvh.getRightChildren(), access_location::device, access_mode::read);
     ArrayHandle<unsigned int> d_sorted_indexes(lbvh.getPrimitives(), access_location::device, access_mode::read);
-    ArrayHandle<float3> d_lo(lbvh.getLowerBounds(), access_location::device, access_mode::read);
-    ArrayHandle<float3> d_hi(lbvh.getUpperBounds(), access_location::device, access_mode::read);
+    ArrayHandle<NeighborReal3> d_lo(lbvh.getLowerBounds(), access_location::device, access_mode::read);
+    ArrayHandle<NeighborReal3> d_hi(lbvh.getUpperBounds(), access_location::device, access_mode::read);
 
     gpu::LBVHData tree;
     tree.parent = d_parent.data;
