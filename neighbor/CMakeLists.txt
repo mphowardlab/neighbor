@@ -47,7 +47,7 @@ pybind11_add_module(_${COMPONENT_NAME} SHARED ${_cu_sources} ${_cc_sources} ${_h
 add_library(HOOMD::_${COMPONENT_NAME} ALIAS _${COMPONENT_NAME})
 
 if (NEIGHBOR_DISABLE_MIXED)
-    target_compile_definitions(_${COMPONENT_NAME} PUBLIC NEIGHBOR_DISABLED_MIXED) 
+    target_compile_definitions(_${COMPONENT_NAME} PUBLIC NEIGHBOR_DISABLE_MIXED) 
 endif()
 
 target_link_libraries(_${COMPONENT_NAME} PUBLIC HOOMD::_hoomd pybind11::pybind11)
