@@ -30,7 +30,7 @@ struct UniformGridCompressedData
     Scalar3 width;          //!< Width of bins
     Index3D indexer;        //!< 3D indexer into the grid memory
 
-    #ifdef NVCC
+    #ifdef __HIPCC__
     __device__ __forceinline__ int3 toCell(const NeighborReal3& r) const
         {
         // convert position into fraction, then bin
@@ -40,7 +40,7 @@ struct UniformGridCompressedData
                              static_cast<int>(f.z * indexer.getD()));
         return bin;
         }
-    #endif // NVCC
+    #endif // __HIPCC__
     };
 
 template<class TransformOpT>
@@ -62,7 +62,7 @@ void uniform_grid_traverse(const OutputOpT& out,
                            const unsigned int block_size,
                            hipStream_t stream = 0);
 
-#ifdef NVCC
+#ifdef __HIPCC__
 namespace kernel
 {
 template<class TransformOpT>

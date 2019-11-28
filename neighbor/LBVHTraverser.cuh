@@ -318,7 +318,7 @@ void lbvh_compress_ropes(LBVHCompressedData ctree,
     if (max_block_size == UINT_MAX)
         {
         hipFuncAttributes attr;
-        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))(kernel::lbvh_compress_ropes<TransformOpT>));
+        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_compress_ropes<TransformOpT>));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;

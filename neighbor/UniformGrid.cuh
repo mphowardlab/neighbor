@@ -10,7 +10,7 @@
 #include "hoomd/Index1D.h"
 #include <hip/hip_runtime.h>
 
-#ifdef NVCC
+#ifdef __HIPCC__
 #define HOSTDEVICE __host__ __device__ __forceinline__
 #else
 #define HOSTDEVICE inline

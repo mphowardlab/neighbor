@@ -365,7 +365,7 @@ void lbvh_one_primitive(const LBVHData tree,
     {
     hipLaunchKernelGGL(kernel::lbvh_one_primitive, dim3(1), dim3(1), 0, stream, tree, insert);
     }
-#endif // NVCC
+#endif // __HIPCC__
 
 } // end namespace gpu
 } // end namespace neighbor
