@@ -47,12 +47,12 @@ typedef Scalar3 NeighborReal3;
 #define REAL_RCP_RD(x) (Scalar(1.0)/x)
 
 #ifdef SINGLE_PRECISION
-#define REAL_MIN(x) (fminf(x,y)) 
-#define REAL_MAX(x) (fmaxf(x,y))
+#define REAL_MIN(x,y) (fminf(x,y)) 
+#define REAL_MAX(x,y) (fmaxf(x,y))
 #define REAL_FLOOR(x) (floorf(x))
 #else
-#define REAL_MIN(x) (fmin(x,y)) 
-#define REAL_MAX(x) (fmax(x,y))
+#define REAL_MIN(x,y) (fmin(x,y)) 
+#define REAL_MAX(x,y) (fmax(x,y))
 #define REAL_FLOOR(x) (floor(x))
 #endif
 
