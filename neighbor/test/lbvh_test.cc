@@ -149,8 +149,8 @@ UP_TEST( lbvh_test )
             int4 node = h_data.data[0];
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 0);
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 0);
-            UP_ASSERT_EQUAL(node.z, 1);
-            UP_ASSERT_EQUAL(node.w, neighbor::gpu::LBVHSentinel);
+            UP_ASSERT_EQUAL((int) node.z, 1);
+            UP_ASSERT_EQUAL((int) node.w, neighbor::gpu::LBVHSentinel);
             }
         // Node 1
             {
@@ -158,8 +158,8 @@ UP_TEST( lbvh_test )
 
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 0);
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 511);
-            UP_ASSERT_EQUAL(node.z, 2);
-            UP_ASSERT_EQUAL(node.w, 4);
+            UP_ASSERT_EQUAL((int) node.z, 2);
+            UP_ASSERT_EQUAL((int) node.w, 4);
             }
         // Node 2
             {
@@ -167,8 +167,8 @@ UP_TEST( lbvh_test )
 
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 0);
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 1023);
-            UP_ASSERT_EQUAL(node.z, ~2);
-            UP_ASSERT_EQUAL(node.w, 3);
+            UP_ASSERT_EQUAL((int) node.z, ~2);
+            UP_ASSERT_EQUAL((int) node.w, 3);
             }
         // Node 3
             {
@@ -176,8 +176,8 @@ UP_TEST( lbvh_test )
 
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 511);
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 511);
-            UP_ASSERT_EQUAL(node.z, ~1);
-            UP_ASSERT_EQUAL(node.w, 4);
+            UP_ASSERT_EQUAL((int) node.z, ~1);
+            UP_ASSERT_EQUAL((int) node.w, 4);
             }
         // Node 4
             {
@@ -185,8 +185,8 @@ UP_TEST( lbvh_test )
 
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 1023);
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 0);
-            UP_ASSERT_EQUAL(node.z, ~0);
-            UP_ASSERT_EQUAL(node.w, neighbor::gpu::LBVHSentinel);
+            UP_ASSERT_EQUAL((int) node.z, ~0);
+            UP_ASSERT_EQUAL((int) node.w, neighbor::gpu::LBVHSentinel);
             }
 
         // each node should have the correct number of hits
@@ -595,7 +595,7 @@ UP_TEST( lbvh_small_test )
             {
             int4 node = h_data.data[0];
             UP_ASSERT_EQUAL((int) node.z, ~0);
-            UP_ASSERT_EQUAL(node.w, neighbor::gpu::LBVHSentinel);
+            UP_ASSERT_EQUAL((int) node.w, neighbor::gpu::LBVHSentinel);
             }
 
         // each node should have the correct number of hits
