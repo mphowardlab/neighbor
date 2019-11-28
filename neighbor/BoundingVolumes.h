@@ -130,6 +130,7 @@ struct BoundingSphere
         Rsq = REAL_MUL_RU(r,r);
         }
 
+    #if !defined(NEIGHBOR_DISABLE_MIXED) || defined(SINGLE_PRECISION)
     //! Double-precision constructor.
     /*!
      * \param o Center of sphere.
@@ -153,6 +154,7 @@ struct BoundingSphere
         origin = make_neighbor_real3(lo.x, lo.y, lo.z);
         Rsq = REAL_MUL_RU(R,R);
         }
+    #endif
 
     //! Test for overlap between a sphere and a BoundingBox.
     /*!
