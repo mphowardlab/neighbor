@@ -49,6 +49,7 @@ struct BoundingBox
         {}
 
     #ifdef __HIPCC__
+    #if !defined(DISABLE_MIXED_PRECISION) || defined(SINGLE_PRECISION)
     //! Double-precision constructor
     /*!
      * \param lo_ Lower bound of box.
@@ -63,6 +64,7 @@ struct BoundingBox
         lo = make_neighbor_real3(DOUBLE2REAL_RD(lo_.x), DOUBLE2REAL_RD(lo_.y), DOUBLE2REAL_RD(lo_.z));
         hi = make_neighbor_real3(DOUBLE2REAL_RU(hi_.x), DOUBLE2REAL_RU(hi_.y), DOUBLE2REAL_RU(hi_.z));
         }
+    #endif
     #endif
 
     DEVICE NeighborReal3 getCenter() const
