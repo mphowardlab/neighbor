@@ -594,7 +594,7 @@ UP_TEST( lbvh_small_test )
         // only one node, just check its index contents
             {
             int4 node = h_data.data[0];
-            UP_ASSERT_EQUAL(node.z, ~0);
+            UP_ASSERT_EQUAL((int) node.z, ~0);
             UP_ASSERT_EQUAL(node.w, neighbor::gpu::LBVHSentinel);
             }
 
