@@ -3,7 +3,7 @@
 
 // Maintainer: mphoward
 
-#include <hip/hip_runtime.hpp>
+#include <hip/hip_runtime.h>
 
 #include "neighbor/MixedPrecision.h"
 #include "neighbor/LBVH.h"

@@ -3,6 +3,8 @@
 
 // Maintainer: mphoward
 
+#include <hip/hip_runtime.h>
+
 #include "neighbor/LBVH.h"
 #include "neighbor/LBVHTraverser.h"
 #include "neighbor/OutputOps.h"
@@ -51,13 +53,13 @@ double profile(const std::function <void ()>& f, unsigned int samples)
     {
     ClockSource t;
 
-    cudaDeviceSynchronize();
+    hipDeviceSynchronize();
     uint64_t start = t.getTime();
     for (unsigned int i=0; i < samples; ++i)
         {
         f();
         }
-    cudaDeviceSynchronize();
+    hipDeviceSynchronize();
     uint64_t elapsed = t.getTime() - start;
 
     return double(elapsed)/1e6/double(samples);
