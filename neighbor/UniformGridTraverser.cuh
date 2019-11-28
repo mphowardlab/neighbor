@@ -240,7 +240,7 @@ void uniform_grid_compress(const UniformGridCompressedData& cgrid,
     if (max_block_size == UINT_MAX)
         {
         hipFuncAttributes attr;
-        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::uniform_grid_compress<TransformOpT>);
+        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>(kernel::uniform_grid_compress<TransformOpT>));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
@@ -265,7 +265,7 @@ void uniform_grid_traverse(const OutputOpT& out,
     if (max_block_size == UINT_MAX)
         {
         hipFuncAttributes attr;
-        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::uniform_grid_traverse<OutputOpT,QueryOpT>);
+        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>(kernel::uniform_grid_traverse<OutputOpT,QueryOpT>));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;

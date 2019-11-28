@@ -170,7 +170,7 @@ void uniform_grid_bin_points(unsigned int *d_cells,
     if (max_block_size == UINT_MAX)
         {
         hipFuncAttributes attr;
-        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::uniform_grid_bin_points);
+        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>(kernel::uniform_grid_bin_points));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
@@ -242,7 +242,7 @@ void uniform_grid_move_points(Scalar4 *d_sorted_points,
     if (max_block_size == UINT_MAX)
         {
         hipFuncAttributes attr;
-        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::uniform_grid_move_points);
+        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>(kernel::uniform_grid_move_points));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
@@ -289,7 +289,7 @@ void uniform_grid_find_cells(unsigned int *d_first,
         if (max_block_size_find == UINT_MAX)
             {
             hipFuncAttributes attr;
-            hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::uniform_grid_find_ends);
+            hipFuncGetAttributes(&attr, reinterpret_cast<const void*>(kernel::uniform_grid_find_ends));
             max_block_size_find = attr.maxThreadsPerBlock;
             }
         const unsigned int run_block_size = (block_size < max_block_size_find) ? block_size : max_block_size_find;
@@ -305,7 +305,7 @@ void uniform_grid_find_cells(unsigned int *d_first,
         if (max_block_size_size == UINT_MAX)
             {
             hipFuncAttributes attr;
-            hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::uniform_grid_size_cells);
+            hipFuncGetAttributes(&attr, reinterpret_cast<const void*>(kernel::uniform_grid_size_cells));
             max_block_size_size = attr.maxThreadsPerBlock;
             }
         const unsigned int run_block_size = (block_size < max_block_size_size) ? block_size : max_block_size_size;
