@@ -233,14 +233,14 @@ __global__ void lbvh_traverse_ropes(OutputOpT out,
             // load node and decompress bounds so that they always *expand*
             const int4 aabb = __ldg(lbvh.data + node);
             const unsigned int lo = aabb.x;
-            const NeighborReal3 lof = make_neighbor_real3(REAL_ADD_RD(tree_box.lo.x, REAL_MUL_RD((lo >> 20) & 0x3ffu,tree_bins.x)),
-                                           REAL_ADD_RD(tree_box.lo.y, REAL_MUL_RD((lo >> 10) & 0x3ffu,tree_bins.y)),
-                                           REAL_ADD_RD(tree_box.lo.z, REAL_MUL_RD((lo      ) & 0x3ffu,tree_bins.z)));
+            const NeighborReal3 lof = make_neighbor_real3(REAL_ADD_RD(tree_box.lo.x, REAL_MUL_RD(((lo >> 20) & 0x3ffu),tree_bins.x)),
+                                           REAL_ADD_RD(tree_box.lo.y, REAL_MUL_RD(((lo >> 10) & 0x3ffu),tree_bins.y)),
+                                           REAL_ADD_RD(tree_box.lo.z, REAL_MUL_RD(((lo      ) & 0x3ffu),tree_bins.z)));
 
             const unsigned int hi = aabb.y;
-            const NeighborReal3 hif = make_neighbor_real3(REAL_SUB_RU(tree_box.hi.x, REAL_MUL_RD((hi >> 20) & 0x3ffu,tree_bins.x)),
-                                           REAL_SUB_RU(tree_box.hi.y, REAL_MUL_RD((hi >> 10) & 0x3ffu,tree_bins.y)),
-                                           REAL_SUB_RU(tree_box.hi.z, REAL_MUL_RD((hi      ) & 0x3ffu,tree_bins.z)));
+            const NeighborReal3 hif = make_neighbor_real3(REAL_SUB_RU(tree_box.hi.x, REAL_MUL_RD(((hi >> 20) & 0x3ffu),tree_bins.x)),
+                                           REAL_SUB_RU(tree_box.hi.y, REAL_MUL_RD(((hi >> 10) & 0x3ffu),tree_bins.y)),
+                                           REAL_SUB_RU(tree_box.hi.z, REAL_MUL_RD(((hi      ) & 0x3ffu),tree_bins.z)));
             const int left = aabb.z;
 
             // advance to rope as a preliminary

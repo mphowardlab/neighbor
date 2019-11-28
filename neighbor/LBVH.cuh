@@ -311,7 +311,7 @@ void lbvh_gen_codes(unsigned int *d_codes,
     if (max_block_size == UINT_MAX)
         {
         hipFuncAttributes attr;
-        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::lbvh_gen_codes<InsertOpT>);
+        hipFuncGetAttributes(&attr, kernel::lbvh_gen_codes<InsertOpT>);
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
@@ -349,7 +349,7 @@ void lbvh_bubble_aabbs(const LBVHData tree,
     if (max_block_size == UINT_MAX)
         {
         hipFuncAttributes attr;
-        hipFuncGetAttributes(&attr, reinterpret_cast<const void*>((const void*))kernel::lbvh_bubble_aabbs<InsertOpT>);
+        hipFuncGetAttributes(&attr, kernel::lbvh_bubble_aabbs<InsertOpT>);
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
