@@ -46,6 +46,9 @@ pybind11_add_module(_${COMPONENT_NAME} SHARED ${_cu_sources} ${_cc_sources} ${_h
 # alias into the HOOMD namespace so that plugins and symlinked components both work
 add_library(HOOMD::_${COMPONENT_NAME} ALIAS _${COMPONENT_NAME})
 
+# no device linker
+set_property(TARGET _${COMPONENT_NAME} PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS OFF)
+
 if (NEIGHBOR_DISABLE_MIXED)
     target_compile_definitions(_${COMPONENT_NAME} PUBLIC NEIGHBOR_DISABLE_MIXED) 
 endif()
