@@ -125,7 +125,7 @@ __device__ __forceinline__ unsigned int calcMortonCode(uint3 point)
  */
 __device__ __forceinline__ unsigned int fractionToBin(NeighborReal f)
     {
-    return static_cast<unsigned int>(fminf(fmaxf(f * 1023.f, 0.f), 1023.f));
+    return static_cast<unsigned int>(REAL_MIN(REAL_MAX(f * 1023.f, 0.f), 1023.f));
     }
 
 //! Kernel to generate the Morton codes

@@ -130,16 +130,16 @@ __global__ void lbvh_compress_ropes(LBVHCompressedData ctree,
     // compress node data into one byte per box dim
     // low bounds are encoded relative to the low of the box, always rounding down
     const NeighborReal3 lo = tree.lo[idx];
-    const uint3 lo_bin = make_uint3((unsigned int)floorf(REAL_MUL_RD(REAL_SUB_RD(lo.x,tree_lo.x),tree_bininv.x)),
-                                    (unsigned int)floorf(REAL_MUL_RD(REAL_SUB_RD(lo.y,tree_lo.y),tree_bininv.y)),
-                                    (unsigned int)floorf(REAL_MUL_RD(REAL_SUB_RD(lo.z,tree_lo.z),tree_bininv.z)));
+    const uint3 lo_bin = make_uint3((unsigned int)REAL_FLOOR(REAL_MUL_RD(REAL_SUB_RD(lo.x,tree_lo.x),tree_bininv.x)),
+                                    (unsigned int)REAL_FLOOR(REAL_MUL_RD(REAL_SUB_RD(lo.y,tree_lo.y),tree_bininv.y)),
+                                    (unsigned int)REAL_FLOOR(REAL_MUL_RD(REAL_SUB_RD(lo.z,tree_lo.z),tree_bininv.z)));
     const unsigned int lo_bin3 = (lo_bin.x << 20) +  (lo_bin.y << 10) + lo_bin.z;
 
     // high bounds are encoded relative to the high of the box, always rounding down
     const NeighborReal3 hi = tree.hi[idx];
-    const uint3 hi_bin = make_uint3((unsigned int)floorf(REAL_MUL_RD(REAL_SUB_RD(tree_hi.x,hi.x),tree_bininv.x)),
-                                    (unsigned int)floorf(REAL_MUL_RD(REAL_SUB_RD(tree_hi.y,hi.y),tree_bininv.y)),
-                                    (unsigned int)floorf(REAL_MUL_RD(REAL_SUB_RD(tree_hi.z,hi.z),tree_bininv.z)));
+    const uint3 hi_bin = make_uint3((unsigned int)REAL_FLOOR(REAL_MUL_RD(REAL_SUB_RD(tree_hi.x,hi.x),tree_bininv.x)),
+                                    (unsigned int)REAL_FLOOR(REAL_MUL_RD(REAL_SUB_RD(tree_hi.y,hi.y),tree_bininv.y)),
+                                    (unsigned int)REAL_FLOOR(REAL_MUL_RD(REAL_SUB_RD(tree_hi.z,hi.z),tree_bininv.z)));
     const unsigned int hi_bin3 = (hi_bin.x << 20) + (hi_bin.y << 10) + hi_bin.z;
 
     // node holds left child for internal nodes (>= 0) or primitive for leaf (< 0)

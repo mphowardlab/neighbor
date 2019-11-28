@@ -26,6 +26,7 @@ typedef float3 NeighborReal3;
 #define REAL_MAX(x,y) (fmaxf(xy))
 #define REAL_MAF_RD(x,y,z) (__fmaf_rd(x,y,z))
 #define REAL_SQRT_RU(x) (__fsqrt_ru(x))
+#define REAL_FLOOR(x) (floorf(x))
 #else
 
 // No need to have higher precision than the input data types
@@ -48,9 +49,11 @@ typedef Scalar3 NeighborReal3;
 #ifdef SINGLE_PRECISION
 #define REAL_MIN(x) (fminf(x,y)) 
 #define REAL_MAX(x) (fmaxf(x,y))
+#define REAL_FLOOR(x) (floorf(x))
 #else
 #define REAL_MIN(x) (fmin(x,y)) 
 #define REAL_MAX(x) (fmax(x,y))
+#define REAL_FLOOR(x) (floor(x))
 #endif
 
 #define REAL_MAF_RD(x,y,z) (x*y+z)
