@@ -3,6 +3,8 @@
 
 // Maintainer: mphoward
 
+#include <hip/hip_runtime.hpp>
+
 #include "neighbor/MixedPrecision.h"
 #include "neighbor/LBVH.h"
 #include "neighbor/LBVH.cuh"
@@ -25,8 +27,8 @@ UP_TEST( lbvh_test )
     std::shared_ptr<neighbor::LBVH> lbvh;
 
     // make some cuda streams to test with
-    cudaStream_t streams[2];
-    cudaStreamCreate(&streams[0]); // different stream
+    hipStream_t streams[2];
+    hipStreamCreate(&streams[0]); // different stream
     streams[1] = 0; // default stream
 
     // points for tree
@@ -75,7 +77,7 @@ UP_TEST( lbvh_test )
             {
             ArrayHandle<Scalar4> d_points(points, access_location::device, access_mode::read);
             lbvh->build(neighbor::PointInsertOp(d_points.data, 3), min, max, streams[i]);
-            cudaStreamSynchronize(streams[i]);
+            hipStreamSynchronize(streams[i]);
             }
 
         UP_ASSERT_EQUAL(lbvh->getN(), 3);
@@ -217,7 +219,7 @@ UP_TEST( lbvh_test )
             neighbor::SphereQueryOp query(d_spheres.data, spheres.getNumElements());
 
             traverser.traverse(nl_op, query, *lbvh, GlobalArray<Scalar3>(), streams[i]);
-            cudaStreamSynchronize(streams[i]);
+            hipStreamSynchronize(streams[i]);
             }
         // check output
             {
@@ -316,7 +318,7 @@ UP_TEST( lbvh_test )
             UP_ASSERT_EQUAL(h_nneigh.data[6], 0);
             }
         }
-    cudaStreamDestroy(streams[0]);
+    hipStreamDestroy(streams[0]);
     }
 
 // Test that LBVH traverser handles images correctly
