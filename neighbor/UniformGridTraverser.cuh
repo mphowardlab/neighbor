@@ -154,7 +154,8 @@ __global__ void uniform_grid_traverse(const OutputOpT out,
         }
 
     // stackless search
-    typename QueryOpT::Volume q = query.get(qdata, make_scalar3(0,0,0));
+    Scalar3 image = make_scalar3(0,0,0);
+    typename QueryOpT::Volume q = query.get(qdata, image);
     do
         {
         // get bin of this bounding box
@@ -190,7 +191,7 @@ __global__ void uniform_grid_traverse(const OutputOpT out,
 
                         if (query.overlap(q, BoundingBox(r,r)))
                             {
-                            if (query.refine(qdata,primitive))
+                            if (query.refine(qdata,primitive, image))
                                 out.process(result,primitive);
                             }
                         }
@@ -206,7 +207,7 @@ __global__ void uniform_grid_traverse(const OutputOpT out,
             --image_bit;
 
             // move the sphere to the next image
-            const Scalar3 image = d_images[image_bit];
+            image = d_images[image_bit];
             q = query.get(qdata, image);
 
             // unset the bit from this image
