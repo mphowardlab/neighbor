@@ -100,7 +100,6 @@ struct SphereQueryOp
     /*!
      * \param q Thread data.
      * \param primitive Overlapped primitive.
-     * \param image The current image
      *
      * \returns True if the primitive truly overlaps.
      *
@@ -115,7 +114,7 @@ struct SphereQueryOp
      * In this reference implementation, we do not need any additional refinement, and
      * so we simply return true for all overlapped primitives.
      */
-    DEVICE bool refine(const ThreadData& q, const int primitive, const Scalar3& image) const
+    DEVICE bool refine(const ThreadData& q, const int primitive) const
         {
         return true;
         }

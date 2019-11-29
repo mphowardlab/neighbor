@@ -222,8 +222,7 @@ __global__ void lbvh_traverse_ropes(OutputOpT out,
         }
 
     // stackless search
-    Scalar3 image = make_scalar3(0,0,0);
-    typename QueryOpT::Volume q = query.get(qdata, image);
+    typename QueryOpT::Volume q = query.get(qdata, make_scalar3(0,0,0));
     int node = lbvh.root;
     do
         {
@@ -251,7 +250,7 @@ __global__ void lbvh_traverse_ropes(OutputOpT out,
                 if(left < 0)
                     {
                     const int primitive = ~left;
-                    if (query.refine(qdata,primitive, image))
+                    if (query.refine(qdata,primitive))
                         out.process(result,primitive);
                     // leaf nodes always move to their rope
                     }
@@ -271,7 +270,7 @@ __global__ void lbvh_traverse_ropes(OutputOpT out,
             --image_bit;
 
             // move the sphere to the next image
-            image = d_images[image_bit];
+            const Scalar3 image = d_images[image_bit];
             q = query.get(qdata, image);
             node = lbvh.root;
 
