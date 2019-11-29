@@ -23,7 +23,7 @@ typedef float3 NeighborReal3;
 #define REAL_DIV_RD(x,y) (__fdiv_rd(x,y))
 #define REAL_RCP_RD(x) (__frcp_rd(x))
 #define REAL_MIN(x,y) (fminf(x,y))
-#define REAL_MAX(x,y) (fmaxf(xy))
+#define REAL_MAX(x,y) (fmaxf(x,y))
 #define REAL_MAF_RD(x,y,z) (__fmaf_rd(x,y,z))
 #define REAL_SQRT_RU(x) (__fsqrt_ru(x))
 #define REAL_FLOOR(x) (floorf(x))
