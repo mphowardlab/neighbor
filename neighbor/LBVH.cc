@@ -18,9 +18,11 @@ LBVH::LBVH(std::shared_ptr<const ExecutionConfiguration> exec_conf)
     {
     m_exec_conf->msg->notice(4) << "Constructing LBVH" << std::endl;
 
-    m_tune_gen_codes.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_gen_codes", m_exec_conf));
-    m_tune_gen_tree.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_gen_tree", m_exec_conf));
-    m_tune_bubble.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_bubble", m_exec_conf));
+    unsigned int warp_size = m_exec_conf->dev_prop.warpSize;
+    unsigned int max_threads = m_exec_conf->dev_prop.maxThreadsPerBlock;
+    m_tune_gen_codes.reset(new Autotuner(warp_size, max_threads, warp_size, 5, 100000, "lbvh_gen_codes", m_exec_conf));
+    m_tune_gen_tree.reset(new Autotuner(warp_size, max_threads, warp_size, 5, 100000, "lbvh_gen_tree", m_exec_conf));
+    m_tune_bubble.reset(new Autotuner(warp_size, max_threads, warp_size, 5, 100000, "lbvh_bubble", m_exec_conf));
     }
 
 LBVH::~LBVH()

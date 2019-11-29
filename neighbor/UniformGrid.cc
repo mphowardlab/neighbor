@@ -28,9 +28,12 @@ UniformGrid::UniformGrid(std::shared_ptr<const ExecutionConfiguration> exec_conf
     {
     m_exec_conf->msg->notice(4) << "Constructing UniformGrid" << std::endl;
 
-    m_tune_bin.reset(new Autotuner(32, 1024, 32, 5, 100000, "grid_bin", m_exec_conf));
-    m_tune_move.reset(new Autotuner(32, 1024, 32, 5, 100000, "grid_move", m_exec_conf));
-    m_tune_cells.reset(new Autotuner(32, 1024, 32, 5, 100000, "grid_find_cells", m_exec_conf));
+    unsigned int warp_size = m_exec_conf->dev_prop.warpSize;
+    unsigned int max_threads = m_exec_conf->dev_prop.maxThreadsPerBlock;
+ 
+    m_tune_bin.reset(new Autotuner(warp_size, max_threads, warp_size, 5, 100000, "grid_bin", m_exec_conf));
+    m_tune_move.reset(new Autotuner(warp_size, max_threads, warp_size, 5, 100000, "grid_move", m_exec_conf));
+    m_tune_cells.reset(new Autotuner(warp_size, max_threads, warp_size, 5, 100000, "grid_find_cells", m_exec_conf));
 
     m_dim = make_uint3(0,0,0);
     }
