@@ -10,10 +10,10 @@ IF(NOT NEIGHBOR_HOOMD_INTERNAL)
     set(HOOMD_INTERNAL OFF)
 
     # Name the plugin project
-    project(neighbor LANGUAGES C CXX CUDA)
+    project(neighbor LANGUAGES C CXX)
 
     # Find the installed HOOMD
-    find_package(HOOMD 2.6.0 REQUIRED)
+    find_package(HOOMD 3.0.0 REQUIRED)
 
     message(STATUS "Found HOOMD ${HOOMD_VERSION}: ${HOOMD_INSTALL_PREFIX}/${PYTHON_SITE_INSTALL_DIR}")
 
