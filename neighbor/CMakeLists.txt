@@ -53,9 +53,6 @@ else()
 set_target_properties(_${COMPONENT_NAME} PROPERTIES INSTALL_RPATH "\$ORIGIN/..;\$ORIGIN")
 endif()
 
-# link the library to its dependencies
-target_link_libraries(_${COMPONENT_NAME} PUBLIC HOOMD::_hoomd)
-
 fix_cudart_rpath(_${COMPONENT_NAME})
 
 # install the library
