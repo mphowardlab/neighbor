@@ -10,7 +10,7 @@ IF(NOT NEIGHBOR_HOOMD_INTERNAL)
     set(HOOMD_INTERNAL OFF)
 
     # Name the plugin project
-    project(neighbor LANGUAGES C CXX CUDA)
+    project(neighbor LANGUAGES C CXX)
 
     # Find the installed HOOMD
     find_package(HOOMD 2.6.0 REQUIRED)
@@ -29,7 +29,7 @@ IF(NOT NEIGHBOR_HOOMD_INTERNAL)
 endif()
 
 # CUDA is required to build this module
-if(NOT ENABLE_CUDA AND NOT ENABLE_HIP)
+if(NOT ENABLE_CUDA)
     message(FATAL_ERROR "Plugins require CUDA-enabled hoomd")
 endif()
 
@@ -40,6 +40,5 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 add_subdirectory(neighbor)
 
 if (NOT NEIGHBOR_HOOMD_INTERNAL)
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR})
     add_subdirectory(benchmark)
 endif()
