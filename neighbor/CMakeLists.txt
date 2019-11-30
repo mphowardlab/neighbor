@@ -55,17 +55,11 @@ endif()
 
 target_link_libraries(_${COMPONENT_NAME} PUBLIC HOOMD::_hoomd pybind11::pybind11)
 
-# alias into the HOOMD namespace so that plugins and symlinked components both work
-add_library(HOOMD::_${COMPONENT_NAME} ALIAS _${COMPONENT_NAME})
-
 if (APPLE)
 set_target_properties(_${COMPONENT_NAME} PROPERTIES INSTALL_RPATH "@loader_path/..;@loader_path")
 else()
 set_target_properties(_${COMPONENT_NAME} PROPERTIES INSTALL_RPATH "\$ORIGIN/..;\$ORIGIN")
 endif()
-
-# link the library to its dependencies
-target_link_libraries(_${COMPONENT_NAME} PUBLIC HOOMD::_hoomd)
 
 fix_cudart_rpath(_${COMPONENT_NAME})
 
