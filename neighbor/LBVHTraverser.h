@@ -66,8 +66,11 @@ class PYBIND11_EXPORT LBVHTraverser
             {
             m_exec_conf->msg->notice(4) << "Constructing LBVHTraverser" << std::endl;
 
-            m_tune_traverse.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_rope_traverse", m_exec_conf));
-            m_tune_compress.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_rope_compress", m_exec_conf));
+            unsigned int warp_size = m_exec_conf->dev_prop.warpSize;
+            unsigned int max_threads = m_exec_conf->dev_prop.maxThreadsPerBlock;
+ 
+            m_tune_traverse.reset(new Autotuner(warp_size, max_threads, warp_size, 5, 100000, "lbvh_rope_traverse", m_exec_conf));
+            m_tune_compress.reset(new Autotuner(warp_size, max_threads, warp_size, 5, 100000, "lbvh_rope_compress", m_exec_conf));
             }
 
         //! Destructor
