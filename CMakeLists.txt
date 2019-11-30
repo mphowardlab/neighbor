@@ -13,7 +13,7 @@ IF(NOT NEIGHBOR_HOOMD_INTERNAL)
     project(neighbor LANGUAGES C CXX)
 
     # Find the installed HOOMD
-    find_package(HOOMD 2.6.0 REQUIRED)
+    find_package(HOOMD 3.0.0 REQUIRED)
 
     message(STATUS "Found HOOMD ${HOOMD_VERSION}: ${HOOMD_INSTALL_PREFIX}/${PYTHON_SITE_INSTALL_DIR}")
 
@@ -29,7 +29,7 @@ IF(NOT NEIGHBOR_HOOMD_INTERNAL)
 endif()
 
 # CUDA is required to build this module
-if(NOT ENABLE_CUDA)
+if(NOT ENABLE_HIP)
     message(FATAL_ERROR "Plugins require CUDA-enabled hoomd")
 endif()
 
