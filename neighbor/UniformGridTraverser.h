@@ -34,7 +34,7 @@ namespace neighbor
  * the grid using multiple threads per test sphere using ::setThreads. By default, only 1
  * thread is used per test sphere.
  */
-class UniformGridTraverser
+class PYBIND11_EXPORT UniformGridTraverser
     {
     public:
         //! Create uniform grid traverser

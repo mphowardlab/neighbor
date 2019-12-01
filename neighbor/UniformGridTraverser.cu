@@ -14,7 +14,8 @@ namespace gpu
 {
 
 // template declaration for compressing without transforming primitives
-template void uniform_grid_compress(const UniformGridCompressedData&,
+template void __attribute__((visibility("default")))
+uniform_grid_compress(const UniformGridCompressedData&,
                                     const NullTransformOp&,
                                     const UniformGridData&,
                                     const unsigned int,
@@ -23,7 +24,8 @@ template void uniform_grid_compress(const UniformGridCompressedData&,
                                     cudaStream_t);
 
 // template declaration for compressing with map transformation of primitives
-template void uniform_grid_compress(const UniformGridCompressedData&,
+template void __attribute__((visibility("default")))
+uniform_grid_compress(const UniformGridCompressedData&,
                                     const MapTransformOp&,
                                     const UniformGridData&,
                                     const unsigned int,
@@ -32,7 +34,8 @@ template void uniform_grid_compress(const UniformGridCompressedData&,
                                     cudaStream_t);
 
 // template declaration to count neighbors
-template void uniform_grid_traverse(const CountNeighborsOp& out,
+template void __attribute__((visibility("default")))
+ uniform_grid_traverse(const CountNeighborsOp& out,
                                     const UniformGridCompressedData& lbvh,
                                     const SphereQueryOp& query,
                                     const Scalar3 *d_images,
@@ -41,7 +44,8 @@ template void uniform_grid_traverse(const CountNeighborsOp& out,
                                     cudaStream_t stream);
 
 // template declaration to generate neighbor list
-template void uniform_grid_traverse(const NeighborListOp& out,
+template void __attribute__((visibility("default")))
+uniform_grid_traverse(const NeighborListOp& out,
                                     const UniformGridCompressedData& lbvh,
                                     const SphereQueryOp& query,
                                     const Scalar3 *d_images,

@@ -174,6 +174,7 @@ __global__ void lbvh_gen_tree(LBVHData tree,
  * The second call will then sort the Morton codes and indexes. The sorted data will be in the
  * appropriate buffer, which can be determined by the returned flags.
  */
+ __attribute__((visibility("default")))
 uchar2 lbvh_sort_codes(void *d_tmp,
                        size_t &tmp_bytes,
                        unsigned int *d_codes,
@@ -211,6 +212,7 @@ uchar2 lbvh_sort_codes(void *d_tmp,
  *
  * \sa kernel::lbvh_gen_tree
  */
+ __attribute__((visibility("default")))
 void lbvh_gen_tree(const LBVHData tree,
                    const unsigned int *d_codes,
                    const unsigned int N,
@@ -232,7 +234,8 @@ void lbvh_gen_tree(const LBVHData tree,
     }
 
 //! Template declarations for lbvh_gen_codes
-template void lbvh_gen_codes(unsigned int *d_codes,
+template void __attribute__((visibility("default")))
+lbvh_gen_codes(unsigned int *d_codes,
                              unsigned int *d_indexes,
                              const PointInsertOp& insert,
                              const Scalar3 lo,
@@ -241,7 +244,8 @@ template void lbvh_gen_codes(unsigned int *d_codes,
                              const unsigned int block_size,
                              cudaStream_t stream);
 
-template void lbvh_gen_codes(unsigned int *d_codes,
+template void __attribute__((visibility("default")))
+lbvh_gen_codes(unsigned int *d_codes,
                              unsigned int *d_indexes,
                              const SphereInsertOp& insert,
                              const Scalar3 lo,
@@ -251,24 +255,28 @@ template void lbvh_gen_codes(unsigned int *d_codes,
                              cudaStream_t stream);
 
 //! Template declarations for lbvh_bubble_aabbs
-template void lbvh_bubble_aabbs(const LBVHData tree,
+template void __attribute__((visibility("default")))
+lbvh_bubble_aabbs(const LBVHData tree,
                                 const PointInsertOp& insert,
                                 unsigned int *d_locks,
                                 const unsigned int N,
                                 const unsigned int block_size,
                                 cudaStream_t stream);
 
-template void lbvh_bubble_aabbs(const LBVHData tree,
+template void __attribute__((visibility("default")))
+lbvh_bubble_aabbs(const LBVHData tree,
                                 const SphereInsertOp& insert,
                                 unsigned int *d_locks,
                                 const unsigned int N,
                                 const unsigned int block_size,
                                 cudaStream_t stream);
 
-template void lbvh_one_primitive(const LBVHData tree,
+template void __attribute__((visibility("default")))
+ lbvh_one_primitive(const LBVHData tree,
                                  const PointInsertOp& insert,
                                  cudaStream_t stream);
-template void lbvh_one_primitive(const LBVHData tree,
+template void __attribute__((visibility("default")))
+lbvh_one_primitive(const LBVHData tree,
                                  const SphereInsertOp& insert,
                                  cudaStream_t stream);
 
