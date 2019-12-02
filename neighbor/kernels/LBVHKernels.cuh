@@ -7,7 +7,6 @@
 #define NEIGHBOR_KERNELS_LBVH_KERNELS_CUH_
 
 #include "neighbor/BoundingVolumes.h"
-#include "neighbor/InsertOps.h"
 
 #include "hoomd/extern/cub/cub/cub.cuh"
 

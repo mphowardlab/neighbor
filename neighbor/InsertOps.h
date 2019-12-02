@@ -19,10 +19,10 @@ struct PointInsertOp
     {
     //! Constructor
     /*!
-     * \param points_ Points array (x,y,z,_)
+     * \param points_ Points array (x,y,z)
      * \param N_ The number of points
      */
-    PointInsertOp(const float4 *points_, unsigned int N_)
+    PointInsertOp(const float3* points_, unsigned int N_)
         : points(points_), N(N_)
         {}
 
@@ -34,8 +34,7 @@ struct PointInsertOp
      */
     __device__ __forceinline__ BoundingBox get(const unsigned int idx) const
         {
-        const float4 point = points[idx];
-        const float3 p = make_float3(point.x, point.y, point.z);
+        const float3 p = points[idx];
 
         // construct the bounding box for a point
         return BoundingBox(p,p);
@@ -50,7 +49,7 @@ struct PointInsertOp
         return N;
         }
 
-    const float4 *points;
+    const float3* points;
     unsigned int N;
     };
 
@@ -59,11 +58,11 @@ struct SphereInsertOp
     {
     //! Constructor
     /*!
-     * \param points_ Sphere centers (x,y,z,_)
+     * \param points_ Sphere centers (x,y,z)
      * \param r_ Constant sphere radius
      * \param N_ The number of points
      */
-    SphereInsertOp(const float4 *points_, const float r_, unsigned int N_)
+    SphereInsertOp(const float3 *points_, const float r_, unsigned int N_)
         : points(points_), r(r_), N(N_)
         {}
 
@@ -75,7 +74,7 @@ struct SphereInsertOp
      */
     __device__ __forceinline__ BoundingBox get(unsigned int idx) const
         {
-        const float4 point = points[idx];
+        const float3 point = points[idx];
         const float3 lo = make_float3(point.x-r, point.y-r, point.z-r);
         const float3 hi = make_float3(point.x+r, point.y+r, point.z+r);
 
@@ -91,7 +90,7 @@ struct SphereInsertOp
         return N;
         }
 
-    const float4 *points;  //!< Sphere centers
+    const float3 *points;  //!< Sphere centers
     const float r;         //!< Constant sphere radius
     unsigned int N;        //!< Number of spheres
     };

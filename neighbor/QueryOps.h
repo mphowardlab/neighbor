@@ -62,9 +62,7 @@ struct SphereQueryOp
      */
     __device__ __forceinline__ Volume get(const ThreadData& q, const float3& image) const
         {
-        const float3 t = make_float3(q.x + image.x,
-                                     q.y + image.y,
-                                     q.z + image.z);
+        const float3 t = make_float3(q.x + image.x, q.y + image.y, q.z + image.z);
         return BoundingSphere(t,q.w);
         }
 

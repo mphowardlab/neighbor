@@ -3,21 +3,7 @@
 
 # Maintainer: mphoward
 
-set(COMPONENT_NAME neighbor)
-
 ##############################
-# List of all source files
-# c++ source files
-set(_cc_sources
-    )
-#    UniformGrid.cc
-#    UniformGridTraverser.cc
-# cuda source files
-set(_cu_sources
-    )
-#    UniformGrid.cu
-#    UniformGridTraverser.cu
-# headers
 set(_h_sources
     BoundingVolumes.h
     InsertOps.h

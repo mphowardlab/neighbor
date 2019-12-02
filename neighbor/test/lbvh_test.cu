@@ -28,11 +28,11 @@ UP_TEST( lbvh_test )
     streams[1] = 0; // default stream
 
     // points for tree
-    thrust::device_vector<float4> points(3);
+    thrust::device_vector<float3> points(3);
         {
-        points[0] = make_float4(2.5, 0., 0., 0.);
-        points[1] = make_float4(1.5, 0., 0.,  0.);
-        points[2] = make_float4(0.5, 0., 0., 0.);
+        points[0] = make_float3(2.5, 0., 0.);
+        points[1] = make_float3(1.5, 0., 0.);
+        points[2] = make_float3(0.5, 0., 0.);
         }
 
     // query spheres for tree
@@ -314,11 +314,11 @@ UP_TEST( lbvh_periodic_test )
     auto lbvh = std::make_shared<neighbor::LBVH>();
 
     // points for tree
-    thrust::device_vector<float4> points(3);
+    thrust::device_vector<float3> points(3);
         {
-        points[0] = make_float4( 1.9, 1.9, 1.9, 0.);
-        points[1] = make_float4(  0., 0.,  0., 0.);
-        points[2] = make_float4(-1.9,-1.9,-1.9, 0.);
+        points[0] = make_float3( 1.9, 1.9, 1.9);
+        points[1] = make_float3(  0., 0.,  0.);
+        points[2] = make_float3(-1.9,-1.9,-1.9);
         }
 
     const float3 max = make_float3( 2., 2., 2.);
@@ -391,16 +391,16 @@ UP_TEST( lbvh_validate )
     const float rcut = 1.0;
 
     // generate random points in the box
-    thrust::host_vector<float4> h_points(N);
+    thrust::host_vector<float3> h_points(N);
         {
         std::mt19937 mt(42);
         std::uniform_real_distribution<float> U(-0.5, 0.5);
         for (unsigned int i=0; i < N; ++i)
             {
-            h_points[i] = make_float4(L.x*U(mt), L.y*U(mt), L.z*U(mt), 0);
+            h_points[i] = make_float3(L.x*U(mt), L.y*U(mt), L.z*U(mt));
             }
         }
-    thrust::device_vector<float4> points(h_points);
+    thrust::device_vector<float3> points(h_points);
 
     const float3 lo = make_float3(-0.5*L.x, -0.5*L.y, -0.5*L.z);
     const float3 hi = make_float3( 0.5*L.x,  0.5*L.y,  0.5*L.z);
@@ -412,7 +412,7 @@ UP_TEST( lbvh_validate )
         thrust::host_vector<float4> h_spheres(spheres);
         for (unsigned int i=0; i < N; ++i)
             {
-            const float4 point = h_points[i];
+            const float3 point = h_points[i];
             h_spheres[i] = make_float4(point.x, point.y, point.z, rcut);
             }
         spheres = h_spheres;
@@ -455,10 +455,10 @@ UP_TEST( lbvh_validate )
         std::fill(ref_hits.begin(), ref_hits.end(), 0);
         for (unsigned int i=0; i < N; ++i)
             {
-            const float4 ri = h_points[i];
+            const float3 ri = h_points[i];
             for (unsigned int j=i; j < N; ++j)
                 {
-                const float4 rj = h_points[j];
+                const float3 rj = h_points[j];
                 float3 dr = make_float3(rj.x-ri.x, rj.y-ri.y, rj.z-ri.z);
 
                 // minimum image
@@ -502,9 +502,9 @@ UP_TEST( lbvh_small_test )
     auto lbvh = std::make_shared<neighbor::LBVH>();
 
     // one point for tree
-    thrust::device_vector<float4> points(1);
+    thrust::device_vector<float3> points(1);
         {
-        points[0] = make_float4(2.5, 0., 0., 0.);
+        points[0] = make_float3(2.5, 0., 0.);
         }
     // query spheres for tree
     thrust::device_vector<float4> spheres(2);

@@ -161,18 +161,12 @@ struct NeighborListOp
     /*!
      * \param t The ThreadData being operated on.
      *
-     * The number of neighbors is written to global memory.
-     *
-     * \todo This method should also alert the caller if the number of neighbors
-     * exceeded the allocation.
+     * The number of neighbors is written to global memory. This number may be larger
+     * than the maximum allocation.
      */
     __device__ __forceinline__ void finalize(const ThreadData& t) const
         {
         nneigh[t.idx] = t.num_neigh;
-        if (t.num_neigh > max_neigh)
-            {
-            // write overflow condition
-            }
         }
 
     unsigned int* neigh_list;   //!< Neighbors of each sphere
