@@ -6,11 +6,7 @@
 #ifndef NEIGHBOR_TRANSFORM_OPS_H_
 #define NEIGHBOR_TRANSFORM_OPS_H_
 
-#ifdef NVCC
 #define HOSTDEVICE __host__ __device__ __forceinline__
-#else
-#define HOSTDEVICE
-#endif
 
 namespace neighbor
 {

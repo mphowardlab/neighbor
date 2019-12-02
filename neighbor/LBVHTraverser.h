@@ -7,13 +7,8 @@
 #define NEIGHBOR_LBVH_TRAVERSER_H_
 
 #include "LBVH.h"
-#include "LBVHTraverser.cuh"
+#include "kernels/LBVHTraverserKernels.cuh"
 #include "TransformOps.h"
-
-#include "hoomd/ExecutionConfiguration.h"
-#include "hoomd/GlobalArray.h"
-#include "hoomd/GPUFlags.h"
-#include "hoomd/Autotuner.h"
 
 namespace neighbor
 {
@@ -54,34 +49,21 @@ namespace neighbor
  * image list can be specified for ::traverse. The image list specifies *additional* translations
  * to consider, beyond the original volume.
  */
-class PYBIND11_EXPORT LBVHTraverser
+class LBVHTraverser
     {
     public:
         //! Constructor
         /*!
          * \param exec_conf HOOMD-blue execution configuration.
          */
-        LBVHTraverser(std::shared_ptr<const ExecutionConfiguration> exec_conf)
-            : m_exec_conf(exec_conf), m_lbvh_lo(exec_conf), m_lbvh_hi(exec_conf), m_bins(exec_conf), m_replay(false)
-            {
-            m_exec_conf->msg->notice(4) << "Constructing LBVHTraverser" << std::endl;
-
-            m_tune_traverse.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_rope_traverse", m_exec_conf));
-            m_tune_compress.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_rope_compress", m_exec_conf));
-            }
-
-        //! Destructor
-        ~LBVHTraverser()
-            {
-            m_exec_conf->msg->notice(4) << "Destroying LBVHTraverser" << std::endl;
-            }
+        LBVHTraverser();
 
         //! Setup LBVH for traversal
         template<class TransformOpT>
-        void setup(const TransformOpT& transform, const LBVH& lbvh, cudaStream_t stream = 0);
+        void setup(const TransformOpT& transform, LBVH& lbvh, cudaStream_t stream = 0);
 
         //! Setup LBVH for traversal
-        void setup(const LBVH& lbvh, cudaStream_t stream = 0)
+        void setup(LBVH& lbvh, cudaStream_t stream = 0)
             {
             setup(NullTransformOp(), lbvh, stream);
             }
@@ -97,27 +79,40 @@ class PYBIND11_EXPORT LBVHTraverser
         void traverse(OutputOpT& out,
                       const QueryOpT& query,
                       const TransformOpT& transform,
-                      const LBVH& lbvh,
-                      const GlobalArray<Scalar3>& images = GlobalArray<Scalar3>(),
+                      LBVH& lbvh,
+                      const thrust::device_vector<float3>& images = thrust::device_vector<float3>(),
                       cudaStream_t stream = 0);
 
         //! Traverse the LBVH.
         template<class OutputOpT, class QueryOpT>
         void traverse(OutputOpT& out,
                       const QueryOpT& query,
-                      const LBVH& lbvh,
-                      const GlobalArray<Scalar3>& images = GlobalArray<Scalar3>(),
+                      LBVH& lbvh,
+                      const thrust::device_vector<float3>& images = thrust::device_vector<float3>(),
                       cudaStream_t stream = 0)
             {
             traverse(out, query, NullTransformOp(), lbvh, images, stream);
             }
 
         //! Access the compressed LBVH data for traversal
-        const GlobalArray<int4>& getData() const
+        const thrust::device_vector<int4>& getData() const
             {
             return m_data;
             }
 
+        const gpu::LBVHCompressedData data()
+            {
+            gpu::LBVHCompressedData clbvh;
+            clbvh.root = m_root;
+            clbvh.data = thrust::raw_pointer_cast(m_data.data());
+            clbvh.lo = thrust::raw_pointer_cast(m_lbvh_lo.data());
+            clbvh.hi = thrust::raw_pointer_cast(m_lbvh_hi.data());
+            clbvh.bins = thrust::raw_pointer_cast(m_bins.data());
+
+            return clbvh;
+            }
+
+        #if 0
         //! Set the kernel autotuner parameters
         /*!
          * \param enable If true, run the autotuners. If false, disable them.
@@ -131,24 +126,35 @@ class PYBIND11_EXPORT LBVHTraverser
             m_tune_compress->setEnabled(enable);
             m_tune_compress->setPeriod(period);
             }
+        #endif
 
     private:
-        std::shared_ptr<const ExecutionConfiguration> m_exec_conf;  //!< Execution configuration
+        int m_root;
+        thrust::device_vector<int4> m_data;   //!< Internal representation of the LBVH for traversal
+        thrust::device_vector<float3> m_lbvh_lo; //!< Lower bound of tree
+        thrust::device_vector<float3> m_lbvh_hi; //!< Upper bound of tree
+        thrust::device_vector<float3> m_bins;    //!< Bin size for compression
 
-        GlobalArray<int4> m_data;   //!< Internal representation of the LBVH for traversal
-        GPUFlags<float3> m_lbvh_lo; //!< Lower bound of tree
-        GPUFlags<float3> m_lbvh_hi; //!< Upper bound of tree
-        GPUFlags<float3> m_bins;    //!< Bin size for compression
-
+        #if 0
         std::unique_ptr<Autotuner> m_tune_traverse; //!< Autotuner for traversal kernel
         std::unique_ptr<Autotuner> m_tune_compress; //!< Autotuner for compression kernel
+        #endif
 
         //! Compresses the lbvh into internal representation
         template<class TransformOpT>
-        void compress(const LBVH& lbvh, const TransformOpT& transform, cudaStream_t stream);
+        void compress(LBVH& lbvh, const TransformOpT& transform, cudaStream_t stream);
 
         bool m_replay;  //!< If true, the compressed structure has already been set explicitly
     };
+
+LBVHTraverser::LBVHTraverser()
+    : m_lbvh_lo(1), m_lbvh_hi(1), m_bins(1), m_replay(false)
+    {
+    #if 0
+    m_tune_traverse.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_rope_traverse", m_exec_conf));
+    m_tune_compress.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_rope_compress", m_exec_conf));
+    #endif
+    }
 
 /*!
  * \param transform Transformation operation for cached primitive indexes.
@@ -165,7 +171,7 @@ class PYBIND11_EXPORT LBVHTraverser
  * To clear a setup, call reset().
  */
 template<class TransformOpT>
-void LBVHTraverser::setup(const TransformOpT& transform, const LBVH& lbvh, cudaStream_t stream)
+void LBVHTraverser::setup(const TransformOpT& transform, LBVH& lbvh, cudaStream_t stream)
     {
     if (lbvh.getN() == 0) return;
 
@@ -198,18 +204,18 @@ template<class OutputOpT, class QueryOpT, class TransformOpT>
 void LBVHTraverser::traverse(OutputOpT& out,
                              const QueryOpT& query,
                              const TransformOpT& transform,
-                             const LBVH& lbvh,
-                             const GlobalArray<Scalar3>& images,
+                             LBVH& lbvh,
+                             const thrust::device_vector<float3>& images,
                              cudaStream_t stream)
     {
     // don't traverse with empty lbvh
     if (lbvh.getN() == 0) return;
 
     // kernel uses int32 bitflags for the images, so limit to 32 images
-    const unsigned int Nimages = images.getNumElements();
+    const unsigned int Nimages = images.size();
     if (Nimages > 32)
         {
-        m_exec_conf->msg->error() << "A maximum of 32 image vectors are supported by LBVH traversers." << std::endl;
+        std::cerr << "A maximum of 32 image vectors are supported by LBVH traversers." << std::endl;
         throw std::runtime_error("Too many images (>32) in LBVH traverser.");
         }
 
@@ -218,27 +224,18 @@ void LBVHTraverser::traverse(OutputOpT& out,
         setup(transform, lbvh, stream);
 
     // compressed lbvh data
-    ArrayHandle<int4> d_data(m_data, access_location::device, access_mode::read);
-    gpu::LBVHCompressedData clbvh;
-    clbvh.root = lbvh.getRoot();
-    clbvh.data = d_data.data;
-    clbvh.lo = m_lbvh_lo.getDeviceFlags();
-    clbvh.hi = m_lbvh_hi.getDeviceFlags();
-    clbvh.bins = m_bins.getDeviceFlags();
+    gpu::LBVHCompressedData clbvh = data();
 
     // traversal data
-    ArrayHandle<Scalar3> d_images(images, access_location::device, access_mode::read);
-
-    m_tune_traverse->begin();
+//     m_tune_traverse->begin();
     gpu::lbvh_traverse_ropes(out,
                              clbvh,
                              query,
-                             d_images.data,
+                             thrust::raw_pointer_cast(images.data()),
                              Nimages,
-                             m_tune_traverse->getParam(),
+                             128/*m_tune_traverse->getParam()*/,
                              stream);
-    if (m_exec_conf->isCUDAErrorCheckingEnabled()) CHECK_CUDA_ERROR();
-    m_tune_traverse->end();
+//     m_tune_traverse->end();
     }
 
 /*!
@@ -271,53 +268,33 @@ void LBVHTraverser::traverse(OutputOpT& out,
  * index to save indirection when the index itself is not of interest.
  */
 template<class TransformOpT>
-void LBVHTraverser::compress(const LBVH& lbvh, const TransformOpT& transform, cudaStream_t stream)
+void LBVHTraverser::compress(LBVH& lbvh, const TransformOpT& transform, cudaStream_t stream)
     {
     // resize the internal data array
     const unsigned int num_data = lbvh.getNNodes();
-    if (num_data > m_data.getNumElements())
+    if (num_data > m_data.size())
         {
-        GlobalArray<int4> tmp(num_data, m_exec_conf);
+        thrust::device_vector<int4> tmp(num_data);
         m_data.swap(tmp);
         }
 
     // acquire current tree data for reading
-    ArrayHandle<int> d_parent(lbvh.getParents(), access_location::device, access_mode::read);
-    ArrayHandle<int> d_left(lbvh.getLeftChildren(), access_location::device, access_mode::read);
-    ArrayHandle<int> d_right(lbvh.getRightChildren(), access_location::device, access_mode::read);
-    ArrayHandle<unsigned int> d_sorted_indexes(lbvh.getPrimitives(), access_location::device, access_mode::read);
-    ArrayHandle<float3> d_lo(lbvh.getLowerBounds(), access_location::device, access_mode::read);
-    ArrayHandle<float3> d_hi(lbvh.getUpperBounds(), access_location::device, access_mode::read);
+    gpu::LBVHData tree = lbvh.data();
 
-    gpu::LBVHData tree;
-    tree.parent = d_parent.data;
-    tree.left = d_left.data;
-    tree.right = d_right.data;
-    tree.primitive = d_sorted_indexes.data;
-    tree.lo = d_lo.data;
-    tree.hi = d_hi.data;
-    tree.root = lbvh.getRoot();
-
-    // acquire compressed tree data for writing
-    gpu::LBVHCompressedData ctree;
-    ArrayHandle<int4> d_data(m_data, access_location::device, access_mode::overwrite);
-    ctree.root = lbvh.getRoot();
-    ctree.data = d_data.data;
-    ctree.lo = m_lbvh_lo.getDeviceFlags();
-    ctree.hi = m_lbvh_hi.getDeviceFlags();
-    ctree.bins = m_bins.getDeviceFlags();
+    // set root and acquire compressed tree data for writing
+    m_root = lbvh.getRoot();
+    gpu::LBVHCompressedData ctree = data();
 
     // compress the data
-    m_tune_compress->begin();
+//     m_tune_compress->begin();
     gpu::lbvh_compress_ropes(ctree,
                              transform,
                              tree,
                              lbvh.getNInternal(),
                              lbvh.getNNodes(),
-                             m_tune_compress->getParam(),
+                             128/*m_tune_compress->getParam()*/,
                              stream);
-    if (m_exec_conf->isCUDAErrorCheckingEnabled()) CHECK_CUDA_ERROR();
-    m_tune_compress->end();
+//     m_tune_compress->end();
     }
 } // end namespace neighbor
 

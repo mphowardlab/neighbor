@@ -6,9 +6,8 @@
 #ifndef NEIGHBOR_LBVH_TRAVERSER_CUH_
 #define NEIGHBOR_LBVH_TRAVERSER_CUH_
 
-#include "hoomd/HOOMDMath.h"
-#include "LBVH.cuh"
-#include "BoundingVolumes.h"
+#include "LBVHKernels.cuh"
+#include "neighbor/BoundingVolumes.h"
 
 namespace neighbor
 {
@@ -25,30 +24,6 @@ struct LBVHCompressedData
     float3* bins;   //!< Bin spacing used in compression.
     };
 
-//! Compress LBVH for rope traversal.
-template<class TransformOpT>
-void lbvh_compress_ropes(LBVHCompressedData ctree,
-                         const TransformOpT& transform,
-                         const LBVHData tree,
-                         unsigned int N_internal,
-                         unsigned int N_nodes,
-                         unsigned int block_size,
-                         cudaStream_t stream = 0);
-
-//! Traverse the LBVH using ropes.
-template<class OutputOpT, class QueryOpT>
-void lbvh_traverse_ropes(OutputOpT& out,
-                         const LBVHCompressedData& lbvh,
-                         const QueryOpT& query,
-                         const Scalar3 *d_images,
-                         unsigned int Nimages,
-                         unsigned int block_size,
-                         cudaStream_t stream = 0);
-
-/*
- * Templated function definitions should only be available in NVCC.
- */
-#ifdef NVCC
 namespace kernel
 {
 //! Kernel to compress LBVH for rope traversal
@@ -189,7 +164,7 @@ template<class OutputOpT, class QueryOpT>
 __global__ void lbvh_traverse_ropes(OutputOpT out,
                                     const LBVHCompressedData lbvh,
                                     const QueryOpT query,
-                                    const Scalar3 *d_images,
+                                    const float3 *d_images,
                                     const unsigned int Nimages)
     {
     // one thread per test
@@ -216,13 +191,13 @@ __global__ void lbvh_traverse_ropes(OutputOpT out,
     const int nbits = ((int)Nimages <= 32) ? Nimages : 32;
     for (unsigned int i=0; i < nbits; ++i)
         {
-        const Scalar3 image = d_images[i];
+        const float3 image = d_images[i];
         const typename QueryOpT::Volume q = query.get(qdata,image);
         if (query.overlap(q,tree_box)) flags |= 1u << i;
         }
 
     // stackless search
-    typename QueryOpT::Volume q = query.get(qdata, make_scalar3(0,0,0));
+    typename QueryOpT::Volume q = query.get(qdata, make_float3(0,0,0));
     int node = lbvh.root;
     do
         {
@@ -270,7 +245,7 @@ __global__ void lbvh_traverse_ropes(OutputOpT out,
             --image_bit;
 
             // move the sphere to the next image
-            const Scalar3 image = d_images[image_bit];
+            const float3 image = d_images[image_bit];
             q = query.get(qdata, image);
             node = lbvh.root;
 
@@ -309,7 +284,7 @@ void lbvh_compress_ropes(LBVHCompressedData ctree,
                          unsigned int N_internal,
                          unsigned int N_nodes,
                          unsigned int block_size,
-                         cudaStream_t stream)
+                         cudaStream_t stream = 0)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
@@ -345,10 +320,10 @@ template<class OutputOpT, class QueryOpT>
 void lbvh_traverse_ropes(OutputOpT& out,
                          const LBVHCompressedData& lbvh,
                          const QueryOpT& query,
-                         const Scalar3 *d_images,
+                         const float3 *d_images,
                          unsigned int Nimages,
                          unsigned int block_size,
-                         cudaStream_t stream)
+                         cudaStream_t stream = 0)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
@@ -364,7 +339,6 @@ void lbvh_traverse_ropes(OutputOpT& out,
     kernel::lbvh_traverse_ropes<<<num_blocks, run_block_size, 0, stream>>>
         (out, lbvh, query, d_images, Nimages);
     }
-#endif
 
 } // end namespace gpu
 } // end namespace neighbor

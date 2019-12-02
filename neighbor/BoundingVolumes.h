@@ -6,16 +6,6 @@
 #ifndef NEIGHBOR_BOUNDING_VOLUMES_H_
 #define NEIGHBOR_BOUNDING_VOLUMES_H_
 
-#include "hoomd/HOOMDMath.h"
-
-#ifdef NVCC
-#define DEVICE __device__ __forceinline__
-#define HOSTDEVICE __host__ __device__ __forceinline__
-#else
-#define DEVICE
-#define HOSTDEVICE
-#endif
-
 namespace neighbor
 {
 
@@ -43,11 +33,10 @@ struct BoundingBox
      * \param lo_ Lower bound of box.
      * \param hi_ Upper bound of box.
      */
-    HOSTDEVICE BoundingBox(const float3& lo_, const float3& hi_)
+    __device__ __forceinline__ BoundingBox(const float3& lo_, const float3& hi_)
         : lo(lo_), hi(hi_)
         {}
 
-    #ifdef NVCC
     //! Double-precision constructor
     /*!
      * \param lo_ Lower bound of box.
@@ -57,14 +46,13 @@ struct BoundingBox
      *
      * \todo This needs a __host__ implementation that does not rely on CUDA intrinsics.
      */
-    DEVICE BoundingBox(const double3& lo_, const double3& hi_)
+    __device__ __forceinline__ BoundingBox(const double3& lo_, const double3& hi_)
         {
         lo = make_float3(__double2float_rd(lo_.x), __double2float_rd(lo_.y), __double2float_rd(lo_.z));
         hi = make_float3(__double2float_ru(hi_.x), __double2float_ru(hi_.y), __double2float_ru(hi_.z));
         }
-    #endif
 
-    DEVICE float3 getCenter() const
+    __device__ __forceinline__ float3 getCenter() const
         {
         float3 c;
         c.x = 0.5f*(lo.x+hi.x);
@@ -83,14 +71,14 @@ struct BoundingBox
      * The overlap test is performed using cheap comparison operators.
      * The two overlap if none of the dimensions of the box overlap.
      */
-    HOSTDEVICE bool overlap(const BoundingBox& box) const
+    __device__ __forceinline__ bool overlap(const BoundingBox& box) const
         {
         return !(hi.x < box.lo.x || lo.x > box.hi.x ||
                  hi.y < box.lo.y || lo.y > box.hi.y ||
                  hi.z < box.lo.z || lo.z > box.hi.z);
         }
 
-    HOSTDEVICE BoundingBox asBox() const
+    __device__ __forceinline__ BoundingBox asBox() const
         {
         return *this;
         }
@@ -111,7 +99,6 @@ struct BoundingSphere
     {
     BoundingSphere() {}
 
-    #ifdef NVCC
     //! Single-precision constructor.
     /*!
      * \param o Center of sphere.
@@ -121,7 +108,7 @@ struct BoundingSphere
      *
      * \todo This needs a __host__ implementation.
      */
-    DEVICE BoundingSphere(const float3& o, const float r)
+    __device__ __forceinline__ BoundingSphere(const float3& o, const float r)
         {
         origin = o;
         Rsq = __fmul_ru(r,r);
@@ -137,7 +124,7 @@ struct BoundingSphere
      *
      * \todo This needs a __host__ implementation.
      */
-    DEVICE BoundingSphere(const double3& o, const double r)
+    __device__ __forceinline__ BoundingSphere(const double3& o, const double r)
         {
         const float3 lo = make_float3(__double2float_rd(o.x),
                                       __double2float_rd(o.y),
@@ -165,7 +152,7 @@ struct BoundingSphere
      *
      * \todo This needs a __host__ implementation.
      */
-    DEVICE bool overlap(const BoundingBox& box) const
+    __device__ __forceinline__ bool overlap(const BoundingBox& box) const
         {
         const float3 dr = make_float3(__fsub_rd(fminf(fmaxf(origin.x, box.lo.x), box.hi.x), origin.x),
                                       __fsub_rd(fminf(fmaxf(origin.y, box.lo.y), box.hi.y), origin.y),
@@ -175,22 +162,18 @@ struct BoundingSphere
         return (dr2 <= Rsq);
         }
 
-    DEVICE BoundingBox asBox() const
+    __device__ __forceinline__ BoundingBox asBox() const
         {
         const float R = __fsqrt_ru(Rsq);
         const float3 lo = make_float3(__fsub_rd(origin.x,R),__fsub_rd(origin.y,R),__fsub_rd(origin.z,R));
         const float3 hi = make_float3(__fadd_ru(origin.x,R),__fadd_ru(origin.y,R),__fadd_ru(origin.z,R));
         return BoundingBox(lo,hi);
         }
-    #endif
 
     float3 origin;  //!< Center of the sphere
     float Rsq;      //!< Squared radius of the sphere
     };
 
 } // end namespace neighbor
-
-#undef DEVICE
-#undef HOSTDEVICE
 
 #endif // NEIGHBOR_BOUNDING_VOLUMES_H_

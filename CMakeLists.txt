@@ -39,6 +39,6 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 # add subdirectories
 add_subdirectory(neighbor)
 
-if (NOT NEIGHBOR_HOOMD_INTERNAL)
-    add_subdirectory(benchmark)
-endif()
+#if (NOT NEIGHBOR_HOOMD_INTERNAL)
+#    add_subdirectory(benchmark)
+#endif()
