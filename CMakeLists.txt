@@ -13,21 +13,21 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 set(NEIGHBOR_MASTER_PROJECT OFF)
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     set(NEIGHBOR_MASTER_PROJECT ON)
+    set(NEIGHBOR_CUDA_ARCH "35" CACHE STRING "Target CUDA architecture for compiled objects.")
 endif()
 option(NEIGHBOR_INSTALL "Install neighbor header files?" ${NEIGHBOR_MASTER_PROJECT})
 option(NEIGHBOR_TEST "Build neighbor test suite?" ${NEIGHBOR_MASTER_PROJECT})
 option(NEIGHBOR_BENCHMARK "Build neighbor benchmarks?" ${NEIGHBOR_MASTER_PROJECT})
-set(NEIGHBOR_CUDA_ARCH "35" CACHE STRING "Target CUDA architecture for compiled objects.")
 
-# find CUB and make it a dependency
+# find CUB, which is a dependency
+# thrust should be taken care of by CUDA language
 find_package(CUB REQUIRED)
 
 # setup the neighbor header-only library
 include(GNUInstallDirs)
-set(NEIGHBOR_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}/include")
 add_library(neighbor INTERFACE)
 add_library(neighbor::neighbor ALIAS neighbor)
-target_include_directories(neighbor INTERFACE $<BUILD_INTERFACE:${NEIGHBOR_INCLUDE_DIR}>
+target_include_directories(neighbor INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
                                               $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(neighbor INTERFACE CUB::CUB)
 
@@ -45,7 +45,7 @@ endif()
 # install headers & cmake package
 include(CMakePackageConfigHelpers)
 if(NEIGHBOR_INSTALL)
-    install(DIRECTORY ${NEIGHBOR_INCLUDE_DIR}/neighbor DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/include/neighbor DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
     configure_package_config_file(cmake/neighborConfig.cmake.in
                                   "${CMAKE_CURRENT_BINARY_DIR}/neighborConfig.cmake"

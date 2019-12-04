@@ -12,7 +12,7 @@ find_path(UPP11_INCLUDE_DIR NAMES upp11/upp11.h)
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(UPP11 REQUIRED_VARS UPP11_INCLUDE_DIR)
-mark_as_advanced(UPP11_FOUND CUB_INCLUDE_DIR)
+mark_as_advanced(UPP11_FOUND UPP11_INCLUDE_DIR)
 
 if(UPP11_FOUND)
     set(UPP11_INCLUDE_DIRS ${UPP11_INCLUDE_DIR})
