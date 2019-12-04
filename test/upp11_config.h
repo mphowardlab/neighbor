@@ -14,7 +14,7 @@
 #ifndef NEIGHBOR_TEST_UPP11_CONFIG_H_
 #define NEIGHBOR_TEST_UPP11_CONFIG_H_
 
-#include "hoomd/extern/upp11/upp11.h"
+#include <upp11/upp11.h>
 
 #include <cmath>
 #include <string>

@@ -14,9 +14,11 @@ For additional details, please refer to the following publications:
 ## Dependencies
 
 * [HOOMD-blue](http://bitbucket.org/glotzer/hoomd-blue) >= 2.4.1
-* CMake >= 2.8.0
+* CMake >= 3.9
 * A CUDA toolkit compatible with HOOMD-blue and an NVIDIA GPU with
   compute capability >= 3.5.
+* The CUB library.
+* For testing: the UPP11 library.
 
 ## Compiling
 

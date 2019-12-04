@@ -3,42 +3,66 @@
 
 # Maintainer: mphoward
 
-CMAKE_MINIMUM_REQUIRED(VERSION 3.9 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.9)
 
-IF(NOT NEIGHBOR_HOOMD_INTERNAL)
-    # check for internal hoomd project
-    set(HOOMD_INTERNAL OFF)
+project(neighbor VERSION 0.3.0 LANGUAGES CXX CUDA)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
-    # Name the plugin project
-    project(neighbor LANGUAGES C CXX)
+# check if neighbor is being used directly or via add_subdirectory
+# this sets the default options for whether headers, tests, and benchmarks should be used
+set(NEIGHBOR_MASTER_PROJECT OFF)
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    set(NEIGHBOR_MASTER_PROJECT ON)
+endif()
+option(NEIGHBOR_INSTALL "Install neighbor header files?" ${NEIGHBOR_MASTER_PROJECT})
+option(NEIGHBOR_TEST "Build neighbor test suite?" ${NEIGHBOR_MASTER_PROJECT})
+option(NEIGHBOR_BENCHMARK "Build neighbor benchmarks?" ${NEIGHBOR_MASTER_PROJECT})
+set(NEIGHBOR_CUDA_ARCH "35" CACHE STRING "Target CUDA architecture for compiled objects.")
 
-    # Find the installed HOOMD
-    find_package(HOOMD 2.6.0 REQUIRED)
+# find CUB and make it a dependency
+find_package(CUB REQUIRED)
 
-    message(STATUS "Found HOOMD ${HOOMD_VERSION}: ${HOOMD_INSTALL_PREFIX}/${PYTHON_SITE_INSTALL_DIR}")
+# setup the neighbor header-only library
+include(GNUInstallDirs)
+set(NEIGHBOR_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}/include")
+add_library(neighbor INTERFACE)
+add_library(neighbor::neighbor ALIAS neighbor)
+target_include_directories(neighbor INTERFACE $<BUILD_INTERFACE:${NEIGHBOR_INCLUDE_DIR}>
+                                              $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_link_libraries(neighbor INTERFACE CUB::CUB)
 
-    # Force installation to the HOOMD installation location
-    set(CMAKE_INSTALL_PREFIX ${HOOMD_INSTALL_PREFIX} CACHE PATH "Installation prefix" FORCE)
-
-    # setup unit tests
+# add tests
+if(NEIGHBOR_TEST)
     enable_testing()
-    option(BUILD_TESTING "Build unit tests" ON)
-    if(BUILD_TESTING)
-        add_custom_target(test_all ALL)
-    endif(BUILD_TESTING)
+    add_subdirectory(test)
 endif()
 
-# CUDA is required to build this module
-if(NOT ENABLE_CUDA)
-    message(FATAL_ERROR "Plugins require CUDA-enabled hoomd")
-endif()
-
-# add the base directory as an include source (for executables / tests)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-
-# add subdirectories
-add_subdirectory(neighbor)
-
-#if (NOT NEIGHBOR_HOOMD_INTERNAL)
+# add benchmark
+#if(NEIGHBOR_BENCHMARK)
 #    add_subdirectory(benchmark)
 #endif()
+
+# install headers & cmake package
+include(CMakePackageConfigHelpers)
+if(NEIGHBOR_INSTALL)
+    install(DIRECTORY ${NEIGHBOR_INCLUDE_DIR}/neighbor DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+    configure_package_config_file(cmake/neighborConfig.cmake.in
+                                  "${CMAKE_CURRENT_BINARY_DIR}/neighborConfig.cmake"
+                                  INSTALL_DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/cmake/neighbor)
+
+    write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/neighborConfigVersion.cmake
+                                     VERSION ${neighbor_VERSION}
+                                     COMPATIBILITY SameMajorVersion)
+
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/neighborConfig.cmake
+                  ${CMAKE_CURRENT_BINARY_DIR}/neighborConfigVersion.cmake
+                  cmake/FindCUB.cmake
+            DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/cmake/neighbor)
+
+    install(TARGETS neighbor EXPORT neighborTargets)
+
+    install(EXPORT neighborTargets
+            NAMESPACE neighbor::
+            DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/cmake/neighbor)
+endif()

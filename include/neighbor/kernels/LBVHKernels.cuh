@@ -8,7 +8,7 @@
 
 #include "neighbor/BoundingVolumes.h"
 
-#include "hoomd/extern/cub/cub/cub.cuh"
+#include <cub/cub.cuh>
 
 namespace neighbor
 {
