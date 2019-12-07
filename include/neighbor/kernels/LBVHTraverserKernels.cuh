@@ -160,12 +160,11 @@ __global__ void lbvh_compress_ropes(LBVHCompressedData ctree,
  * During traversal, an image processes the entire tree, and then advances to the next
  * image once traversal terminates. A maximum of 32 images is supported.
  */
-template<class OutputOpT, class QueryOpT>
+template<class OutputOpT, class QueryOpT, class TranslateOpT>
 __global__ void lbvh_traverse_ropes(OutputOpT out,
                                     const LBVHCompressedData lbvh,
                                     const QueryOpT query,
-                                    const float3 *d_images,
-                                    const unsigned int Nimages)
+                                    const TranslateOpT images)
     {
     // one thread per test
     const unsigned int idx = blockDim.x * blockIdx.x + threadIdx.x;
@@ -188,19 +187,38 @@ __global__ void lbvh_traverse_ropes(OutputOpT out,
 
     // find image flags against root before divergence
     unsigned int flags = 0;
-    const int nbits = ((int)Nimages <= 32) ? Nimages : 32;
+    const int nbits = (images.size() <= 32u) ? images.size() : 32;
     for (unsigned int i=0; i < nbits; ++i)
         {
-        const float3 image = d_images[i];
+        const typename TranslateOpT::type image = images.get(i);
         const typename QueryOpT::Volume q = query.get(qdata,image);
         if (query.overlap(q,tree_box)) flags |= 1u << i;
         }
 
     // stackless search
-    typename QueryOpT::Volume q = query.get(qdata, make_float3(0,0,0));
-    int node = lbvh.root;
     do
         {
+        // look for the next image
+        int image_bit = __ffs(flags);
+        if (image_bit)
+            {
+            // shift the lsb by 1 to get the image index
+            --image_bit;
+
+            // unset the bit from this image
+            flags &= ~(1u << image_bit);
+            }
+        else
+            {
+            // no more images, quit
+            break;
+            }
+
+        // move the sphere to the next image
+        const typename TranslateOpT::type image = images.get(image_bit);
+        typename QueryOpT::Volume q = query.get(qdata, image);
+
+        int node = lbvh.root;
         while (node != LBVHSentinel)
             {
             // load node and decompress bounds so that they always *expand*
@@ -236,27 +254,6 @@ __global__ void lbvh_traverse_ropes(OutputOpT out,
                     }
                 }
             } // end stackless search
-
-        // look for the next image
-        int image_bit = __ffs(flags);
-        if (image_bit)
-            {
-            // shift the lsb by 1 to get the image index
-            --image_bit;
-
-            // move the sphere to the next image
-            const float3 image = d_images[image_bit];
-            q = query.get(qdata, image);
-            node = lbvh.root;
-
-            // unset the bit from this image
-            flags &= ~(1u << image_bit);
-            }
-        else
-            {
-            // no more images, quit
-            break;
-            }
         } while(true);
 
     out.finalize(result);
@@ -316,28 +313,30 @@ void lbvh_compress_ropes(LBVHCompressedData ctree,
  *
  * \sa kernel::lbvh_traverse_ropes
  */
-template<class OutputOpT, class QueryOpT>
+template<class OutputOpT, class QueryOpT, class TranslateOpT>
 void lbvh_traverse_ropes(OutputOpT& out,
                          const LBVHCompressedData& lbvh,
                          const QueryOpT& query,
-                         const float3 *d_images,
-                         unsigned int Nimages,
+                         const TranslateOpT& images,
                          unsigned int block_size,
                          cudaStream_t stream = 0)
     {
+    // quit if there are no images
+    if (query.size() == 0 || images.size() == 0)
+        return;
+
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
         cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_traverse_ropes<OutputOpT,QueryOpT>);
+        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_traverse_ropes<OutputOpT,QueryOpT,TranslateOpT>);
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = (query.size() + run_block_size - 1)/run_block_size;
-    kernel::lbvh_traverse_ropes<<<num_blocks, run_block_size, 0, stream>>>
-        (out, lbvh, query, d_images, Nimages);
+    kernel::lbvh_traverse_ropes<<<num_blocks, run_block_size, 0, stream>>>(out, lbvh, query, images);
     }
 
 } // end namespace gpu

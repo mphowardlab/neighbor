@@ -9,6 +9,7 @@
 #include "LBVH.h"
 #include "kernels/LBVHTraverserKernels.cuh"
 #include "TransformOps.h"
+#include "TranslateOps.h"
 
 namespace neighbor
 {
@@ -75,20 +76,20 @@ class LBVHTraverser
             }
 
         //! Traverse the LBVH.
-        template<class OutputOpT, class QueryOpT, class TransformOpT>
+        template<class OutputOpT, class QueryOpT, class TransformOpT, class TranslateOpT=SelfOp>
         void traverse(OutputOpT& out,
                       const QueryOpT& query,
                       const TransformOpT& transform,
                       LBVH& lbvh,
-                      const thrust::device_vector<float3>& images = thrust::device_vector<float3>(),
+                      const TranslateOpT& images = TranslateOpT(),
                       cudaStream_t stream = 0);
 
         //! Traverse the LBVH.
-        template<class OutputOpT, class QueryOpT>
+        template<class OutputOpT, class QueryOpT, class TranslateOpT=SelfOp>
         void traverse(OutputOpT& out,
                       const QueryOpT& query,
                       LBVH& lbvh,
-                      const thrust::device_vector<float3>& images = thrust::device_vector<float3>(),
+                      const TranslateOpT& images = TranslateOpT(),
                       cudaStream_t stream = 0)
             {
             traverse(out, query, NullTransformOp(), lbvh, images, stream);
@@ -200,23 +201,24 @@ void LBVHTraverser::setup(const TransformOpT& transform, LBVH& lbvh, cudaStream_
  * If the query volume does not overlap OR it has reached a leaf node, the traversal should proceed
  * along the rope. Traversal terminates when the LBVHSentinel is reached for the rope.
  */
-template<class OutputOpT, class QueryOpT, class TransformOpT>
+template<class OutputOpT, class QueryOpT, class TransformOpT, class TranslateOpT>
 void LBVHTraverser::traverse(OutputOpT& out,
                              const QueryOpT& query,
                              const TransformOpT& transform,
                              LBVH& lbvh,
-                             const thrust::device_vector<float3>& images,
+                             const TranslateOpT& images,
                              cudaStream_t stream)
     {
     // don't traverse with empty lbvh
     if (lbvh.getN() == 0) return;
 
+    // don't traverse with no query objects or images
+    if (query.size() == 0 || images.size() == 0) return;
+
     // kernel uses int32 bitflags for the images, so limit to 32 images
-    const unsigned int Nimages = images.size();
-    if (Nimages > 32)
+    if (images.size() > 32)
         {
-        std::cerr << "A maximum of 32 image vectors are supported by LBVH traversers." << std::endl;
-        throw std::runtime_error("Too many images (>32) in LBVH traverser.");
+        throw std::runtime_error("A maximum of 32 image vectores are supported by LBVH traversers.");
         }
 
     // setup if this is not a replay
@@ -231,8 +233,7 @@ void LBVHTraverser::traverse(OutputOpT& out,
     gpu::lbvh_traverse_ropes(out,
                              clbvh,
                              query,
-                             thrust::raw_pointer_cast(images.data()),
-                             Nimages,
+                             images,
                              128/*m_tune_traverse->getParam()*/,
                              stream);
 //     m_tune_traverse->end();

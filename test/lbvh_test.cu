@@ -207,7 +207,7 @@ UP_TEST( lbvh_test )
             neighbor::SphereQueryOp query(thrust::raw_pointer_cast(spheres.data()),
                                           spheres.size());
 
-            traverser.traverse(nl_op, query, *lbvh, thrust::device_vector<float3>(), streams[i]);
+            traverser.traverse(nl_op, query, *lbvh, neighbor::SelfOp(), streams[i]);
             cudaStreamSynchronize(streams[i]);
             }
         // check output
@@ -327,7 +327,7 @@ UP_TEST( lbvh_periodic_test )
 
     // query spheres for tree that intersect through boundaries
     thrust::device_vector<float4> spheres(2);
-    thrust::device_vector<float3> images(26);
+    thrust::device_vector<float3> images(27);
         {
         // p2
         spheres[0] = make_float4(-1.9, 1.9, 1.9, 0.5);
@@ -341,8 +341,6 @@ UP_TEST( lbvh_periodic_test )
                 {
                 for (int iz=-1; iz <= 1; ++iz)
                     {
-                    if (ix == 0 && iy == 0 && iz == 0) continue;
-
                     images[idx++] = make_float3(4*ix, 4*iy, 4*iz);
                     }
                 }
@@ -372,7 +370,9 @@ UP_TEST( lbvh_periodic_test )
         neighbor::SphereQueryOp query(thrust::raw_pointer_cast(spheres.data()),
                                       spheres.size());
 
-        traverser.traverse(count, query, *lbvh, images);
+        neighbor::ImageListOp<float3> translate(thrust::raw_pointer_cast(images.data()), images.size());
+
+        traverser.traverse(count, query, *lbvh, translate);
 
         thrust::host_vector<unsigned int> h_hits(hits);
         UP_ASSERT_EQUAL(h_hits[0], 2);
@@ -419,7 +419,7 @@ UP_TEST( lbvh_validate )
         }
 
     // traversal images
-    thrust::device_vector<float3> images(26);
+    thrust::device_vector<float3> images(27);
         {
         unsigned int idx=0;
         for (int ix=-1; ix <= 1; ++ix)
@@ -428,8 +428,6 @@ UP_TEST( lbvh_validate )
                 {
                 for (int iz=-1; iz <= 1; ++iz)
                     {
-                    if (ix == 0 && iy == 0 && iz == 0) continue;
-
                     images[idx++] = make_float3(L.x*ix, L.y*iy, L.z*iz);
                     }
                 }
@@ -445,7 +443,10 @@ UP_TEST( lbvh_validate )
         neighbor::SphereQueryOp query(thrust::raw_pointer_cast(spheres.data()),
                                       spheres.size());
 
-        traverser.traverse(count, query, *lbvh, images);
+        neighbor::ImageListOp<float3> translate(thrust::raw_pointer_cast(images.data()),
+                                                images.size());
+
+        traverser.traverse(count, query, *lbvh, translate);
         }
 
     // generate list of reference collisions
