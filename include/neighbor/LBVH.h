@@ -3,11 +3,12 @@
 
 // Maintainer: mphoward
 
-#ifndef NEIGHBOR_LBVH_CUH_
-#define NEIGHBOR_LBVH_CUH_
+#ifndef NEIGHBOR_LBVH_H_
+#define NEIGHBOR_LBVH_H_
 
 #include <thrust/device_vector.h>
 
+#include "Autotuner.h"
 #include "kernels/LBVHKernels.cuh"
 
 namespace neighbor
@@ -133,7 +134,6 @@ class LBVH
             return tree;
             }
 
-        #if 0
         //! Set the kernel autotuner parameters
         /*!
          * \param enable If true, run the autotuners. If false, disable them.
@@ -150,7 +150,6 @@ class LBVH
             m_tune_bubble->setEnabled(enable);
             m_tune_bubble->setPeriod(period);
             }
-        #endif
 
     private:
         int m_root;                 //!< Root index
@@ -171,11 +170,9 @@ class LBVH
 
         thrust::device_vector<unsigned int> m_locks; //!< Node locks for generating aabb hierarchy
 
-        #if 0
         std::unique_ptr<Autotuner> m_tune_gen_codes;    //!< Autotuner for generating Morton codes kernel
         std::unique_ptr<Autotuner> m_tune_gen_tree;     //!< Autotuner for generating tree hierarchy kernel
         std::unique_ptr<Autotuner> m_tune_bubble;       //!< Autotuner for AABB bubble kernel
-        #endif
 
         //! Allocate
         void allocate(unsigned int N);
@@ -187,11 +184,9 @@ class LBVH
 LBVH::LBVH()
     : m_root(gpu::LBVHSentinel), m_N(0), m_N_internal(0), m_N_nodes(0)
     {
-    #if 0
-    m_tune_gen_codes.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_gen_codes", m_exec_conf));
-    m_tune_gen_tree.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_gen_tree", m_exec_conf));
-    m_tune_bubble.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_bubble", m_exec_conf));
-    #endif
+    m_tune_gen_codes.reset(new Autotuner(32, 1024, 32, 5, 100000));
+    m_tune_gen_tree.reset(new Autotuner(32, 1024, 32, 5, 100000));
+    m_tune_bubble.reset(new Autotuner(32, 1024, 32, 5, 100000));
     }
 
 /*!
@@ -231,16 +226,16 @@ void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cuda
         }
 
     // calculate morton codes
-//         m_tune_gen_codes->begin();
+    m_tune_gen_codes->begin();
     gpu::lbvh_gen_codes(thrust::raw_pointer_cast(m_codes.data()),
                         thrust::raw_pointer_cast(m_indexes.data()),
                         insert,
                         lo,
                         hi,
                         m_N,
-                        /*m_tune_gen_codes->getParam()*/128,
+                        m_tune_gen_codes->getParam(),
                         stream);
-//         m_tune_gen_codes->end();
+     m_tune_gen_codes->end();
 
     // sort morton codes
         {
@@ -277,22 +272,22 @@ void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cuda
     // process hierarchy and bubble aabbs
     gpu::LBVHData tree = data();
 
-//         m_tune_gen_tree->begin();
+    m_tune_gen_tree->begin();
     gpu::lbvh_gen_tree(tree,
                        thrust::raw_pointer_cast(m_sorted_codes.data()),
                        m_N,
-                       128/*m_tune_gen_tree->getParam()*/,
+                       m_tune_gen_tree->getParam(),
                        stream);
-//         m_tune_gen_tree->end();
+    m_tune_gen_tree->end();
 
-//         m_tune_bubble->begin();
+    m_tune_bubble->begin();
     gpu::lbvh_bubble_aabbs(tree,
                            insert,
                            thrust::raw_pointer_cast(m_locks.data()),
                            m_N,
-                           128/*m_tune_bubble->getParam()*/,
+                           m_tune_bubble->getParam(),
                            stream);
-//         m_tune_bubble->end();
+    m_tune_bubble->end();
     }
 
 /*!
@@ -363,4 +358,4 @@ void LBVH::allocate(unsigned int N)
 
 } // end namespace neighbor
 
-#endif // NEIGHBOR_LBVH_CUH_
+#endif // NEIGHBOR_LBVH_H_

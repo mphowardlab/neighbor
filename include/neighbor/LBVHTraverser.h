@@ -7,9 +7,11 @@
 #define NEIGHBOR_LBVH_TRAVERSER_H_
 
 #include "LBVH.h"
-#include "kernels/LBVHTraverserKernels.cuh"
 #include "TransformOps.h"
 #include "TranslateOps.h"
+
+#include "Autotuner.h"
+#include "kernels/LBVHTraverserKernels.cuh"
 
 namespace neighbor
 {
@@ -113,7 +115,6 @@ class LBVHTraverser
             return clbvh;
             }
 
-        #if 0
         //! Set the kernel autotuner parameters
         /*!
          * \param enable If true, run the autotuners. If false, disable them.
@@ -127,7 +128,6 @@ class LBVHTraverser
             m_tune_compress->setEnabled(enable);
             m_tune_compress->setPeriod(period);
             }
-        #endif
 
     private:
         int m_root;
@@ -136,10 +136,8 @@ class LBVHTraverser
         thrust::device_vector<float3> m_lbvh_hi; //!< Upper bound of tree
         thrust::device_vector<float3> m_bins;    //!< Bin size for compression
 
-        #if 0
         std::unique_ptr<Autotuner> m_tune_traverse; //!< Autotuner for traversal kernel
         std::unique_ptr<Autotuner> m_tune_compress; //!< Autotuner for compression kernel
-        #endif
 
         //! Compresses the lbvh into internal representation
         template<class TransformOpT>
@@ -151,10 +149,8 @@ class LBVHTraverser
 LBVHTraverser::LBVHTraverser()
     : m_lbvh_lo(1), m_lbvh_hi(1), m_bins(1), m_replay(false)
     {
-    #if 0
-    m_tune_traverse.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_rope_traverse", m_exec_conf));
-    m_tune_compress.reset(new Autotuner(32, 1024, 32, 5, 100000, "lbvh_rope_compress", m_exec_conf));
-    #endif
+    m_tune_traverse.reset(new Autotuner(32, 1024, 32, 5, 100000));
+    m_tune_compress.reset(new Autotuner(32, 1024, 32, 5, 100000));
     }
 
 /*!
@@ -229,14 +225,14 @@ void LBVHTraverser::traverse(OutputOpT& out,
     gpu::LBVHCompressedData clbvh = data();
 
     // traversal data
-//     m_tune_traverse->begin();
+    m_tune_traverse->begin();
     gpu::lbvh_traverse_ropes(out,
                              clbvh,
                              query,
                              images,
-                             128/*m_tune_traverse->getParam()*/,
+                             m_tune_traverse->getParam(),
                              stream);
-//     m_tune_traverse->end();
+    m_tune_traverse->end();
     }
 
 /*!
@@ -287,15 +283,15 @@ void LBVHTraverser::compress(LBVH& lbvh, const TransformOpT& transform, cudaStre
     gpu::LBVHCompressedData ctree = data();
 
     // compress the data
-//     m_tune_compress->begin();
+    m_tune_compress->begin();
     gpu::lbvh_compress_ropes(ctree,
                              transform,
                              tree,
                              lbvh.getNInternal(),
                              lbvh.getNNodes(),
-                             128/*m_tune_compress->getParam()*/,
+                             m_tune_compress->getParam(),
                              stream);
-//     m_tune_compress->end();
+    m_tune_compress->end();
     }
 } // end namespace neighbor
 
