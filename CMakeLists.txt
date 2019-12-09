@@ -38,9 +38,9 @@ if(NEIGHBOR_TEST)
 endif()
 
 # add benchmark
-#if(NEIGHBOR_BENCHMARK)
-#    add_subdirectory(benchmark)
-#endif()
+if(NEIGHBOR_BENCHMARK)
+    add_subdirectory(benchmark)
+endif()
 
 # install headers & cmake package
 include(CMakePackageConfigHelpers)

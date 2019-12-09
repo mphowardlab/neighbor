@@ -3,11 +3,7 @@
 
 // Maintainer: mphoward
 
-#include "neighbor/LBVH.h"
-#include "neighbor/LBVHTraverser.h"
-#include "neighbor/OutputOps.h"
-#include "neighbor/QueryOps.h"
-#include "neighbor/InsertOps.h"
+#include "lbvh_benchmark.cuh"
 
 #include "hoomd/ClockSource.h"
 #include "hoomd/ExecutionConfiguration.h"
@@ -93,7 +89,7 @@ int main(int argc, char * argv[])
     double rcut;
     if (argc != 5)
         {
-        std::cout << "Usage: benchmark_lbvh <input> <Nframes> <rcut> <output>" << std::endl;
+        std::cout << "Usage: lbvh_benchmark <input> <Nframes> <rcut> <output>" << std::endl;
         return safe_exit(1);
         }
     else
@@ -136,7 +132,7 @@ int main(int argc, char * argv[])
             auto pdata = sysdef->getParticleData();
 
             // build the lbvh
-            auto lbvh = std::make_shared<neighbor::LBVH>(exec_conf);
+            LBVHWrapper lbvh;
             const BoxDim& box = pdata->getBox();
 
             // warmup the lbvh autotuners
@@ -147,10 +143,10 @@ int main(int argc, char * argv[])
                 // warmup the lbvh autotuners
                 for (unsigned int i=0; i < 200; ++i)
                     {
-                    lbvh->build(neighbor::PointInsertOp(d_postype.data, pdata->getN()), box.getLo(), box.getHi());
+                    lbvh.build(d_postype.data, pdata->getN(), box.getLo(), box.getHi());
                     }
                 }
-            lbvh->setAutotunerParams(false, 100000);
+            lbvh.setAutotunerParams(false, 100000);
 
             // profile lbvh build times
             std::vector<double> times(5);
@@ -159,7 +155,7 @@ int main(int argc, char * argv[])
 
                 for (size_t i=0; i < times.size(); ++i)
                     {
-                    times[i] = profile([&]{lbvh->build(neighbor::PointInsertOp(d_postype.data, pdata->getN()), box.getLo(), box.getHi());}, 500);
+                    times[i] = profile([&]{lbvh.build(d_postype.data, pdata->getN(), box.getLo(), box.getHi());}, 500);
                     }
                 }
             std::sort(times.begin(), times.end());
@@ -168,15 +164,15 @@ int main(int argc, char * argv[])
 
             // make traversal volumes
             GlobalArray<Scalar4> spheres(pdata->getN(), exec_conf);
-            GlobalArray<Scalar3> images(26, exec_conf);
+            GlobalArray<Scalar3> images(27, exec_conf);
             GlobalArray<unsigned int> hits(pdata->getN(), exec_conf);
                 {
                 ArrayHandle<Scalar4> h_spheres(spheres, access_location::host, access_mode::overwrite);
                 ArrayHandle<Scalar4> h_pos(pdata->getPositions(), access_location::host, access_mode::read);
-                ArrayHandle<unsigned int> h_primitives(lbvh->getPrimitives(), access_location::host, access_mode::read);
+                thrust::host_vector<unsigned int> h_primitives(lbvh.getPrimitives());
                 for (unsigned int i=0; i < pdata->getN(); ++i)
                     {
-                    unsigned int tag = h_primitives.data[i];
+                    unsigned int tag = h_primitives[i];
                     const Scalar4 postype = h_pos.data[tag];
                     const Scalar3 pos = make_scalar3(postype.x, postype.y, postype.z);
                     h_spheres.data[i] = make_scalar4(pos.x, pos.y, pos.z, rcut);
@@ -185,7 +181,8 @@ int main(int argc, char * argv[])
                 // 26 periodic image vectors
                 ArrayHandle<Scalar3> h_images(images, access_location::host, access_mode::overwrite);
                 const Scalar3 L = pdata->getBox().getL();
-                unsigned int idx = 0;
+                h_images.data[0] = make_scalar3(0,0,0);
+                unsigned int idx = 1;
                 for (int ix=-1; ix <= 1; ++ix)
                     {
                     for (int iy=-1; iy <= 1; ++iy)
@@ -201,24 +198,22 @@ int main(int argc, char * argv[])
 
             // try with rope traversal
                 {
-                neighbor::LBVHTraverser traverser(exec_conf);
+                LBVHTraverserWrapper traverser;
                     {
                     ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
-                    neighbor::CountNeighborsOp count(d_hits.data);
-
                     ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
-                    neighbor::SphereQueryOp query(d_spheres.data, pdata->getN());
 
+                    ArrayHandle<Scalar3> d_images(images, access_location::device, access_mode::read);
                     // warmup the autotuners
                     for (unsigned int i=0; i < 200; ++i)
                         {
-                        traverser.traverse(count, query, *lbvh, images);
+                        traverser.traverse(d_hits.data, d_spheres.data, pdata->getN(), lbvh.get(), d_images.data, 27);
                         }
                     traverser.setAutotunerParams(false, 100000);
 
                     for (size_t i=0; i < times.size(); ++ i)
                         {
-                        times[i] = profile([&]{traverser.traverse(count, query, *lbvh, images);},500);
+                        times[i] = profile([&]{traverser.traverse(d_hits.data, d_spheres.data, pdata->getN(), lbvh.get(), d_images.data, 27);},500);
                         }
                     }
                 std::sort(times.begin(), times.end());
