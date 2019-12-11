@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_KERNELS_LBVH_KERNELS_CUH_
 #define NEIGHBOR_KERNELS_LBVH_KERNELS_CUH_
 
-#include "neighbor/BoundingVolumes.h"
+#include "../BoundingVolumes.h"
 
 #include <cub/cub.cuh>
 

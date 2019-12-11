@@ -7,7 +7,7 @@
 #define NEIGHBOR_LBVH_TRAVERSER_CUH_
 
 #include "LBVHKernels.cuh"
-#include "neighbor/BoundingVolumes.h"
+#include "../BoundingVolumes.h"
 
 namespace neighbor
 {
