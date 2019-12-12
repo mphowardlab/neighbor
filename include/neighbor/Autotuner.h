@@ -47,10 +47,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace neighbor
 {
 
+//! Kernel launch parameter autotuner
+/*!
+ * The autotuner scans through a range of parameters for the block size. The kernels are timed
+ * using CUDA events in the default stream. The tuner will select the "best" launch parameter
+ * using the median of multiple samples at each parameter value. It will periodically rescan
+ * to check this parameter.
+ *
+ * This class is a modification of HOOMD-blue's Autotuner (see license). It has been modified
+ * to remove vestigial code and the dependence on certain objects that are not compatible
+ * with compilation in NVCC.
+ */
 class Autotuner
     {
     public:
-        //! Constructor with implicit range
+        //! Constructor with set range
         Autotuner(unsigned int start,
                   unsigned int end,
                   unsigned int step,
@@ -58,7 +69,7 @@ class Autotuner
                   unsigned int period);
 
         //! Destructor
-        ~Autotuner();
+        virtual ~Autotuner();
 
         //! Call before kernel launch
         void begin();
@@ -67,11 +78,12 @@ class Autotuner
         void end();
 
         //! Get the parameter to set for the kernel launch
-        /*! \returns the current parameter that should be set for the kernel launch
-
-        While sampling, the value returned by this function will sweep though all valid parameters. Otherwise, it will
-        return the fastest performing parameter.
-        */
+        /*!
+         * \returns the current parameter that should be set for the kernel launch
+         *
+         * While sampling, the value returned by this function will sweep though all valid
+         * parameters. Otherwise, it will return the fastest performing parameter.
+         */
         unsigned int getParam()
             {
             return m_current_param;
@@ -133,8 +145,8 @@ class Autotuner
         unsigned int m_calls;           //!< Count of the number of calls since the last sample
         unsigned int m_current_param;   //!< Value of the current parameter
 
-        std::vector< std::vector< float > > m_samples;  //!< Raw sample data for each element
-        std::vector< float > m_sample_median;           //!< Current sample median for each element
+        std::vector<std::vector<float>> m_samples;  //!< Raw sample data for each element
+        std::vector<float> m_sample_median;         //!< Current sample median for each element
 
         cudaEvent_t m_start;      //!< CUDA event for recording start times
         cudaEvent_t m_stop;       //!< CUDA event for recording end times
@@ -145,8 +157,6 @@ class Autotuner
     \param step spacing between valid parameters
     \param nsamples Number of time samples to take at each parameter
     \param period Number of calls to begin() before sampling is redone
-    \param name Descriptive name (used in messenger output)
-    \param exec_conf Execution configuration
 
     \post Valid parameters will be generated with a spacing of \a step in the range [start,end] inclusive.
 */
@@ -161,7 +171,7 @@ Autotuner::Autotuner(unsigned int start,
     // initialize the parameters
     m_parameters.resize((end - start) / step + 1);
     unsigned int cur_param = start;
-    for (unsigned int i = 0; i < m_parameters.size(); i++)
+    for (unsigned int i=0; i < m_parameters.size(); ++i)
         {
         m_parameters[i] = cur_param;
         cur_param += step;
@@ -172,7 +182,7 @@ Autotuner::Autotuner(unsigned int start,
     if ((m_nsamples & 1) == 0) m_nsamples += 1;
     m_samples.resize(m_parameters.size());
     m_sample_median.resize(m_parameters.size());
-    for (unsigned int i = 0; i < m_parameters.size(); i++)
+    for (unsigned int i=0; i < m_parameters.size(); ++i)
         {
         m_samples[i].resize(m_nsamples);
         }
@@ -188,6 +198,10 @@ Autotuner::~Autotuner()
     cudaEventDestroy(m_stop);
     }
 
+/*!
+ * Beginning the tuner will place a CUDA event into the default stream
+ * if the tuner is not IDLE. This will block execution in other streams.
+ */
 void Autotuner::begin()
     {
     // skip if disabled
@@ -200,6 +214,11 @@ void Autotuner::begin()
         }
     }
 
+/*!
+ * Ending the tuner will place a CUDA event into the default stream
+ * if the tuner is not IDLE and wait for the event to synchronize.
+ * This will block execution in other streams.
+ */
 void Autotuner::end()
     {
     // skip if disabled

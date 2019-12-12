@@ -10,7 +10,8 @@
 #include <thrust/device_vector.h>
 
 #include "Autotuner.h"
-#include "kernels/LBVHKernels.cuh"
+#include "LBVHData.h"
+#include "kernels/LBVH.cuh"
 
 namespace neighbor
 {
@@ -27,7 +28,7 @@ namespace neighbor
  * intersected nodes until the primitives are reached.
  *
  * The LBVH class constructs such a hierarchy on the GPU using the ::build method. The
- * point primitives must be supplied as Scalar4s (defined in HOOMD-blue precision model).
+ * primitives can be injected using a templated insert operation, which converts them to bounding boxes.
  * Regardless of the precision of the primitives, the bounding boxes are stored in
  * single-precision in a way that preserves correctness of the tree. The build algorithm
  * is due to Karras with 30-bit Morton codes to sort primitives.
@@ -40,9 +41,7 @@ namespace neighbor
  * leaf nodes, and the root node is node 0.
  *
  * For processing the LBVH in GPU kernels, it may be useful to obtain an object containing
- * only the raw pointers to the tree data (see LBVHData in LBVH.cuh). The caller must
- * construct such an object due to the multitude of different access modes that are possible
- * for the GPU data.
+ * only the raw pointers to the tree data using ::data (see LBVHData).
  */
 class LBVH
     {
@@ -50,15 +49,19 @@ class LBVH
         //! Setup an unallocated LBVH
         LBVH();
 
-        //! Build the LBVH
-        template<class InsertOpT>
-        void build(const InsertOpT& insert, const float3 lo, const float3 hi, cudaStream_t stream = 0);
-
         //! Pre-setup function
+        /*!
+         * This function can be called in advance to avoid some (but not all) calls that might block
+         * the build operation from executing asynchronously.
+         */
         void setup(unsigned int N)
             {
             allocate(N);
             }
+
+        //! Build the LBVH
+        template<class InsertOpT>
+        void build(const InsertOpT& insert, const float3 lo, const float3 hi, cudaStream_t stream=0);
 
         //! Get the LBVH root node
         int getRoot() const
@@ -120,9 +123,15 @@ class LBVH
             return m_sorted_indexes;
             }
 
-        const gpu::LBVHData data()
+        //! Get the pointer version of the data in the tree.
+        /*!
+         * This method does not currently work as const because the thrust
+         * pointers will be cast to pointers to const, but LBVHData need
+         * not be const.
+         */
+        const LBVHData data()
             {
-            gpu::LBVHData tree;
+            LBVHData tree;
 
             tree.parent = thrust::raw_pointer_cast(m_parent.data());
             tree.left = thrust::raw_pointer_cast(m_left.data());
@@ -164,10 +173,11 @@ class LBVH
         thrust::device_vector<float3> m_lo;  //!< Lower bound of AABB
         thrust::device_vector<float3> m_hi;  //!< Upper bound of AABB
 
-        thrust::device_vector<unsigned int> m_codes;             //!< Morton codes
-        thrust::device_vector<unsigned int> m_indexes;           //!< Primitive indexes
-        thrust::device_vector<unsigned int> m_sorted_codes;      //!< Sorted morton codes
-        thrust::device_vector<unsigned int> m_sorted_indexes;    //!< Sorted primitive indexes
+        thrust::device_vector<unsigned int> m_codes;            //!< Morton codes
+        thrust::device_vector<unsigned int> m_indexes;          //!< Primitive indexes
+        thrust::device_vector<unsigned int> m_sorted_codes;     //!< Sorted morton codes
+        thrust::device_vector<unsigned int> m_sorted_indexes;   //!< Sorted primitive indexes
+        thrust::device_vector<unsigned char> m_tmp;             //!< Temporary memory for sorting
 
         thrust::device_vector<unsigned int> m_locks; //!< Node locks for generating aabb hierarchy
 
@@ -183,7 +193,7 @@ class LBVH
  * The constructor defers memory initialization to the first call to ::build.
  */
 LBVH::LBVH()
-    : m_root(gpu::LBVHSentinel), m_N(0), m_N_internal(0), m_N_nodes(0)
+    : m_root(LBVHSentinel), m_N(0), m_N_internal(0), m_N_nodes(0)
     {
     m_tune_gen_codes.reset(new Autotuner(32, 1024, 32, 5, 100000));
     m_tune_gen_tree.reset(new Autotuner(32, 1024, 32, 5, 100000));
@@ -191,8 +201,7 @@ LBVH::LBVH()
     }
 
 /*!
- * \param insert The insert operation determining AABB extents of primitives
- * \param N Number of primitives
+ * \param insert The insert operation holding the primitives
  * \param lo Lower bound of the scene
  * \param hi Upper bound of the scene
  * \param stream CUDA stream for kernel execution.
@@ -203,9 +212,6 @@ LBVH::LBVH()
  * The caller should ensure that all \a points lie within \a lo and \a hi for best performance.
  * Points lying outside this range are clamped to it during the Morton code calculation, which
  * may lead to a low quality LBVH.
- *
- * \note
- * Currently, small LBVHs (`N` <= 2) are not implemented, and an error will be raised.
  */
 template<class InsertOpT>
 void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cudaStream_t stream)
@@ -221,7 +227,7 @@ void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cuda
     // single-particle just needs a small amount of data
     if (N == 1)
         {
-        gpu::LBVHData tree = data();
+        LBVHData tree = data();
         gpu::lbvh_one_primitive(tree, insert, stream);
         return;
         }
@@ -253,17 +259,22 @@ void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cuda
                              stream);
 
         // make requested temporary allocation (1 char = 1B)
+        // reallocation will block asynchronous builds
         size_t alloc_size = (tmp_bytes > 0) ? tmp_bytes : 4;
-        thrust::device_vector<unsigned char> tmp(alloc_size);
+        if (alloc_size > m_tmp.size())
+            {
+            thrust::device_vector<unsigned char> tmp(alloc_size);
+            m_tmp.swap(tmp);
+            }
 
-        swap = neighbor::gpu::lbvh_sort_codes((void*)thrust::raw_pointer_cast(tmp.data()),
-                                              tmp_bytes,
-                                              thrust::raw_pointer_cast(m_codes.data()),
-                                              thrust::raw_pointer_cast(m_sorted_codes.data()),
-                                              thrust::raw_pointer_cast(m_indexes.data()),
-                                              thrust::raw_pointer_cast(m_sorted_indexes.data()),
-                                              m_N,
-                                              stream);
+        swap = gpu::lbvh_sort_codes((void*)thrust::raw_pointer_cast(m_tmp.data()),
+                                    tmp_bytes,
+                                    thrust::raw_pointer_cast(m_codes.data()),
+                                    thrust::raw_pointer_cast(m_sorted_codes.data()),
+                                    thrust::raw_pointer_cast(m_indexes.data()),
+                                    thrust::raw_pointer_cast(m_sorted_indexes.data()),
+                                    m_N,
+                                    stream);
 
         // sorting will synchronize the stream before returning, so this unfortunately blocks concurrent execution of builds
         if (swap.x) m_sorted_codes.swap(m_codes);
@@ -271,7 +282,7 @@ void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cuda
         }
 
     // process hierarchy and bubble aabbs
-    gpu::LBVHData tree = data();
+    LBVHData tree = data();
 
     m_tune_gen_tree->begin();
     gpu::lbvh_gen_tree(tree,

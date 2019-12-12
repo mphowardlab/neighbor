@@ -1,12 +1,14 @@
+// Copyright (c) 2018-2019, Michael P. Howard.
+// This file is released under the Modified BSD License.
+
+// Maintainer: mphoward
+
 #include "lbvh_benchmark.cuh"
 
-#include "neighbor/LBVH.h"
-#include "neighbor/LBVHTraverser.h"
-#include "neighbor/BoundingVolumes.h"
-#include "neighbor/OutputOps.h"
-#include "neighbor/TranslateOps.h"
+#include "neighbor/neighbor.h"
 
-__host__ float double2float_rd(double x)
+//! Host function approximating double2float round-down
+static float double2float_rd(double x)
     {
     float xf = static_cast<float>(x);
     if (static_cast<double>(xf) > x)
@@ -16,7 +18,8 @@ __host__ float double2float_rd(double x)
     return xf;
     }
 
-__host__ float double2float_ru(double x)
+//! Host function approximating double2float round-up
+static float double2float_ru(double x)
     {
     float xf = static_cast<float>(x);
     if (static_cast<double>(xf) < x)

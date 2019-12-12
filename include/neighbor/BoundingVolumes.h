@@ -28,6 +28,9 @@ namespace neighbor
 struct BoundingBox
     {
     //! Default constructor
+    /*!
+     * This constructor may not assign anything, as it causes issues inside kernels.
+     */
     BoundingBox() {}
 
     //! Single-precision constructor
@@ -54,6 +57,10 @@ struct BoundingBox
         hi = make_float3(__double2float_ru(hi_.x), __double2float_ru(hi_.y), __double2float_ru(hi_.z));
         }
 
+    //! Get the center of the box
+    /*!
+     * \returns The center of the box, which is the arithmetic mean of the bounds.
+     */
     __device__ __forceinline__ float3 getCenter() const
         {
         float3 c;
@@ -80,11 +87,6 @@ struct BoundingBox
                  hi.z < box.lo.z || lo.z > box.hi.z);
         }
 
-    __device__ __forceinline__ BoundingBox asBox() const
-        {
-        return *this;
-        }
-
     float3 lo;  //!< Lower bound of box
     float3 hi;  //!< Upper bound of box
     };
@@ -99,6 +101,10 @@ struct BoundingBox
  */
 struct BoundingSphere
     {
+    //! Default constructor
+    /*!
+     * This constructor may not assign anything, as it causes issues inside kernels.
+     */
     BoundingSphere() {}
 
     //! Single-precision constructor.
@@ -162,14 +168,6 @@ struct BoundingSphere
         const float dr2 = __fmaf_rd(dr.x, dr.x, __fmaf_rd(dr.y, dr.y, __fmul_rd(dr.z,dr.z)));
 
         return (dr2 <= Rsq);
-        }
-
-    __device__ __forceinline__ BoundingBox asBox() const
-        {
-        const float R = __fsqrt_ru(Rsq);
-        const float3 lo = make_float3(__fsub_rd(origin.x,R),__fsub_rd(origin.y,R),__fsub_rd(origin.z,R));
-        const float3 hi = make_float3(__fadd_ru(origin.x,R),__fadd_ru(origin.y,R),__fadd_ru(origin.z,R));
-        return BoundingBox(lo,hi);
         }
 
     float3 origin;  //!< Center of the sphere

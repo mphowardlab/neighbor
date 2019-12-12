@@ -6,11 +6,12 @@
 #ifndef NEIGHBOR_INSERT_OPS_H_
 #define NEIGHBOR_INSERT_OPS_H_
 
+#include <cuda_runtime.h>
+
 #include "BoundingVolumes.h"
 
 namespace neighbor
 {
-
 //! Reference implementation of an (almost trivial) tree insertion operation for points
 /*!
  * The get() method returns a BoundingBox object, which will be used to instantiate a leaf node.
@@ -50,7 +51,7 @@ struct PointInsertOp
         }
 
     const float3* points;
-    unsigned int N;
+    const unsigned int N;
     };
 
 //! An insertion operation for spheres of constant radius
@@ -90,9 +91,9 @@ struct SphereInsertOp
         return N;
         }
 
-    const float3 *points;  //!< Sphere centers
+    const float3* points;  //!< Sphere centers
     const float r;         //!< Constant sphere radius
-    unsigned int N;        //!< Number of spheres
+    const unsigned int N;  //!< Number of spheres
     };
 
 } // end namespace neighbor

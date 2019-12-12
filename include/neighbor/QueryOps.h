@@ -6,6 +6,8 @@
 #ifndef NEIGHBOR_QUERY_OPS_H_
 #define NEIGHBOR_QUERY_OPS_H_
 
+#include <cuda_runtime.h>
+
 #include "BoundingVolumes.h"
 
 namespace neighbor
@@ -114,8 +116,8 @@ struct SphereQueryOp
         return N;
         }
 
-    float4 *spheres;
-    unsigned int N;
+    const float4* spheres;
+    const unsigned int N;
     };
 
 } // end namespace neighbor

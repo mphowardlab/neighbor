@@ -3,37 +3,19 @@
 
 // Maintainer: mphoward
 
-#ifndef NEIGHBOR_KERNELS_LBVH_KERNELS_CUH_
-#define NEIGHBOR_KERNELS_LBVH_KERNELS_CUH_
+#ifndef NEIGHBOR_KERNELS_LBVH_CUH_
+#define NEIGHBOR_KERNELS_LBVH_CUH_
+
+#include <cuda_runtime.h>
+#include <cub/cub.cuh>
 
 #include "../BoundingVolumes.h"
-
-#include <cub/cub.cuh>
+#include "../LBVHData.h"
 
 namespace neighbor
 {
 namespace gpu
 {
-// LBVH sentinel has value of max signed int (~2 billion)
-const int LBVHSentinel=0x7fffffff;
-
-//! Linear bounding volume hierarchy raw data
-/*!
- * LBVHData is a lightweight struct representation of the LBVH. It is useful for passing tree data
- * to a CUDA kernel. It is valid to set a pointer to NULL if it is not required, but the caller
- * for doing so responsibly.
- */
-struct LBVHData
-    {
-    int* parent;                        //!< Parent node
-    int* left;                          //!< Left child
-    int* right;                         //!< Right child
-    unsigned int* primitive;            //!< Primitives
-    float3* lo;                         //!< Lower bound of AABB
-    float3* hi;                         //!< Upper bound of AABB
-    int root;                           //!< Root index
-    };
-
 namespace kernel
 {
 //! Expand a 10-bit integer into 30 bits by inserting 2 zeros after each bit.
@@ -343,6 +325,17 @@ __global__ void lbvh_bubble_aabbs(const LBVHData tree,
         }
     }
 
+//! Kernel to set data for a one-primitive LBVH.
+/*!
+ * \param tree LBVH tree (raw pointers).
+ * \param insert The insert operation to obtain the ONE aabb.
+ *
+ * \tparam InsertOpT the kind of insert operation.
+ *
+ * The one-primitive LBVH needs to be handled in a special kernel
+ * because it violates assumptions about how to traverse the tree,
+ * and this would be overkill anyway.
+ */
 template<class InsertOpT>
 __global__ void lbvh_one_primitive(const LBVHData tree,
                                    const InsertOpT insert)
@@ -361,6 +354,7 @@ __global__ void lbvh_one_primitive(const LBVHData tree,
 
 } // end namespace kernel
 
+//! Generate Morton codes for the primitives.
 /*!
  * \param d_codes Generated Morton codes.
  * \param d_indexes Generated index for the primitive.
@@ -399,6 +393,7 @@ void lbvh_gen_codes(unsigned int *d_codes,
     kernel::lbvh_gen_codes<<<num_blocks, run_block_size, 0, stream>>>(d_codes, d_indexes, insert, lo, hi, N);
     }
 
+//! Sort the primitives into Morton code order.
 /*!
  * \param d_tmp Temporary storage for CUB.
  * \param tmp_bytes Temporary storage size (B) for CUB.
@@ -423,13 +418,13 @@ void lbvh_gen_codes(unsigned int *d_codes,
  * appropriate buffer, which can be determined by the returned flags.
  */
 inline uchar2 lbvh_sort_codes(void *d_tmp,
-                       size_t &tmp_bytes,
-                       unsigned int *d_codes,
-                       unsigned int *d_sorted_codes,
-                       unsigned int *d_indexes,
-                       unsigned int *d_sorted_indexes,
-                       const unsigned int N,
-                       cudaStream_t stream = 0)
+                              size_t &tmp_bytes,
+                              unsigned int *d_codes,
+                              unsigned int *d_sorted_codes,
+                              unsigned int *d_indexes,
+                              unsigned int *d_sorted_indexes,
+                              const unsigned int N,
+                              cudaStream_t stream = 0)
     {
 
     cub::DoubleBuffer<unsigned int> d_keys(d_codes, d_sorted_codes);
@@ -450,6 +445,7 @@ inline uchar2 lbvh_sort_codes(void *d_tmp,
     return swap;
     }
 
+//! Generate the tree hierarchy from the Morton codes.
 /*!
  * \param tree LBVH tree (raw pointers).
  * \param d_codes Sorted Morton codes for the primitives.
@@ -479,6 +475,7 @@ inline void lbvh_gen_tree(const LBVHData tree,
     kernel::lbvh_gen_tree<<<num_blocks, run_block_size, 0, stream>>>(tree, d_codes, N);
     }
 
+//! Bubble the bounding boxes up the tree hierarchy.
 /*!
  * \param tree LBVH tree (raw pointers).
  * \param d_locks Temporary storage for state of internal nodes.
@@ -517,6 +514,16 @@ void lbvh_bubble_aabbs(const LBVHData tree,
     kernel::lbvh_bubble_aabbs<<<num_blocks, run_block_size, 0, stream>>>(tree, insert, d_locks, N);
     }
 
+//! Set data for a one-primitive LBVH.
+/*!
+ * \param tree LBVH tree (raw pointers).
+ * \param insert The insert operation to obtain the ONE aabb.
+ * \param stream CUDA stream for kernel execution.
+ *
+ * \tparam InsertOpT the kind of insert operation
+ *
+ * \sa kernel::lbvh_one_primitive
+ */
 template<class InsertOpT>
 void lbvh_one_primitive(const LBVHData tree,
                         const InsertOpT& insert,
@@ -528,4 +535,4 @@ void lbvh_one_primitive(const LBVHData tree,
 } // end namespace gpu
 } // end namespace neighbor
 
-#endif // NEIGHBOR_KERNELS_LBVH_KERNELS_CUH_
+#endif // NEIGHBOR_KERNELS_LBVH_CUH_

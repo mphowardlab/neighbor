@@ -6,12 +6,15 @@
 #ifndef NEIGHBOR_LBVH_TRAVERSER_H_
 #define NEIGHBOR_LBVH_TRAVERSER_H_
 
+#include <cuda_runtime.h>
+
+#include "LBVHTraverserData.h"
 #include "LBVH.h"
 #include "TransformOps.h"
 #include "TranslateOps.h"
 
 #include "Autotuner.h"
-#include "kernels/LBVHTraverserKernels.cuh"
+#include "kernels/LBVHTraverser.cuh"
 
 namespace neighbor
 {
@@ -47,26 +50,22 @@ namespace neighbor
  * is flexibly implemented using an \a OutputOpT. Common query ops use box or sphere volumes,
  * while output ops may count neighbors or write a neighbor list.
  *
- * The LBVH is not aware of periodic boundary conditions of a scene, and so by default the
- * LBVHTraverser only intersects the volume directly against the LBVH. However, an additional
- * image list can be specified for ::traverse. The image list specifies *additional* translations
- * to consider, beyond the original volume.
+ * The LBVH is not aware of periodic boundary conditions of a scene. The LBVHTraverser accepts
+ * an translation operator, which can move the same volume around the scene. By default, only
+ * the self-image is traversed.
  */
 class LBVHTraverser
     {
     public:
         //! Constructor
-        /*!
-         * \param exec_conf HOOMD-blue execution configuration.
-         */
         LBVHTraverser();
 
         //! Setup LBVH for traversal
         template<class TransformOpT>
-        void setup(const TransformOpT& transform, LBVH& lbvh, cudaStream_t stream = 0);
+        void setup(const TransformOpT& transform, LBVH& lbvh, cudaStream_t stream=0);
 
         //! Setup LBVH for traversal
-        void setup(LBVH& lbvh, cudaStream_t stream = 0)
+        void setup(LBVH& lbvh, cudaStream_t stream=0)
             {
             setup(NullTransformOp(), lbvh, stream);
             }
@@ -77,7 +76,7 @@ class LBVHTraverser
             m_replay = false;
             }
 
-        //! Traverse the LBVH.
+        //! Traverse the LBVH with a primitive transform operation.
         template<class OutputOpT, class QueryOpT, class TransformOpT, class TranslateOpT=SelfOp>
         void traverse(OutputOpT& out,
                       const QueryOpT& query,
@@ -86,7 +85,7 @@ class LBVHTraverser
                       const TranslateOpT& images = TranslateOpT(),
                       cudaStream_t stream = 0);
 
-        //! Traverse the LBVH.
+        //! Traverse the LBVH without a primitive transform operation.
         template<class OutputOpT, class QueryOpT, class TranslateOpT=SelfOp>
         void traverse(OutputOpT& out,
                       const QueryOpT& query,
@@ -103,9 +102,15 @@ class LBVHTraverser
             return m_data;
             }
 
-        const gpu::LBVHCompressedData data()
+        //! Get the pointer version of the data in the traverser.
+        /*!
+         * This method does not currently work as const because the thrust
+         * pointers will be cast to pointers to const, but LBVHCompressedData
+         * need not be const.
+         */
+        const LBVHCompressedData data()
             {
-            gpu::LBVHCompressedData clbvh;
+            LBVHCompressedData clbvh;
             clbvh.root = m_root;
             clbvh.data = thrust::raw_pointer_cast(m_data.data());
             clbvh.lo = thrust::raw_pointer_cast(m_lbvh_lo.data());
@@ -130,11 +135,11 @@ class LBVHTraverser
             }
 
     private:
-        int m_root;
-        thrust::device_vector<int4> m_data;   //!< Internal representation of the LBVH for traversal
-        thrust::device_vector<float3> m_lbvh_lo; //!< Lower bound of tree
-        thrust::device_vector<float3> m_lbvh_hi; //!< Upper bound of tree
-        thrust::device_vector<float3> m_bins;    //!< Bin size for compression
+        int m_root;                                 //!< Root node
+        thrust::device_vector<int4> m_data;         //!< Internal representation of the LBVH for traversal
+        thrust::device_vector<float3> m_lbvh_lo;    //!< Lower bound of tree
+        thrust::device_vector<float3> m_lbvh_hi;    //!< Upper bound of tree
+        thrust::device_vector<float3> m_bins;       //!< Bin size for compression
 
         std::unique_ptr<Autotuner> m_tune_traverse; //!< Autotuner for traversal kernel
         std::unique_ptr<Autotuner> m_tune_compress; //!< Autotuner for compression kernel
@@ -181,17 +186,18 @@ void LBVHTraverser::setup(const TransformOpT& transform, LBVH& lbvh, cudaStream_
  * \param query Query operation for defining search volumes and overlaps.
  * \param transform Transformation operation for cached primitive indexes.
  * \param lbvh LBVH to traverse.
- * \param images Additional images of \a query volumes to test.
+ * \param images Translation operation for moving search volume around.
  * \param stream CUDA stream for kernel execution.
  *
  * \tparam OutputOpT The type of output operation.
  * \tparam QueryOpT The type of query operation.
  * \tparam TransformOpT The type of transformation operation.
+ * \tparam TranslateOpT The type of translation operation.
  *
  * A maximum of 32 \a images are allowed due to the internal representation of the image list
  * in the traversal CUDA kernel. This is more than enough to perform traversal in 3D periodic
- * boundary conditions (26 additional images). Multiple calls to ::traverse are required if
- * more images are needed, but \a out may be overwritten each time depending on the \a OutputOpT.
+ * boundary conditions (27 images). Multiple calls to ::traverse are required if
+ * more images are needed, but \a out must be compatible with multiple calls.
  *
  * If a query volume overlaps an internal node, the traversal should descend to the left child.
  * If the query volume does not overlap OR it has reached a leaf node, the traversal should proceed
@@ -222,7 +228,7 @@ void LBVHTraverser::traverse(OutputOpT& out,
         setup(transform, lbvh, stream);
 
     // compressed lbvh data
-    gpu::LBVHCompressedData clbvh = data();
+    LBVHCompressedData clbvh = data();
 
     // traversal data
     m_tune_traverse->begin();
@@ -276,11 +282,11 @@ void LBVHTraverser::compress(LBVH& lbvh, const TransformOpT& transform, cudaStre
         }
 
     // acquire current tree data for reading
-    gpu::LBVHData tree = lbvh.data();
+    LBVHData tree = lbvh.data();
 
     // set root and acquire compressed tree data for writing
     m_root = lbvh.getRoot();
-    gpu::LBVHCompressedData ctree = data();
+    LBVHCompressedData ctree = data();
 
     // compress the data
     m_tune_compress->begin();

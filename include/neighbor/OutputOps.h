@@ -55,7 +55,7 @@ struct CountNeighborsOp
             : idx(idx_), num_neigh(0)
             {}
 
-        int idx;                //!< Index of the search sphere being processed
+        const int idx;          //!< Index of the search sphere being processed
         unsigned int num_neigh; //!< Number of numbers found
         };
 
@@ -100,7 +100,7 @@ struct CountNeighborsOp
         nneigh[t.idx] = t.num_neigh;
         }
 
-    unsigned int *nneigh;   //!< Number of neighbors per-search sphere
+    unsigned int* nneigh;   //!< Number of neighbors per-search sphere
     };
 
 //! Generate a neighbor list
@@ -126,9 +126,9 @@ struct NeighborListOp
             : idx(idx_), first(first_), num_neigh(0)
             {}
 
-        int idx;                //!< Index of primitive
-        unsigned int first;     //!< First index to use for writing neighbors
-        unsigned int num_neigh; //!< Number of neighbors for this thread
+        const int idx;              //!< Index of primitive
+        const unsigned int first;   //!< First index to use for writing neighbors
+        unsigned int num_neigh;     //!< Number of neighbors for this thread
         };
 
     //! Initialize the local ThreadData
@@ -171,9 +171,9 @@ struct NeighborListOp
         nneigh[t.idx] = t.num_neigh;
         }
 
-    unsigned int* neigh_list;   //!< Neighbors of each sphere
-    unsigned int* nneigh;       //!< Number of neighbors per search sphere
-    unsigned int max_neigh;     //!< Maximum number of neighbors allocated per sphere
+    unsigned int* neigh_list;       //!< Neighbors of each sphere
+    unsigned int* nneigh;           //!< Number of neighbors per search sphere
+    const unsigned int max_neigh;   //!< Maximum number of neighbors allocated per sphere
     };
 
 } // end namespace neighbor

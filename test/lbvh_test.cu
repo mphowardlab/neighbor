@@ -5,12 +5,7 @@
 
 #include <cuda_runtime.h>
 
-#include "neighbor/LBVH.h"
-#include "neighbor/LBVHTraverser.h"
-#include "neighbor/OutputOps.h"
-#include "neighbor/QueryOps.h"
-#include "neighbor/TransformOps.h"
-#include "neighbor/InsertOps.h"
+#include "neighbor/neighbor.h"
 
 #include <random>
 
@@ -79,7 +74,7 @@ UP_TEST( lbvh_test )
         // parents of each node
         UP_ASSERT_EQUAL(lbvh->getParents().size(), 5);
         thrust::host_vector<int> h_parent(lbvh->getParents());
-        UP_ASSERT_EQUAL(h_parent[0], neighbor::gpu::LBVHSentinel);
+        UP_ASSERT_EQUAL(h_parent[0], neighbor::LBVHSentinel);
         UP_ASSERT_EQUAL(h_parent[1], 0);
         UP_ASSERT_EQUAL(h_parent[2], 1);
         UP_ASSERT_EQUAL(h_parent[3], 1);
@@ -139,7 +134,7 @@ UP_TEST( lbvh_test )
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 0);
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 0);
             UP_ASSERT_EQUAL(node.z, 1);
-            UP_ASSERT_EQUAL(node.w, neighbor::gpu::LBVHSentinel);
+            UP_ASSERT_EQUAL(node.w, neighbor::LBVHSentinel);
             }
         // Node 1
             {
@@ -175,7 +170,7 @@ UP_TEST( lbvh_test )
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 1023);
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 0);
             UP_ASSERT_EQUAL(node.z, ~0);
-            UP_ASSERT_EQUAL(node.w, neighbor::gpu::LBVHSentinel);
+            UP_ASSERT_EQUAL(node.w, neighbor::LBVHSentinel);
             }
 
         // each node should have the correct number of hits
@@ -527,7 +522,7 @@ UP_TEST( lbvh_small_test )
         // parents of each node
         UP_ASSERT_EQUAL(lbvh->getParents().size(), 1);
         thrust::host_vector<int> h_parent(lbvh->getParents());
-        UP_ASSERT_EQUAL(h_parent[0], neighbor::gpu::LBVHSentinel);
+        UP_ASSERT_EQUAL(h_parent[0], neighbor::LBVHSentinel);
 
         UP_ASSERT_EQUAL(lbvh->getLeftChildren().size(), 0);
         UP_ASSERT_EQUAL(lbvh->getRightChildren().size(), 0);
@@ -565,7 +560,7 @@ UP_TEST( lbvh_small_test )
             {
             int4 node = h_data[0];
             UP_ASSERT_EQUAL(node.z, ~0);
-            UP_ASSERT_EQUAL(node.w, neighbor::gpu::LBVHSentinel);
+            UP_ASSERT_EQUAL(node.w, neighbor::LBVHSentinel);
             }
 
         // each node should have the correct number of hits

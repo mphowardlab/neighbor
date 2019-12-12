@@ -6,24 +6,16 @@
 #ifndef NEIGHBOR_LBVH_TRAVERSER_CUH_
 #define NEIGHBOR_LBVH_TRAVERSER_CUH_
 
-#include "LBVHKernels.cuh"
+#include <cuda_runtime.h>
+
+#include "../LBVHData.h"
+#include "../LBVHTraverserData.h"
 #include "../BoundingVolumes.h"
 
 namespace neighbor
 {
 namespace gpu
 {
-
-//! Lightweight data structure to hold the compressed LBVH.
-struct LBVHCompressedData
-    {
-    int root;       //!< Root index of the LBVH
-    int4* data;     //!< Compressed LBVH data.
-    float3* lo;     //!< Lower bound used in compression.
-    float3* hi;     //!< Upper bound used in compression.
-    float3* bins;   //!< Bin spacing used in compression.
-    };
-
 namespace kernel
 {
 //! Kernel to compress LBVH for rope traversal
@@ -135,12 +127,11 @@ __global__ void lbvh_compress_ropes(LBVHCompressedData ctree,
  * \param out Output operation for intersected primitives.
  * \param lbvh Compressed LBVH data to traverse.
  * \param query Query operation.
- * \param d_images Image vectors to traverse for \a d_spheres.
- * \param Nimages Number of image vectors.
- * \param N Number of test spheres.
+ * \param images Translation operation.
  *
  * \tparam OutputOpT The type of output operation.
  * \tparam QueryOpT The type of query operation.
+ * \tparam TranslateOpT The type of translation operation.
  *
  * The LBVH is traversed using the rope scheme. In this method, the
  * test sphere always descends to the left child of an intersected node,
@@ -151,8 +142,7 @@ __global__ void lbvh_compress_ropes(LBVHCompressedData ctree,
  * This operation is responsible for constructing the query volume, translating it,
  * and performing overlap operations with the BoundingBox volumes in the LBVH.
  *
- * Each query volume can optionally be translated by a set of \a d_images. The self-image
- * is automatically traversed and should not be included in \a d_images. Before
+ * Each query volume can optionally be translated using a set of \a images. Before
  * entering the traversal loop, each volume is translated and intersected against
  * the tree root. A set of bitflags is encoded for which images possibly overlap the
  * tree. (Some may only intersect in the self-image, while others may intersect multiple
@@ -260,6 +250,7 @@ __global__ void lbvh_traverse_ropes(OutputOpT out,
     }
 } // end namespace kernel
 
+//! Compress LBVH for rope traversal.
 /*!
  * \param ctree Compressed LBVH.
  * \param transform Transformation operation.
@@ -273,7 +264,6 @@ __global__ void lbvh_traverse_ropes(OutputOpT out,
  *
  * \sa kernel::lbvh_compress_ropes
  */
-//! Compress LBVH for rope traversal.
 template<class TransformOpT>
 void lbvh_compress_ropes(LBVHCompressedData ctree,
                          const TransformOpT& transform,
@@ -298,18 +288,18 @@ void lbvh_compress_ropes(LBVHCompressedData ctree,
         (ctree, transform, tree, N_internal, N_nodes);
     }
 
+//! Traverse the LBVH using ropes.
 /*!
  * \param out Output operation for intersected primitives.
  * \param lbvh Compressed LBVH data to traverse.
- * \param d_spheres Test spheres to intersect with LBVH.
- * \param d_images Image vectors to traverse for \a d_spheres.
- * \param Nimages Number of image vectors.
- * \param N Number of test spheres.
+ * \param query Query operation.
+ * \param images Translation operation.
  * \param block_size Number of CUDA threads per block.
  * \param stream CUDA stream for kernel execution.
  *
  * \tparam OutputOpT The type of output operation.
  * \tparam QueryOpT The type of query operation.
+ * \tparam TranslateOpT The type of translation operation.
  *
  * \sa kernel::lbvh_traverse_ropes
  */

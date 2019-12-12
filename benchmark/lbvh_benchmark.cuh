@@ -1,9 +1,15 @@
+// Copyright (c) 2018-2019, Michael P. Howard.
+// This file is released under the Modified BSD License.
+
+// Maintainer: mphoward
 
 #include <cuda_runtime.h>
-#include <memory>
 #include <thrust/device_vector.h>
 
+#include <memory>
+
 #include "hoomd/HOOMDMath.h"
+
 #ifdef NVCC
 #include "neighbor/BoundingVolumes.h"
 #endif
@@ -15,6 +21,7 @@ namespace neighbor
     class LBVHTraverser;
     }
 
+//! Particle insert operation using HOOMD scalars
 struct ParticleInsertOp
     {
     ParticleInsertOp(const Scalar4* particles_, unsigned int N_)
@@ -29,9 +36,7 @@ struct ParticleInsertOp
         const Scalar3 p = make_scalar3(particle.x, particle.y, particle.z);
         return neighbor::BoundingBox(p,p);
         }
-    #endif
 
-    #ifdef NVCC
     __host__ __device__ __forceinline__
     #endif
     unsigned int size() const
@@ -40,9 +45,10 @@ struct ParticleInsertOp
         }
 
     const Scalar4* particles;
-    unsigned int N;
+    const unsigned int N;
     };
 
+//! Particle query op using spheres defined by HOOMD scalars
 struct ParticleQueryOp
     {
     ParticleQueryOp(const Scalar4* spheres_, unsigned int N_)
@@ -82,34 +88,43 @@ struct ParticleQueryOp
         }
 
     const Scalar4* spheres;
-    unsigned int N;
+    const unsigned int N;
     };
 
+//! Wrapper around the neighbor::LBVH that can be called from a C++ program
 class LBVHWrapper
     {
     public:
+        //! Constructor
         LBVHWrapper();
 
+        //! Build using pointers and scalars
         void build(const Scalar4* pos, unsigned int N, const Scalar3& lo, const Scalar3& hi);
 
+        //! Get the underlying neighbor::LBVH object
         std::shared_ptr<neighbor::LBVH> get()
             {
             return lbvh_;
             }
 
+        //! Get the thrust vector holding the LBVH primitives
         const thrust::device_vector<unsigned int>& getPrimitives() const;
 
+        //! Set the autotuner parameters
         void setAutotunerParams(bool enable, unsigned int period);
 
     private:
-        std::shared_ptr<neighbor::LBVH> lbvh_;
+        std::shared_ptr<neighbor::LBVH> lbvh_;  //!< Underlying LBVH
     };
 
+//! Wrapper around the neighbor::LBVHTraverser that can be called from a C++ program
 class LBVHTraverserWrapper
     {
     public:
+        //! Constructor
         LBVHTraverserWrapper();
 
+        //! Traversal method using pointers and scalars
         void traverse(unsigned int* hits,
                       const Scalar4* spheres,
                       unsigned int N,
@@ -117,13 +132,15 @@ class LBVHTraverserWrapper
                       const Scalar3* images,
                       unsigned int Nimages);
 
+        //! Get the underlying neighbor::LBVHTraverser object
         std::shared_ptr<neighbor::LBVHTraverser> get()
             {
             return trav_;
             }
 
+        //! Set the autotuner parameters
         void setAutotunerParams(bool enable, unsigned int period);
 
     private:
-        std::shared_ptr<neighbor::LBVHTraverser> trav_;
+        std::shared_ptr<neighbor::LBVHTraverser> trav_; //!< Underlying traverser
     };
