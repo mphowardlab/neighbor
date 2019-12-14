@@ -4,7 +4,7 @@
 // Maintainer: mphoward
 
 #include <cuda_runtime.h>
-#include <thrust/device_vector.h>
+#include "neighbor/Memory.h"
 
 #include <memory>
 
@@ -108,7 +108,7 @@ class LBVHWrapper
             }
 
         //! Get the thrust vector holding the LBVH primitives
-        const thrust::device_vector<unsigned int>& getPrimitives() const;
+        const neighbor::shared_array<unsigned int>& getPrimitives() const;
 
         //! Set the autotuner parameters
         void setAutotunerParams(bool enable, unsigned int period);

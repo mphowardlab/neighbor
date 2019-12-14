@@ -10,6 +10,7 @@
 
 #include "LBVHTraverserData.h"
 #include "LBVH.h"
+#include "Memory.h"
 #include "TransformOps.h"
 #include "TranslateOps.h"
 
@@ -60,14 +61,27 @@ class LBVHTraverser
         //! Constructor
         LBVHTraverser();
 
-        //! Setup LBVH for traversal
+        //! Setup LBVH for traversal in a stream with a primitive transform operation.
         template<class TransformOpT>
-        void setup(const TransformOpT& transform, LBVH& lbvh, cudaStream_t stream=0);
+        void setup(cudaStream_t stream, const LBVH& lbvh, const TransformOpT& transform);
 
-        //! Setup LBVH for traversal
-        void setup(LBVH& lbvh, cudaStream_t stream=0)
+        //! Setup LBVH for traversal in a stream.
+        void setup(cudaStream_t stream, const LBVH& lbvh)
             {
-            setup(NullTransformOp(), lbvh, stream);
+            setup(stream, lbvh, NullTransformOp());
+            }
+
+        //! Setup LBVH for traversal in the default stream with a primitive transform operation.
+        template<class TransformOpT>
+        void setup(const LBVH& lbvh, const TransformOpT& transform)
+            {
+            setup(0, lbvh, transform);
+            }
+
+        //! Setup LBVH for traversal in the default stream.
+        void setup(const LBVH& lbvh)
+            {
+            setup(0, lbvh, NullTransformOp());
             }
 
         //! Reset (nullify) the setup
@@ -76,47 +90,76 @@ class LBVHTraverser
             m_replay = false;
             }
 
-        //! Traverse the LBVH with a primitive transform operation.
-        template<class OutputOpT, class QueryOpT, class TransformOpT, class TranslateOpT=SelfOp>
-        void traverse(OutputOpT& out,
+        //! Traverse the LBVH in a stream with translation and a primitive transform operation.
+        template<class QueryOpT, class OutputOpT, class TranslateOpT, class TransformOpT>
+        void traverse(cudaStream_t stream,
+                      const LBVH& lbvh,
                       const QueryOpT& query,
-                      const TransformOpT& transform,
-                      LBVH& lbvh,
-                      const TranslateOpT& images = TranslateOpT(),
-                      cudaStream_t stream = 0);
+                      const OutputOpT& out,
+                      const TranslateOpT& images,
+                      const TransformOpT& transform);
 
-        //! Traverse the LBVH without a primitive transform operation.
-        template<class OutputOpT, class QueryOpT, class TranslateOpT=SelfOp>
-        void traverse(OutputOpT& out,
+        //! Traverse the LBVH in a stream with translation.
+        template<class QueryOpT, class OutputOpT, class TranslateOpT>
+        void traverse(cudaStream_t stream,
+                      const LBVH& lbvh,
                       const QueryOpT& query,
-                      LBVH& lbvh,
-                      const TranslateOpT& images = TranslateOpT(),
-                      cudaStream_t stream = 0)
+                      const OutputOpT& out,
+                      const TranslateOpT& images)
             {
-            traverse(out, query, NullTransformOp(), lbvh, images, stream);
+            traverse(stream, lbvh, query, out, images, NullTransformOp());
+            }
+
+        //! Traverse the LBVH in a stream.
+        template<class QueryOpT, class OutputOpT>
+        void traverse(cudaStream_t stream,
+                      const LBVH& lbvh,
+                      const QueryOpT& query,
+                      const OutputOpT& out)
+            {
+            traverse(stream, lbvh, query, out, SelfOp(), NullTransformOp());
+            }
+
+        //! Traverse the LBVH in the default stream with translation and a primitive transform operation.
+        template<class QueryOpT, class OutputOpT, class TranslateOpT, class TransformOpT>
+        void traverse(const LBVH& lbvh,
+                      const QueryOpT& query,
+                      const OutputOpT& out,
+                      const TranslateOpT& images,
+                      const TransformOpT& transform)
+            {
+            traverse(0, lbvh, query, out, images, transform);
+            }
+
+        //! Traverse the LBVH in the default stream with translation.
+        template<class QueryOpT, class OutputOpT, class TranslateOpT>
+        void traverse(const LBVH& lbvh, const QueryOpT& query, const OutputOpT& out, const TranslateOpT& images)
+            {
+            traverse(0, lbvh, query, out, images, NullTransformOp());
+            }
+
+        //! Traverse the LBVH in the default stream.
+        template<class QueryOpT, class OutputOpT>
+        void traverse(const LBVH& lbvh, const QueryOpT& query, const OutputOpT& out)
+            {
+            traverse(0, lbvh, query, out, SelfOp(), NullTransformOp());
             }
 
         //! Access the compressed LBVH data for traversal
-        const thrust::device_vector<int4>& getData() const
+        const shared_array<int4>& getData() const
             {
             return m_data;
             }
 
         //! Get the pointer version of the data in the traverser.
-        /*!
-         * This method does not currently work as const because the thrust
-         * pointers will be cast to pointers to const, but LBVHCompressedData
-         * need not be const.
-         */
-        const LBVHCompressedData data()
+        const LBVHCompressedData data() const
             {
             LBVHCompressedData clbvh;
             clbvh.root = m_root;
-            clbvh.data = thrust::raw_pointer_cast(m_data.data());
-            clbvh.lo = thrust::raw_pointer_cast(m_lbvh_lo.data());
-            clbvh.hi = thrust::raw_pointer_cast(m_lbvh_hi.data());
-            clbvh.bins = thrust::raw_pointer_cast(m_bins.data());
-
+            clbvh.data = const_cast<int4*>(m_data.get());
+            clbvh.lo = const_cast<float3*>(m_lbvh_lo.get());
+            clbvh.hi = const_cast<float3*>(m_lbvh_hi.get());
+            clbvh.bins = const_cast<float3*>(m_bins.get());
             return clbvh;
             }
 
@@ -136,17 +179,17 @@ class LBVHTraverser
 
     private:
         int m_root;                                 //!< Root node
-        thrust::device_vector<int4> m_data;         //!< Internal representation of the LBVH for traversal
-        thrust::device_vector<float3> m_lbvh_lo;    //!< Lower bound of tree
-        thrust::device_vector<float3> m_lbvh_hi;    //!< Upper bound of tree
-        thrust::device_vector<float3> m_bins;       //!< Bin size for compression
+        shared_array<int4> m_data;         //!< Internal representation of the LBVH for traversal
+        shared_array<float3> m_lbvh_lo;    //!< Lower bound of tree
+        shared_array<float3> m_lbvh_hi;    //!< Upper bound of tree
+        shared_array<float3> m_bins;       //!< Bin size for compression
 
         std::unique_ptr<Autotuner> m_tune_traverse; //!< Autotuner for traversal kernel
         std::unique_ptr<Autotuner> m_tune_compress; //!< Autotuner for compression kernel
 
         //! Compresses the lbvh into internal representation
         template<class TransformOpT>
-        void compress(LBVH& lbvh, const TransformOpT& transform, cudaStream_t stream);
+        void compress(cudaStream_t stream, const LBVH& lbvh, const TransformOpT& transform);
 
         bool m_replay;  //!< If true, the compressed structure has already been set explicitly
     };
@@ -159,8 +202,9 @@ LBVHTraverser::LBVHTraverser()
     }
 
 /*!
- * \param transform Transformation operation for cached primitive indexes.
+ * \param stream CUDA stream for execution.
  * \param lbvh LBVH to traverse.
+ * \param transform Transformation operation for cached primitive indexes.
  *
  * \tparam TransformOpT The type of transformation operation.
  *
@@ -173,26 +217,26 @@ LBVHTraverser::LBVHTraverser()
  * To clear a setup, call reset().
  */
 template<class TransformOpT>
-void LBVHTraverser::setup(const TransformOpT& transform, LBVH& lbvh, cudaStream_t stream)
+void LBVHTraverser::setup(cudaStream_t stream, const LBVH& lbvh, const TransformOpT& transform)
     {
     if (lbvh.getN() == 0) return;
 
-    compress(lbvh, transform, stream);
+    compress(stream, lbvh, transform);
     m_replay = true;
     }
 
 /*!
- * \param out Output operation for intersected primitives.
- * \param query Query operation for defining search volumes and overlaps.
- * \param transform Transformation operation for cached primitive indexes.
- * \param lbvh LBVH to traverse.
- * \param images Translation operation for moving search volume around.
  * \param stream CUDA stream for kernel execution.
+ * \param lbvh LBVH to traverse.
+ * \param query Query operation for defining search volumes and overlaps.
+ * \param out Output operation for intersected primitives.
+ * \param images Translation operation for moving search volume around.
+ * \param transform Transformation operation for cached primitive indexes.
  *
- * \tparam OutputOpT The type of output operation.
  * \tparam QueryOpT The type of query operation.
- * \tparam TransformOpT The type of transformation operation.
+ * \tparam OutputOpT The type of output operation.
  * \tparam TranslateOpT The type of translation operation.
+ * \tparam TransformOpT The type of transformation operation.
  *
  * A maximum of 32 \a images are allowed due to the internal representation of the image list
  * in the traversal CUDA kernel. This is more than enough to perform traversal in 3D periodic
@@ -203,13 +247,13 @@ void LBVHTraverser::setup(const TransformOpT& transform, LBVH& lbvh, cudaStream_
  * If the query volume does not overlap OR it has reached a leaf node, the traversal should proceed
  * along the rope. Traversal terminates when the LBVHSentinel is reached for the rope.
  */
-template<class OutputOpT, class QueryOpT, class TransformOpT, class TranslateOpT>
-void LBVHTraverser::traverse(OutputOpT& out,
+template<class QueryOpT, class OutputOpT, class TranslateOpT, class TransformOpT>
+void LBVHTraverser::traverse(cudaStream_t stream,
+                             const LBVH& lbvh,
                              const QueryOpT& query,
-                             const TransformOpT& transform,
-                             LBVH& lbvh,
+                             const OutputOpT& out,
                              const TranslateOpT& images,
-                             cudaStream_t stream)
+                             const TransformOpT& transform)
     {
     // don't traverse with empty lbvh
     if (lbvh.getN() == 0) return;
@@ -225,7 +269,7 @@ void LBVHTraverser::traverse(OutputOpT& out,
 
     // setup if this is not a replay
     if (!m_replay)
-        setup(transform, lbvh, stream);
+        setup(stream, lbvh, transform);
 
     // compressed lbvh data
     LBVHCompressedData clbvh = data();
@@ -242,9 +286,9 @@ void LBVHTraverser::traverse(OutputOpT& out,
     }
 
 /*!
+ * \param stream CUDA stream for kernel execution.
  * \param lbvh LBVH to compress
  * \param transform Transformation operation for cached primitive indexes.
- * \param stream CUDA stream for kernel execution.
  *
  * \tparam TransformOpT The type of transformation operation.
  *
@@ -271,18 +315,18 @@ void LBVHTraverser::traverse(OutputOpT& out,
  * index to save indirection when the index itself is not of interest.
  */
 template<class TransformOpT>
-void LBVHTraverser::compress(LBVH& lbvh, const TransformOpT& transform, cudaStream_t stream)
+void LBVHTraverser::compress(cudaStream_t stream, const LBVH& lbvh, const TransformOpT& transform)
     {
     // resize the internal data array
     const unsigned int num_data = lbvh.getNNodes();
     if (num_data > m_data.size())
         {
-        thrust::device_vector<int4> tmp(num_data);
+        shared_array<int4> tmp(num_data);
         m_data.swap(tmp);
         }
 
     // acquire current tree data for reading
-    LBVHData tree = lbvh.data();
+    ConstLBVHData tree = lbvh.data();
 
     // set root and acquire compressed tree data for writing
     m_root = lbvh.getRoot();

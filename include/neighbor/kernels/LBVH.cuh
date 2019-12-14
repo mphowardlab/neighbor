@@ -165,7 +165,7 @@ __global__ void lbvh_gen_codes(unsigned int *d_codes,
  * exactly N-1 internal nodes.) The algorithm is given by Figure 4 of
  * <a href="https://dl.acm.org/citation.cfm?id=2383801">Karras</a>.
  */
-__global__ static void lbvh_gen_tree(LBVHData tree,
+__global__ static void lbvh_gen_tree(const LBVHData tree,
                                      const unsigned int *d_codes,
                                      const unsigned int N)
     {
@@ -456,10 +456,10 @@ inline uchar2 lbvh_sort_codes(void *d_tmp,
  * \sa kernel::lbvh_gen_tree
  */
 inline void lbvh_gen_tree(const LBVHData tree,
-                   const unsigned int *d_codes,
-                   const unsigned int N,
-                   const unsigned int block_size,
-                   cudaStream_t stream = 0)
+                          const unsigned int *d_codes,
+                          const unsigned int N,
+                          const unsigned int block_size,
+                          cudaStream_t stream = 0)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;

@@ -42,7 +42,7 @@ void LBVHWrapper::build(const Scalar4* pos, unsigned int N, const Scalar3& lo, c
     lbvh_->build(ParticleInsertOp(pos, N), lof, hif);
     }
 
-const thrust::device_vector<unsigned int>& LBVHWrapper::getPrimitives() const
+const neighbor::shared_array<unsigned int>& LBVHWrapper::getPrimitives() const
     {
     return lbvh_->getPrimitives();
     }
@@ -67,7 +67,7 @@ void LBVHTraverserWrapper::traverse(unsigned int* hits,
     neighbor::CountNeighborsOp count(hits);
     ParticleQueryOp query(spheres, N);
     neighbor::ImageListOp<Scalar3> translate(images, Nimages);
-    trav_->traverse(count, query, *lbvh, translate);
+    trav_->traverse(*lbvh, query, count, translate);
     };
 
 void LBVHTraverserWrapper::setAutotunerParams(bool enable, unsigned int period)

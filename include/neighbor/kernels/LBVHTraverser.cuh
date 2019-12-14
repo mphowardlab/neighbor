@@ -41,9 +41,9 @@ namespace kernel
  * The transformation is implemented by \a transform.
  */
 template<class TransformOpT>
-__global__ void lbvh_compress_ropes(LBVHCompressedData ctree,
+__global__ void lbvh_compress_ropes(const LBVHCompressedData ctree,
                                     const TransformOpT transform,
-                                    const LBVHData tree,
+                                    const ConstLBVHData tree,
                                     const unsigned int N_internal,
                                     const unsigned int N_nodes)
     {
@@ -151,7 +151,7 @@ __global__ void lbvh_compress_ropes(LBVHCompressedData ctree,
  * image once traversal terminates. A maximum of 32 images is supported.
  */
 template<class OutputOpT, class QueryOpT, class TranslateOpT>
-__global__ void lbvh_traverse_ropes(OutputOpT out,
+__global__ void lbvh_traverse_ropes(const OutputOpT out,
                                     const LBVHCompressedData lbvh,
                                     const QueryOpT query,
                                     const TranslateOpT images)
@@ -265,9 +265,9 @@ __global__ void lbvh_traverse_ropes(OutputOpT out,
  * \sa kernel::lbvh_compress_ropes
  */
 template<class TransformOpT>
-void lbvh_compress_ropes(LBVHCompressedData ctree,
+void lbvh_compress_ropes(const LBVHCompressedData& ctree,
                          const TransformOpT& transform,
-                         const LBVHData tree,
+                         const ConstLBVHData tree,
                          unsigned int N_internal,
                          unsigned int N_nodes,
                          unsigned int block_size,
@@ -304,7 +304,7 @@ void lbvh_compress_ropes(LBVHCompressedData ctree,
  * \sa kernel::lbvh_traverse_ropes
  */
 template<class OutputOpT, class QueryOpT, class TranslateOpT>
-void lbvh_traverse_ropes(OutputOpT& out,
+void lbvh_traverse_ropes(const OutputOpT& out,
                          const LBVHCompressedData& lbvh,
                          const QueryOpT& query,
                          const TranslateOpT& images,

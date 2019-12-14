@@ -161,6 +161,7 @@ int main(int argc, char * argv[])
             std::sort(times.begin(), times.end());
             std::cout << "Median LBVH build time: " << times[times.size()/2]<< " ms / build" << std::endl;
             output << std::setw(8) << frame << " " << std::setw(16) << std::fixed << std::setprecision(5) << times[times.size()/2];
+            cudaDeviceSynchronize();
 
             // make traversal volumes
             GlobalArray<Scalar4> spheres(pdata->getN(), exec_conf);
@@ -169,10 +170,10 @@ int main(int argc, char * argv[])
                 {
                 ArrayHandle<Scalar4> h_spheres(spheres, access_location::host, access_mode::overwrite);
                 ArrayHandle<Scalar4> h_pos(pdata->getPositions(), access_location::host, access_mode::read);
-                thrust::host_vector<unsigned int> h_primitives(lbvh.getPrimitives());
+                auto primitives = lbvh.getPrimitives();
                 for (unsigned int i=0; i < pdata->getN(); ++i)
                     {
-                    unsigned int tag = h_primitives[i];
+                    unsigned int tag = primitives[i];
                     const Scalar4 postype = h_pos.data[tag];
                     const Scalar3 pos = make_scalar3(postype.x, postype.y, postype.z);
                     h_spheres.data[i] = make_scalar4(pos.x, pos.y, pos.z, rcut);

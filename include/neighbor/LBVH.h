@@ -7,10 +7,10 @@
 #define NEIGHBOR_LBVH_H_
 
 #include <cuda_runtime.h>
-#include <thrust/device_vector.h>
 
 #include "Autotuner.h"
 #include "LBVHData.h"
+#include "Memory.h"
 #include "kernels/LBVH.cuh"
 
 namespace neighbor
@@ -88,59 +88,66 @@ class LBVH
             }
 
         //! Get the array of parents of a given node
-        const thrust::device_vector<int>& getParents() const
+        const shared_array<int>& getParents() const
             {
             return m_parent;
             }
 
         //! Get the array of left children of a given node
-        const thrust::device_vector<int>& getLeftChildren() const
+        const shared_array<int>& getLeftChildren() const
             {
             return m_left;
             }
 
         //! Get the array of right children of a given node
-        const thrust::device_vector<int>& getRightChildren() const
+        const shared_array<int>& getRightChildren() const
             {
             return m_right;
             }
 
         //! Get the lower bounds of the boxes enclosing a node
-        const thrust::device_vector<float3>& getLowerBounds() const
+        const shared_array<float3>& getLowerBounds() const
             {
             return m_lo;
             }
 
         //! Get the upper bounds of the boxes enclosing a node
-        const thrust::device_vector<float3>& getUpperBounds() const
+        const shared_array<float3>& getUpperBounds() const
             {
             return m_hi;
             }
 
         //! Get the original indexes of the primitives in each leaf node
-        const thrust::device_vector<unsigned int>& getPrimitives() const
+        const shared_array<unsigned int>& getPrimitives() const
             {
             return m_sorted_indexes;
             }
 
         //! Get the pointer version of the data in the tree.
-        /*!
-         * This method does not currently work as const because the thrust
-         * pointers will be cast to pointers to const, but LBVHData need
-         * not be const.
-         */
         const LBVHData data()
             {
             LBVHData tree;
-
-            tree.parent = thrust::raw_pointer_cast(m_parent.data());
-            tree.left = thrust::raw_pointer_cast(m_left.data());
-            tree.right = thrust::raw_pointer_cast(m_right.data());
-            tree.primitive = thrust::raw_pointer_cast(m_sorted_indexes.data());
-            tree.lo = thrust::raw_pointer_cast(m_lo.data());
-            tree.hi = thrust::raw_pointer_cast(m_hi.data());
+            tree.parent = m_parent.get();
+            tree.left = m_left.get();
+            tree.right = m_right.get();
+            tree.primitive = m_sorted_indexes.get();
+            tree.lo = m_lo.get();
+            tree.hi = m_hi.get();
             tree.root = m_root;
+            return tree;
+            }
 
+        //! Get the pointer version of the read-only data in the tree.
+        const ConstLBVHData data() const
+            {
+            ConstLBVHData tree;
+            tree.parent = m_parent.get();
+            tree.left = m_left.get();
+            tree.right = m_right.get();
+            tree.primitive = m_sorted_indexes.get();
+            tree.lo = m_lo.get();
+            tree.hi = m_hi.get();
+            tree.root = m_root;
             return tree;
             }
 
@@ -167,19 +174,19 @@ class LBVH
         unsigned int m_N_internal;  //!< Number of internal nodes in tree
         unsigned int m_N_nodes;     //!< Number of nodes in the tree
 
-        thrust::device_vector<int> m_parent; //!< Parent node
-        thrust::device_vector<int> m_left;   //!< Left child
-        thrust::device_vector<int> m_right;  //!< Right child
-        thrust::device_vector<float3> m_lo;  //!< Lower bound of AABB
-        thrust::device_vector<float3> m_hi;  //!< Upper bound of AABB
+        shared_array<int> m_parent; //!< Parent node
+        shared_array<int> m_left;   //!< Left child
+        shared_array<int> m_right;  //!< Right child
+        shared_array<float3> m_lo;  //!< Lower bound of AABB
+        shared_array<float3> m_hi;  //!< Upper bound of AABB
 
-        thrust::device_vector<unsigned int> m_codes;            //!< Morton codes
-        thrust::device_vector<unsigned int> m_indexes;          //!< Primitive indexes
-        thrust::device_vector<unsigned int> m_sorted_codes;     //!< Sorted morton codes
-        thrust::device_vector<unsigned int> m_sorted_indexes;   //!< Sorted primitive indexes
-        thrust::device_vector<unsigned char> m_tmp;             //!< Temporary memory for sorting
+        shared_array<unsigned int> m_codes;            //!< Morton codes
+        shared_array<unsigned int> m_indexes;          //!< Primitive indexes
+        shared_array<unsigned int> m_sorted_codes;     //!< Sorted morton codes
+        shared_array<unsigned int> m_sorted_indexes;   //!< Sorted primitive indexes
+        shared_array<unsigned char> m_tmp;             //!< Temporary memory for sorting
 
-        thrust::device_vector<unsigned int> m_locks; //!< Node locks for generating aabb hierarchy
+        shared_array<unsigned int> m_locks; //!< Node locks for generating aabb hierarchy
 
         std::unique_ptr<Autotuner> m_tune_gen_codes;    //!< Autotuner for generating Morton codes kernel
         std::unique_ptr<Autotuner> m_tune_gen_tree;     //!< Autotuner for generating tree hierarchy kernel
@@ -234,8 +241,8 @@ void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cuda
 
     // calculate morton codes
     m_tune_gen_codes->begin();
-    gpu::lbvh_gen_codes(thrust::raw_pointer_cast(m_codes.data()),
-                        thrust::raw_pointer_cast(m_indexes.data()),
+    gpu::lbvh_gen_codes(m_codes.get(),
+                        m_indexes.get(),
                         insert,
                         lo,
                         hi,
@@ -251,10 +258,10 @@ void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cuda
         size_t tmp_bytes = 0;
         gpu::lbvh_sort_codes(NULL,
                              tmp_bytes,
-                             thrust::raw_pointer_cast(m_codes.data()),
-                             thrust::raw_pointer_cast(m_sorted_codes.data()),
-                             thrust::raw_pointer_cast(m_indexes.data()),
-                             thrust::raw_pointer_cast(m_sorted_indexes.data()),
+                             m_codes.get(),
+                             m_sorted_codes.get(),
+                             m_indexes.get(),
+                             m_sorted_indexes.get(),
                              m_N,
                              stream);
 
@@ -263,16 +270,16 @@ void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cuda
         size_t alloc_size = (tmp_bytes > 0) ? tmp_bytes : 4;
         if (alloc_size > m_tmp.size())
             {
-            thrust::device_vector<unsigned char> tmp(alloc_size);
+            shared_array<unsigned char> tmp(alloc_size);
             m_tmp.swap(tmp);
             }
 
-        swap = gpu::lbvh_sort_codes((void*)thrust::raw_pointer_cast(m_tmp.data()),
+        swap = gpu::lbvh_sort_codes((void*)m_tmp.get(),
                                     tmp_bytes,
-                                    thrust::raw_pointer_cast(m_codes.data()),
-                                    thrust::raw_pointer_cast(m_sorted_codes.data()),
-                                    thrust::raw_pointer_cast(m_indexes.data()),
-                                    thrust::raw_pointer_cast(m_sorted_indexes.data()),
+                                    m_codes.get(),
+                                    m_sorted_codes.get(),
+                                    m_indexes.get(),
+                                    m_sorted_indexes.get(),
                                     m_N,
                                     stream);
 
@@ -286,7 +293,7 @@ void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cuda
 
     m_tune_gen_tree->begin();
     gpu::lbvh_gen_tree(tree,
-                       thrust::raw_pointer_cast(m_sorted_codes.data()),
+                       m_sorted_codes.get(),
                        m_N,
                        m_tune_gen_tree->getParam(),
                        stream);
@@ -295,7 +302,7 @@ void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cuda
     m_tune_bubble->begin();
     gpu::lbvh_bubble_aabbs(tree,
                            insert,
-                           thrust::raw_pointer_cast(m_locks.data()),
+                           m_locks.get(),
                            m_N,
                            m_tune_bubble->getParam(),
                            stream);
@@ -327,43 +334,43 @@ void LBVH::allocate(unsigned int N)
 
     if (m_N_nodes > m_parent.size())
         {
-        thrust::device_vector<int> parent(m_N_nodes);
+        shared_array<int> parent(m_N_nodes);
         m_parent.swap(parent);
         }
 
     if (m_N_internal > m_left.size())
         {
-        thrust::device_vector<int> left(m_N_internal);
+        shared_array<int> left(m_N_internal);
         m_left.swap(left);
 
-        thrust::device_vector<int> right(m_N_internal);
+        shared_array<int> right(m_N_internal);
         m_right.swap(right);
 
-        thrust::device_vector<unsigned int> locks(m_N_internal);
+        shared_array<unsigned int> locks(m_N_internal);
         m_locks.swap(locks);
         }
 
     if (m_N_nodes > m_lo.size())
         {
-        thrust::device_vector<float3> lo(m_N_nodes);
+        shared_array<float3> lo(m_N_nodes);
         m_lo.swap(lo);
 
-        thrust::device_vector<float3> hi(m_N_nodes);
+        shared_array<float3> hi(m_N_nodes);
         m_hi.swap(hi);
         }
 
     if (m_N > m_codes.size())
         {
-        thrust::device_vector<unsigned int> codes(m_N);
+        shared_array<unsigned int> codes(m_N);
         m_codes.swap(codes);
 
-        thrust::device_vector<unsigned int> indexes(m_N);
+        shared_array<unsigned int> indexes(m_N);
         m_indexes.swap(indexes);
 
-        thrust::device_vector<unsigned int> sorted_codes(m_N);
+        shared_array<unsigned int> sorted_codes(m_N);
         m_sorted_codes.swap(sorted_codes);
 
-        thrust::device_vector<unsigned int> sorted_indexes(m_N);
+        shared_array<unsigned int> sorted_indexes(m_N);
         m_sorted_indexes.swap(sorted_indexes);
         }
     }

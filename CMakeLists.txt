@@ -20,7 +20,6 @@ option(NEIGHBOR_TEST "Build neighbor test suite?" ${NEIGHBOR_MASTER_PROJECT})
 option(NEIGHBOR_BENCHMARK "Build neighbor benchmarks?" ${NEIGHBOR_MASTER_PROJECT})
 
 # find CUB, which is a dependency
-# thrust should be taken care of by CUDA language
 find_package(CUB REQUIRED)
 
 # setup the neighbor header-only library
