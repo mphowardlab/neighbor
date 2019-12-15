@@ -5,6 +5,7 @@
 
 #include "lbvh_benchmark.cuh"
 
+#include "hoomd/Autotuner.h"
 #include "hoomd/ClockSource.h"
 #include "hoomd/ExecutionConfiguration.h"
 #include "hoomd/GSDReader.h"
@@ -133,6 +134,7 @@ int main(int argc, char * argv[])
 
             // build the lbvh
             LBVHWrapper lbvh;
+            Autotuner lbvh_tuner(lbvh.getTunableParameters(), 5, 100000, "lbvh_tuner", exec_conf);
             const BoxDim& box = pdata->getBox();
 
             // warmup the lbvh autotuners
@@ -140,13 +142,16 @@ int main(int argc, char * argv[])
 
             for (unsigned int i=0; i < 200; ++i)
                 {
-                // warmup the lbvh autotuners
+                // warmup the lbvh autotuner
                 for (unsigned int i=0; i < 200; ++i)
                     {
-                    lbvh.build(d_postype.data, pdata->getN(), box.getLo(), box.getHi());
+                    lbvh_tuner.begin();
+                    lbvh.build(d_postype.data, pdata->getN(), box.getLo(), box.getHi(), lbvh_tuner.getParam());
+                    lbvh_tuner.end();
                     }
                 }
-            lbvh.setAutotunerParams(false, 100000);
+            lbvh_tuner.setEnabled(false);
+            std::cout << "LBVH tuner: " << lbvh_tuner.getParam() << std::endl;
 
             // profile lbvh build times
             std::vector<double> times(5);
@@ -155,7 +160,7 @@ int main(int argc, char * argv[])
 
                 for (size_t i=0; i < times.size(); ++i)
                     {
-                    times[i] = profile([&]{lbvh.build(d_postype.data, pdata->getN(), box.getLo(), box.getHi());}, 500);
+                    times[i] = profile([&]{lbvh.build(d_postype.data, pdata->getN(), box.getLo(), box.getHi(), lbvh_tuner.getParam());}, 500);
                     }
                 }
             std::sort(times.begin(), times.end());
@@ -197,36 +202,38 @@ int main(int argc, char * argv[])
                     }
                 }
 
-            // try with rope traversal
+            // traversal
+            LBVHTraverserWrapper traverser;
+            Autotuner traverser_tuner(traverser.getTunableParameters(), 5, 100000, "traverser_tuner", exec_conf);
                 {
-                LBVHTraverserWrapper traverser;
+                ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
+                ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
+
+                ArrayHandle<Scalar3> d_images(images, access_location::device, access_mode::read);
+                // warmup the autotuner
+                for (unsigned int i=0; i < 200; ++i)
                     {
-                    ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
-                    ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
-
-                    ArrayHandle<Scalar3> d_images(images, access_location::device, access_mode::read);
-                    // warmup the autotuners
-                    for (unsigned int i=0; i < 200; ++i)
-                        {
-                        traverser.traverse(d_hits.data, d_spheres.data, pdata->getN(), lbvh.get(), d_images.data, 27);
-                        }
-                    traverser.setAutotunerParams(false, 100000);
-
-                    for (size_t i=0; i < times.size(); ++ i)
-                        {
-                        times[i] = profile([&]{traverser.traverse(d_hits.data, d_spheres.data, pdata->getN(), lbvh.get(), d_images.data, 27);},500);
-                        }
+                    traverser_tuner.begin();
+                    traverser.traverse(d_hits.data, d_spheres.data, pdata->getN(), lbvh.get(), d_images.data, 27, traverser_tuner.getParam());
+                    traverser_tuner.end();
                     }
-                std::sort(times.begin(), times.end());
-                std::cout << "Median LBVH rope time: " << times[times.size()/2]<< " ms / traversal" << std::endl;
-                output << " " << std::setw(16) << std::fixed << std::setprecision(5) << times[times.size()/2] << std::endl;
+                traverser_tuner.setEnabled(false);
+                std::cout << "Traverser tuner: " << lbvh_tuner.getParam() << std::endl;
 
-                ArrayHandle<unsigned int> h_hits(hits, access_location::host, access_mode::read);
-                unsigned int min = *std::min_element(h_hits.data, h_hits.data + pdata->getN());
-                unsigned int max = *std::max_element(h_hits.data, h_hits.data + pdata->getN());
-                double mean = std::accumulate(h_hits.data, h_hits.data + pdata->getN(), 0.0) / pdata->getN();
-                std::cout << "min: " << min << ", max: " << max << ", mean: " << mean << std::endl;
+                for (size_t i=0; i < times.size(); ++ i)
+                    {
+                    times[i] = profile([&]{traverser.traverse(d_hits.data, d_spheres.data, pdata->getN(), lbvh.get(), d_images.data, 27, traverser_tuner.getParam());},500);
+                    }
                 }
+            std::sort(times.begin(), times.end());
+            std::cout << "Median LBVH rope time: " << times[times.size()/2]<< " ms / traversal" << std::endl;
+            output << " " << std::setw(16) << std::fixed << std::setprecision(5) << times[times.size()/2] << std::endl;
+
+            ArrayHandle<unsigned int> h_hits(hits, access_location::host, access_mode::read);
+            unsigned int min = *std::min_element(h_hits.data, h_hits.data + pdata->getN());
+            unsigned int max = *std::max_element(h_hits.data, h_hits.data + pdata->getN());
+            double mean = std::accumulate(h_hits.data, h_hits.data + pdata->getN(), 0.0) / pdata->getN();
+            std::cout << "min: " << min << ", max: " << max << ", mean: " << mean << std::endl;
             std::cout << std::endl;
             }
         }

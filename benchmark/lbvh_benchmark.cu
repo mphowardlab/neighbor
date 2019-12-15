@@ -34,12 +34,12 @@ LBVHWrapper::LBVHWrapper()
     lbvh_ = std::make_shared<neighbor::LBVH>();
     }
 
-void LBVHWrapper::build(const Scalar4* pos, unsigned int N, const Scalar3& lo, const Scalar3& hi)
+void LBVHWrapper::build(const Scalar4* pos, unsigned int N, const Scalar3& lo, const Scalar3& hi, unsigned int param)
     {
     float3 lof = make_float3(double2float_rd(lo.x), double2float_rd(lo.y), double2float_rd(lo.z));
     float3 hif = make_float3(double2float_ru(hi.x), double2float_ru(hi.y), double2float_ru(hi.z));
 
-    lbvh_->build(ParticleInsertOp(pos, N), lof, hif);
+    lbvh_->build(neighbor::LBVH::LaunchParameters(param), ParticleInsertOp(pos, N), lof, hif);
     }
 
 const neighbor::shared_array<unsigned int>& LBVHWrapper::getPrimitives() const
@@ -47,9 +47,9 @@ const neighbor::shared_array<unsigned int>& LBVHWrapper::getPrimitives() const
     return lbvh_->getPrimitives();
     }
 
-void LBVHWrapper::setAutotunerParams(bool enable, unsigned int period)
+std::vector<unsigned int> LBVHWrapper::getTunableParameters() const
     {
-    lbvh_->setAutotunerParams(enable, period);
+    return lbvh_->getTunableParameters();
     }
 
 LBVHTraverserWrapper::LBVHTraverserWrapper()
@@ -62,15 +62,16 @@ void LBVHTraverserWrapper::traverse(unsigned int* hits,
                                     unsigned int N,
                                     std::shared_ptr<neighbor::LBVH> lbvh,
                                     const Scalar3* images,
-                                    unsigned int Nimages)
+                                    unsigned int Nimages,
+                                    unsigned int param)
     {
     neighbor::CountNeighborsOp count(hits);
     ParticleQueryOp query(spheres, N);
     neighbor::ImageListOp<Scalar3> translate(images, Nimages);
-    trav_->traverse(*lbvh, query, count, translate);
+    trav_->traverse(neighbor::LBVHTraverser::LaunchParameters(param), *lbvh, query, count, translate);
     };
 
-void LBVHTraverserWrapper::setAutotunerParams(bool enable, unsigned int period)
+std::vector<unsigned int> LBVHTraverserWrapper::getTunableParameters() const
     {
-    trav_->setAutotunerParams(enable, period);
+    return trav_->getTunableParameters();
     }

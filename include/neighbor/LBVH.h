@@ -7,15 +7,15 @@
 #define NEIGHBOR_LBVH_H_
 
 #include <cuda_runtime.h>
-
-#include "Autotuner.h"
-#include "LBVHData.h"
 #include "Memory.h"
+#include "Tunable.h"
+
+#include "LBVHData.h"
 #include "kernels/LBVH.cuh"
 
 namespace neighbor
 {
-//! Linear bounding volume hierarchy
+//! Linear bounding volume hierarchy.
 /*!
  * A linear bounding hierarchy (LBVH) is a binary tree structure that can be used for overlap
  * or collision detection. Briefly, a leaf node in the tree encloses a single primitive
@@ -43,13 +43,13 @@ namespace neighbor
  * For processing the LBVH in GPU kernels, it may be useful to obtain an object containing
  * only the raw pointers to the tree data using ::data (see LBVHData).
  */
-class LBVH
+class LBVH : public Tunable<unsigned int>
     {
     public:
-        //! Setup an unallocated LBVH
+        //! Setup an unallocated LBVH.
         LBVH();
 
-        //! Pre-setup function
+        //! Pre-setup function.
         /*!
          * This function can be called in advance to avoid some (but not all) calls that might block
          * the build operation from executing asynchronously.
@@ -59,82 +59,101 @@ class LBVH
             allocate(N);
             }
 
-        //! Build the LBVH
+        //! Build the LBVH in a stream with tunable parameters.
         template<class InsertOpT>
-        void build(const InsertOpT& insert, const float3 lo, const float3 hi, cudaStream_t stream=0);
+        void build(const LaunchParameters& params, const InsertOpT& insert, const float3& lo, const float3& hi);
 
-        //! Get the LBVH root node
+        //! Build the LBVH in a stream.
+        /*!
+         * \param stream CUDA stream for kernel execution.
+         * \param insert The insert operation holding the primitives.
+         * \param lo Lower bound of the scene.
+         * \param hi Upper bound of the scene.
+         *
+         * \tparam InsertOpT The kind of insert operation.
+         *
+         * The tunable block size defaults to 32 threads per block.
+         */
+        template<class InsertOpT>
+        void build(cudaStream_t stream, const InsertOpT& insert, const float3& lo, const float3& hi)
+            {
+            build(LaunchParameters(32,stream), insert, lo, hi);
+            }
+
+        //! Build the LBVH.
+        /*!
+         * \param insert The insert operation holding the primitives.
+         * \param lo Lower bound of the scene.
+         * \param hi Upper bound of the scene.
+         *
+         * \tparam InsertOpT The kind of insert operation.
+         *
+         * The tunable block size defaults to 32 threads per block, and the kernel executes in the default stream.
+         */
+        template<class InsertOpT>
+        void build(const InsertOpT& insert, const float3& lo, const float3& hi)
+            {
+            build(0, insert, lo, hi);
+            }
+
+        //! Get the LBVH root node.
         int getRoot() const
             {
             return m_root;
             }
 
-        //! Get the number of primitives
+        //! Get the number of primitives.
         unsigned int getN() const
             {
             return m_N;
             }
 
-        //! Get the number of internal nodes
+        //! Get the number of internal nodes.
         unsigned int getNInternal() const
             {
             return m_N_internal;
             }
 
-        //! Get the total number of nodes
+        //! Get the total number of nodes.
         unsigned int getNNodes() const
             {
             return m_N_nodes;
             }
 
-        //! Get the array of parents of a given node
+        //! Get the array of parents of a given node.
         const shared_array<int>& getParents() const
             {
             return m_parent;
             }
 
-        //! Get the array of left children of a given node
+        //! Get the array of left children of a given node.
         const shared_array<int>& getLeftChildren() const
             {
             return m_left;
             }
 
-        //! Get the array of right children of a given node
+        //! Get the array of right children of a given node.
         const shared_array<int>& getRightChildren() const
             {
             return m_right;
             }
 
-        //! Get the lower bounds of the boxes enclosing a node
+        //! Get the lower bounds of the boxes enclosing a node.
         const shared_array<float3>& getLowerBounds() const
             {
             return m_lo;
             }
 
-        //! Get the upper bounds of the boxes enclosing a node
+        //! Get the upper bounds of the boxes enclosing a node.
         const shared_array<float3>& getUpperBounds() const
             {
             return m_hi;
             }
 
-        //! Get the original indexes of the primitives in each leaf node
+        //! Get the original indexes of the primitives in each leaf node.
         const shared_array<unsigned int>& getPrimitives() const
             {
             return m_sorted_indexes;
-            }
-
-        //! Get the pointer version of the data in the tree.
-        const LBVHData data()
-            {
-            LBVHData tree;
-            tree.parent = m_parent.get();
-            tree.left = m_left.get();
-            tree.right = m_right.get();
-            tree.primitive = m_sorted_indexes.get();
-            tree.lo = m_lo.get();
-            tree.hi = m_hi.get();
-            tree.root = m_root;
-            return tree;
             }
 
         //! Get the pointer version of the read-only data in the tree.
@@ -149,23 +168,6 @@ class LBVH
             tree.hi = m_hi.get();
             tree.root = m_root;
             return tree;
-            }
-
-        //! Set the kernel autotuner parameters
-        /*!
-         * \param enable If true, run the autotuners. If false, disable them.
-         * \param period Number of builds between running the autotuners.
-         */
-        void setAutotunerParams(bool enable, unsigned int period)
-            {
-            m_tune_gen_codes->setEnabled(enable);
-            m_tune_gen_codes->setPeriod(period);
-
-            m_tune_gen_tree->setEnabled(enable);
-            m_tune_gen_tree->setPeriod(period);
-
-            m_tune_bubble->setEnabled(enable);
-            m_tune_bubble->setPeriod(period);
             }
 
     private:
@@ -188,32 +190,39 @@ class LBVH
 
         shared_array<unsigned int> m_locks; //!< Node locks for generating aabb hierarchy
 
-        std::unique_ptr<Autotuner> m_tune_gen_codes;    //!< Autotuner for generating Morton codes kernel
-        std::unique_ptr<Autotuner> m_tune_gen_tree;     //!< Autotuner for generating tree hierarchy kernel
-        std::unique_ptr<Autotuner> m_tune_bubble;       //!< Autotuner for AABB bubble kernel
-
-        //! Allocate
+        //! Allocate.
         void allocate(unsigned int N);
+
+        //! Get the pointer version of the data in the tree.
+        const LBVHData data()
+            {
+            LBVHData tree;
+            tree.parent = m_parent.get();
+            tree.left = m_left.get();
+            tree.right = m_right.get();
+            tree.primitive = m_sorted_indexes.get();
+            tree.lo = m_lo.get();
+            tree.hi = m_hi.get();
+            tree.root = m_root;
+            return tree;
+            }
     };
 
 /*!
  * The constructor defers memory initialization to the first call to ::build.
  */
 LBVH::LBVH()
-    : m_root(LBVHSentinel), m_N(0), m_N_internal(0), m_N_nodes(0)
-    {
-    m_tune_gen_codes.reset(new Autotuner(32, 1024, 32, 5, 100000));
-    m_tune_gen_tree.reset(new Autotuner(32, 1024, 32, 5, 100000));
-    m_tune_bubble.reset(new Autotuner(32, 1024, 32, 5, 100000));
-    }
+    : Tunable<unsigned int>(32, 1024, 32),
+      m_root(LBVHSentinel), m_N(0), m_N_internal(0), m_N_nodes(0)
+    {}
 
 /*!
- * \param insert The insert operation holding the primitives
- * \param lo Lower bound of the scene
- * \param hi Upper bound of the scene
- * \param stream CUDA stream for kernel execution.
+ * \param params Launch parameters for kernel execution, including tunable block size and stream.
+ * \param insert The insert operation holding the primitives.
+ * \param lo Lower bound of the scene.
+ * \param hi Upper bound of the scene.
  *
- * \tparam InsertOpT the kind of insert operation
+ * \tparam InsertOpT The kind of insert operation.
  *
  * The LBVH is constructed using the algorithm due to Karras using 30-bit Morton codes.
  * The caller should ensure that all \a points lie within \a lo and \a hi for best performance.
@@ -221,7 +230,7 @@ LBVH::LBVH()
  * may lead to a low quality LBVH.
  */
 template<class InsertOpT>
-void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cudaStream_t stream)
+void LBVH::build(const LaunchParameters& params, const InsertOpT& insert, const float3& lo, const float3& hi)
     {
     const unsigned int N = insert.size();
 
@@ -235,21 +244,22 @@ void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cuda
     if (N == 1)
         {
         LBVHData tree = data();
-        gpu::lbvh_one_primitive(tree, insert, stream);
+        gpu::lbvh_one_primitive(tree, insert, params.stream);
         return;
         }
 
+    // check tuning parameter first
+    checkParameter(params);
+
     // calculate morton codes
-    m_tune_gen_codes->begin();
     gpu::lbvh_gen_codes(m_codes.get(),
                         m_indexes.get(),
                         insert,
                         lo,
                         hi,
                         m_N,
-                        m_tune_gen_codes->getParam(),
-                        stream);
-     m_tune_gen_codes->end();
+                        params.tunable,
+                        params.stream);
 
     // sort morton codes
         {
@@ -263,7 +273,7 @@ void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cuda
                              m_indexes.get(),
                              m_sorted_indexes.get(),
                              m_N,
-                             stream);
+                             params.stream);
 
         // make requested temporary allocation (1 char = 1B)
         // reallocation will block asynchronous builds
@@ -281,7 +291,7 @@ void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cuda
                                     m_indexes.get(),
                                     m_sorted_indexes.get(),
                                     m_N,
-                                    stream);
+                                    params.stream);
 
         // sorting will synchronize the stream before returning, so this unfortunately blocks concurrent execution of builds
         if (swap.x) m_sorted_codes.swap(m_codes);
@@ -291,22 +301,18 @@ void LBVH::build(const InsertOpT& insert, const float3 lo, const float3 hi, cuda
     // process hierarchy and bubble aabbs
     LBVHData tree = data();
 
-    m_tune_gen_tree->begin();
     gpu::lbvh_gen_tree(tree,
                        m_sorted_codes.get(),
                        m_N,
-                       m_tune_gen_tree->getParam(),
-                       stream);
-    m_tune_gen_tree->end();
+                       params.tunable,
+                       params.stream);
 
-    m_tune_bubble->begin();
     gpu::lbvh_bubble_aabbs(tree,
                            insert,
                            m_locks.get(),
                            m_N,
-                           m_tune_bubble->getParam(),
-                           stream);
-    m_tune_bubble->end();
+                           params.tunable,
+                           params.stream);
     }
 
 /*!

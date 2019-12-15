@@ -64,7 +64,7 @@ UP_TEST( lbvh_test )
         {
         lbvh = std::make_shared<neighbor::LBVH>();
             {
-            lbvh->build(neighbor::PointInsertOp(points.get(), 3), min, max, streams[i]);
+            lbvh->build(streams[i], neighbor::PointInsertOp(points.get(), 3), min, max);
             cudaStreamSynchronize(streams[i]);
             }
 

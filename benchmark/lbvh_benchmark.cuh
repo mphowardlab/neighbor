@@ -7,6 +7,7 @@
 #include "neighbor/Memory.h"
 
 #include <memory>
+#include <vector>
 
 #include "hoomd/HOOMDMath.h"
 
@@ -99,7 +100,7 @@ class LBVHWrapper
         LBVHWrapper();
 
         //! Build using pointers and scalars
-        void build(const Scalar4* pos, unsigned int N, const Scalar3& lo, const Scalar3& hi);
+        void build(const Scalar4* pos, unsigned int N, const Scalar3& lo, const Scalar3& hi, unsigned int param);
 
         //! Get the underlying neighbor::LBVH object
         std::shared_ptr<neighbor::LBVH> get()
@@ -111,7 +112,7 @@ class LBVHWrapper
         const neighbor::shared_array<unsigned int>& getPrimitives() const;
 
         //! Set the autotuner parameters
-        void setAutotunerParams(bool enable, unsigned int period);
+        std::vector<unsigned int> getTunableParameters() const;
 
     private:
         std::shared_ptr<neighbor::LBVH> lbvh_;  //!< Underlying LBVH
@@ -130,7 +131,8 @@ class LBVHTraverserWrapper
                       unsigned int N,
                       std::shared_ptr<neighbor::LBVH> lbvh,
                       const Scalar3* images,
-                      unsigned int Nimages);
+                      unsigned int Nimages,
+                      unsigned int param);
 
         //! Get the underlying neighbor::LBVHTraverser object
         std::shared_ptr<neighbor::LBVHTraverser> get()
@@ -139,7 +141,7 @@ class LBVHTraverserWrapper
             }
 
         //! Set the autotuner parameters
-        void setAutotunerParams(bool enable, unsigned int period);
+        std::vector<unsigned int> getTunableParameters() const;
 
     private:
         std::shared_ptr<neighbor::LBVHTraverser> trav_; //!< Underlying traverser

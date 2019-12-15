@@ -8,13 +8,15 @@
 
 #include <cuda_runtime.h>
 
-#include "LBVHTraverserData.h"
-#include "LBVH.h"
 #include "Memory.h"
+#include "Tunable.h"
+
+
+#include "LBVH.h"
 #include "TransformOps.h"
 #include "TranslateOps.h"
 
-#include "Autotuner.h"
+#include "LBVHTraverserData.h"
 #include "kernels/LBVHTraverser.cuh"
 
 namespace neighbor
@@ -55,23 +57,63 @@ namespace neighbor
  * an translation operator, which can move the same volume around the scene. By default, only
  * the self-image is traversed.
  */
-class LBVHTraverser
+class LBVHTraverser : public Tunable<unsigned int>
     {
     public:
-        //! Constructor
+        //! Constructor.
         LBVHTraverser();
 
-        //! Setup LBVH for traversal in a stream with a primitive transform operation.
+        //! Setup LBVH for traversal in a stream with tunable parameter and a primitive transform operation.
         template<class TransformOpT>
-        void setup(cudaStream_t stream, const LBVH& lbvh, const TransformOpT& transform);
+        void setup(const LaunchParameters& params, const LBVH& lbvh, const TransformOpT& transform);
+
+        //! Setup LBVH for traversal in a stream with tunable parameter.
+        /*!
+         * \param params Launch parameters for kernel execution, including tunable block size and stream.
+         * \param lbvh LBVH to traverse.
+         */
+        void setup(const LaunchParameters& params, const LBVH& lbvh)
+            {
+            setup(params, lbvh, NullTransformOp());
+            }
+
+        //! Setup LBVH for traversal in a stream with a primitive transform operation.
+        /*!
+         * \param stream CUDA stream for kernel execution.
+         * \param lbvh LBVH to traverse.
+         * \param transform Transformation operation for cached primitive indexes.
+         *
+         * \tparam TransformOpT The type of transformation operation.
+         *
+         * The default block size is 32 threads.
+         */
+        template<class TransformOpT>
+        void setup(cudaStream_t stream, const LBVH& lbvh, const TransformOpT& transform)
+            {
+            setup(LaunchParameters(32,stream), lbvh, transform);
+            }
 
         //! Setup LBVH for traversal in a stream.
+        /*!
+         * \param params Launch parameters for kernel execution, including tunable block size and stream.
+         * \param lbvh LBVH to traverse.
+         *
+         * The default block size is 32 threads.
+         */
         void setup(cudaStream_t stream, const LBVH& lbvh)
             {
             setup(stream, lbvh, NullTransformOp());
             }
 
         //! Setup LBVH for traversal in the default stream with a primitive transform operation.
+        /*!
+         * \param lbvh LBVH to traverse.
+         * \param transform Transformation operation for cached primitive indexes.
+         *
+         * \tparam TransformOpT The type of transformation operation.
+         *
+         * The default block size is 32 threads, and the kernel executes in the default stream.
+         */
         template<class TransformOpT>
         void setup(const LBVH& lbvh, const TransformOpT& transform)
             {
@@ -79,6 +121,11 @@ class LBVHTraverser
             }
 
         //! Setup LBVH for traversal in the default stream.
+        /*!
+         * \param lbvh LBVH to traverse.
+         *
+         * The default block size is 32 threads, and the kernel executes in the default stream.
+         */
         void setup(const LBVH& lbvh)
             {
             setup(0, lbvh, NullTransformOp());
@@ -90,16 +137,99 @@ class LBVHTraverser
             m_replay = false;
             }
 
-        //! Traverse the LBVH in a stream with translation and a primitive transform operation.
+        //! Traverse the LBVH in a stream with tunable parameter, translation, and a primitive transform operation.
         template<class QueryOpT, class OutputOpT, class TranslateOpT, class TransformOpT>
-        void traverse(cudaStream_t stream,
+        void traverse(const LaunchParameters& params,
                       const LBVH& lbvh,
                       const QueryOpT& query,
                       const OutputOpT& out,
                       const TranslateOpT& images,
                       const TransformOpT& transform);
 
+        //! Traverse the LBVH in a stream with tunable parameter and translation.
+        /*!
+         * \param params Launch parameters for kernel execution, including tunable block size and stream.
+         * \param lbvh LBVH to traverse.
+         * \param query Query operation for defining search volumes and overlaps.
+         * \param out Output operation for intersected primitives.
+         * \param images Translation operation for moving search volume around.
+         *
+         * \tparam QueryOpT The type of query operation.
+         * \tparam OutputOpT The type of output operation.
+         * \tparam TranslateOpT The type of translation operation.
+         */
+        template<class QueryOpT, class OutputOpT, class TranslateOpT>
+        void traverse(const LaunchParameters& params,
+                      const LBVH& lbvh,
+                      const QueryOpT& query,
+                      const OutputOpT& out,
+                      const TranslateOpT& images)
+            {
+            traverse(params, lbvh, query, out, images, NullTransformOp());
+            }
+
+        //! Traverse the LBVH in a stream with tunable parameter.
+        /*!
+         * \param params Launch parameters for kernel execution, including tunable block size and stream.
+         * \param lbvh LBVH to traverse.
+         * \param query Query operation for defining search volumes and overlaps.
+         * \param out Output operation for intersected primitives.
+         *
+         * \tparam QueryOpT The type of query operation.
+         * \tparam OutputOpT The type of output operation.
+         *
+         * Only the self image (no translation) is traversed.
+         */
+        template<class QueryOpT, class OutputOpT>
+        void traverse(const LaunchParameters& params,
+                      const LBVH& lbvh,
+                      const QueryOpT& query,
+                      const OutputOpT& out)
+            {
+            traverse(params, lbvh, query, out, SelfOp(), NullTransformOp());
+            }
+
+        //! Traverse the LBVH in a stream with translation and a primitive transform operation.
+        /*!
+         * \param stream CUDA stream for kernel execution.
+         * \param lbvh LBVH to traverse.
+         * \param query Query operation for defining search volumes and overlaps.
+         * \param out Output operation for intersected primitives.
+         * \param images Translation operation for moving search volume around.
+         * \param transform Transformation operation for cached primitive indexes.
+         *
+         * \tparam QueryOpT The type of query operation.
+         * \tparam OutputOpT The type of output operation.
+         * \tparam TranslateOpT The type of translation operation.
+         * \tparam TransformOpT The type of transformation operation.
+         *
+         * The default block size is 32 threads.
+         */
+        template<class QueryOpT, class OutputOpT, class TranslateOpT, class TransformOpT>
+        void traverse(cudaStream_t stream,
+                      const LBVH& lbvh,
+                      const QueryOpT& query,
+                      const OutputOpT& out,
+                      const TranslateOpT& images,
+                      const TransformOpT& transform)
+            {
+            traverse(LaunchParameters(32,stream), lbvh, query, out, images, transform);
+            }
+
         //! Traverse the LBVH in a stream with translation.
+        /*!
+         * \param stream CUDA stream for kernel execution.
+         * \param lbvh LBVH to traverse.
+         * \param query Query operation for defining search volumes and overlaps.
+         * \param out Output operation for intersected primitives.
+         * \param images Translation operation for moving search volume around.
+         *
+         * \tparam QueryOpT The type of query operation.
+         * \tparam OutputOpT The type of output operation.
+         * \tparam TranslateOpT The type of translation operation.
+         *
+         * The default block size is 32 threads.
+         */
         template<class QueryOpT, class OutputOpT, class TranslateOpT>
         void traverse(cudaStream_t stream,
                       const LBVH& lbvh,
@@ -111,6 +241,17 @@ class LBVHTraverser
             }
 
         //! Traverse the LBVH in a stream.
+        /*!
+         * \param stream CUDA stream for kernel execution.
+         * \param lbvh LBVH to traverse.
+         * \param query Query operation for defining search volumes and overlaps.
+         * \param out Output operation for intersected primitives.
+         *
+         * \tparam QueryOpT The type of query operation.
+         * \tparam OutputOpT The type of output operation.
+         *
+         * The default block size is 32 threads.
+         */
         template<class QueryOpT, class OutputOpT>
         void traverse(cudaStream_t stream,
                       const LBVH& lbvh,
@@ -121,6 +262,20 @@ class LBVHTraverser
             }
 
         //! Traverse the LBVH in the default stream with translation and a primitive transform operation.
+        /*!
+         * \param lbvh LBVH to traverse.
+         * \param query Query operation for defining search volumes and overlaps.
+         * \param out Output operation for intersected primitives.
+         * \param images Translation operation for moving search volume around.
+         * \param transform Transformation operation for cached primitive indexes.
+         *
+         * \tparam QueryOpT The type of query operation.
+         * \tparam OutputOpT The type of output operation.
+         * \tparam TranslateOpT The type of translation operation.
+         * \tparam TransformOpT The type of transformation operation.
+         *
+         * The default block size is 32 threads, and the kernel executes in the default stream.
+         */
         template<class QueryOpT, class OutputOpT, class TranslateOpT, class TransformOpT>
         void traverse(const LBVH& lbvh,
                       const QueryOpT& query,
@@ -132,6 +287,18 @@ class LBVHTraverser
             }
 
         //! Traverse the LBVH in the default stream with translation.
+        /*!
+         * \param lbvh LBVH to traverse.
+         * \param query Query operation for defining search volumes and overlaps.
+         * \param out Output operation for intersected primitives.
+         * \param images Translation operation for moving search volume around.
+         *
+         * \tparam QueryOpT The type of query operation.
+         * \tparam OutputOpT The type of output operation.
+         * \tparam TranslateOpT The type of translation operation.
+         *
+         * The default block size is 32 threads, and the kernel executes in the default stream.
+         */
         template<class QueryOpT, class OutputOpT, class TranslateOpT>
         void traverse(const LBVH& lbvh, const QueryOpT& query, const OutputOpT& out, const TranslateOpT& images)
             {
@@ -139,70 +306,62 @@ class LBVHTraverser
             }
 
         //! Traverse the LBVH in the default stream.
+        /*!
+         * \param lbvh LBVH to traverse.
+         * \param query Query operation for defining search volumes and overlaps.
+         * \param out Output operation for intersected primitives.
+         *
+         * \tparam QueryOpT The type of query operation.
+         * \tparam OutputOpT The type of output operation.
+         *
+         * The default block size is 32 threads, and the kernel executes in the default stream.
+         */
         template<class QueryOpT, class OutputOpT>
         void traverse(const LBVH& lbvh, const QueryOpT& query, const OutputOpT& out)
             {
             traverse(0, lbvh, query, out, SelfOp(), NullTransformOp());
             }
 
-        //! Access the compressed LBVH data for traversal
+        //! Access the compressed LBVH data for traversal.
         const shared_array<int4>& getData() const
             {
             return m_data;
             }
 
+    private:
+        int m_root;                     //!< Root node
+        shared_array<int4> m_data;      //!< Internal representation of the LBVH for traversal
+        shared_array<float3> m_lbvh_lo; //!< Lower bound of tree
+        shared_array<float3> m_lbvh_hi; //!< Upper bound of tree
+        shared_array<float3> m_bins;    //!< Bin size for compression
+
+        //! Compresses the lbvh into internal representation.
+        template<class TransformOpT>
+        void compress(const LaunchParameters& params, const LBVH& lbvh, const TransformOpT& transform);
+
+        bool m_replay;  //!< If true, the compressed structure has already been set explicitly
+
         //! Get the pointer version of the data in the traverser.
-        const LBVHCompressedData data() const
+        const LBVHCompressedData data()
             {
             LBVHCompressedData clbvh;
             clbvh.root = m_root;
-            clbvh.data = const_cast<int4*>(m_data.get());
-            clbvh.lo = const_cast<float3*>(m_lbvh_lo.get());
-            clbvh.hi = const_cast<float3*>(m_lbvh_hi.get());
-            clbvh.bins = const_cast<float3*>(m_bins.get());
+            clbvh.data = m_data.get();
+            clbvh.lo = m_lbvh_lo.get();
+            clbvh.hi = m_lbvh_hi.get();
+            clbvh.bins = m_bins.get();
             return clbvh;
             }
-
-        //! Set the kernel autotuner parameters
-        /*!
-         * \param enable If true, run the autotuners. If false, disable them.
-         * \param period Number of traversals between running the autotuners.
-         */
-        void setAutotunerParams(bool enable, unsigned int period)
-            {
-            m_tune_traverse->setEnabled(enable);
-            m_tune_traverse->setPeriod(period);
-
-            m_tune_compress->setEnabled(enable);
-            m_tune_compress->setPeriod(period);
-            }
-
-    private:
-        int m_root;                                 //!< Root node
-        shared_array<int4> m_data;         //!< Internal representation of the LBVH for traversal
-        shared_array<float3> m_lbvh_lo;    //!< Lower bound of tree
-        shared_array<float3> m_lbvh_hi;    //!< Upper bound of tree
-        shared_array<float3> m_bins;       //!< Bin size for compression
-
-        std::unique_ptr<Autotuner> m_tune_traverse; //!< Autotuner for traversal kernel
-        std::unique_ptr<Autotuner> m_tune_compress; //!< Autotuner for compression kernel
-
-        //! Compresses the lbvh into internal representation
-        template<class TransformOpT>
-        void compress(cudaStream_t stream, const LBVH& lbvh, const TransformOpT& transform);
-
-        bool m_replay;  //!< If true, the compressed structure has already been set explicitly
     };
 
 LBVHTraverser::LBVHTraverser()
-    : m_lbvh_lo(1), m_lbvh_hi(1), m_bins(1), m_replay(false)
+    : Tunable<unsigned int>(32, 1024, 32),
+      m_lbvh_lo(1), m_lbvh_hi(1), m_bins(1), m_replay(false)
     {
-    m_tune_traverse.reset(new Autotuner(32, 1024, 32, 5, 100000));
-    m_tune_compress.reset(new Autotuner(32, 1024, 32, 5, 100000));
     }
 
 /*!
- * \param stream CUDA stream for execution.
+ * \param params Launch parameters for kernel execution, including tunable block size and stream.
  * \param lbvh LBVH to traverse.
  * \param transform Transformation operation for cached primitive indexes.
  *
@@ -217,16 +376,16 @@ LBVHTraverser::LBVHTraverser()
  * To clear a setup, call reset().
  */
 template<class TransformOpT>
-void LBVHTraverser::setup(cudaStream_t stream, const LBVH& lbvh, const TransformOpT& transform)
+void LBVHTraverser::setup(const LaunchParameters& params, const LBVH& lbvh, const TransformOpT& transform)
     {
     if (lbvh.getN() == 0) return;
 
-    compress(stream, lbvh, transform);
+    compress(params, lbvh, transform);
     m_replay = true;
     }
 
 /*!
- * \param stream CUDA stream for kernel execution.
+ * \param params Launch parameters for kernel execution, including tunable block size and stream.
  * \param lbvh LBVH to traverse.
  * \param query Query operation for defining search volumes and overlaps.
  * \param out Output operation for intersected primitives.
@@ -248,7 +407,7 @@ void LBVHTraverser::setup(cudaStream_t stream, const LBVH& lbvh, const Transform
  * along the rope. Traversal terminates when the LBVHSentinel is reached for the rope.
  */
 template<class QueryOpT, class OutputOpT, class TranslateOpT, class TransformOpT>
-void LBVHTraverser::traverse(cudaStream_t stream,
+void LBVHTraverser::traverse(const LaunchParameters& params,
                              const LBVH& lbvh,
                              const QueryOpT& query,
                              const OutputOpT& out,
@@ -267,26 +426,26 @@ void LBVHTraverser::traverse(cudaStream_t stream,
         throw std::runtime_error("A maximum of 32 image vectores are supported by LBVH traversers.");
         }
 
+    checkParameter(params);
+
     // setup if this is not a replay
     if (!m_replay)
-        setup(stream, lbvh, transform);
+        setup(params, lbvh, transform);
 
     // compressed lbvh data
     LBVHCompressedData clbvh = data();
 
     // traversal data
-    m_tune_traverse->begin();
     gpu::lbvh_traverse_ropes(out,
-                             clbvh,
+                             data(),
                              query,
                              images,
-                             m_tune_traverse->getParam(),
-                             stream);
-    m_tune_traverse->end();
+                             params.tunable,
+                             params.stream);
     }
 
 /*!
- * \param stream CUDA stream for kernel execution.
+ * \param params Launch parameters for kernel execution, including tunable block size and stream.
  * \param lbvh LBVH to compress
  * \param transform Transformation operation for cached primitive indexes.
  *
@@ -315,8 +474,11 @@ void LBVHTraverser::traverse(cudaStream_t stream,
  * index to save indirection when the index itself is not of interest.
  */
 template<class TransformOpT>
-void LBVHTraverser::compress(cudaStream_t stream, const LBVH& lbvh, const TransformOpT& transform)
+void LBVHTraverser::compress(const LaunchParameters& params, const LBVH& lbvh, const TransformOpT& transform)
     {
+    // check tuning parameter first
+    checkParameter(params);
+
     // resize the internal data array
     const unsigned int num_data = lbvh.getNNodes();
     if (num_data > m_data.size())
@@ -333,15 +495,13 @@ void LBVHTraverser::compress(cudaStream_t stream, const LBVH& lbvh, const Transf
     LBVHCompressedData ctree = data();
 
     // compress the data
-    m_tune_compress->begin();
     gpu::lbvh_compress_ropes(ctree,
                              transform,
                              tree,
                              lbvh.getNInternal(),
                              lbvh.getNNodes(),
-                             m_tune_compress->getParam(),
-                             stream);
-    m_tune_compress->end();
+                             params.tunable,
+                             params.stream);
     }
 } // end namespace neighbor
 
