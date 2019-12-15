@@ -6,16 +6,9 @@
 #ifndef NEIGHBOR_QUERY_OPS_H_
 #define NEIGHBOR_QUERY_OPS_H_
 
-#include "hoomd/HOOMDMath.h"
-#include "BoundingVolumes.h"
+#include <cuda_runtime.h>
 
-#ifdef NVCC
-#define DEVICE __device__ __forceinline__
-#define HOSTDEVICE __host__ __device__ __forceinline__
-#else
-#define DEVICE
-#define HOSTDEVICE
-#endif
+#include "BoundingVolumes.h"
 
 namespace neighbor
 {
@@ -44,16 +37,11 @@ struct SphereQueryOp
      * \param spheres_ Sphere data storing (x,y,z,R) for each query volume.
      * \param N_ The number of spheres.
      */
-    SphereQueryOp(Scalar4 *spheres_, unsigned int N_)
+    SphereQueryOp(float4 *spheres_, unsigned int N_)
         : spheres(spheres_), N(N_)
         {}
 
-    /*
-     * Many of these methods only have __device__ implementations, and so only compile
-     * them in NVCC.
-     */
-    #ifdef NVCC
-    typedef Scalar4 ThreadData;
+    typedef float4 ThreadData;
     typedef BoundingSphere Volume;
 
     //! Setup the thread data.
@@ -62,7 +50,7 @@ struct SphereQueryOp
      *
      * The reference position for the sphere is simply loaded into thread-local memory.
      */
-    DEVICE ThreadData setup(const unsigned int idx) const
+    __device__ __forceinline__ ThreadData setup(const unsigned int idx) const
         {
         return spheres[idx];
         }
@@ -74,9 +62,9 @@ struct SphereQueryOp
      *
      * \returns The enclosing BoundingSphere at \a image.
      */
-    DEVICE Volume get(const ThreadData& q, const Scalar3& image) const
+    __device__ __forceinline__ Volume get(const ThreadData& q, const float3& image) const
         {
-        const Scalar3 t = make_scalar3(q.x,q.y,q.z) + image;
+        const float3 t = make_float3(q.x + image.x, q.y + image.y, q.z + image.z);
         return BoundingSphere(t,q.w);
         }
 
@@ -91,7 +79,7 @@ struct SphereQueryOp
      * already implemented. This overlap test should be *fast*, since it will be
      * applied against all internal nodes of the BVH.
      */
-    DEVICE bool overlap(const Volume& v, const BoundingBox& box) const
+    __device__ __forceinline__ bool overlap(const Volume& v, const BoundingBox& box) const
         {
         return v.overlap(box);
         }
@@ -114,28 +102,24 @@ struct SphereQueryOp
      * In this reference implementation, we do not need any additional refinement, and
      * so we simply return true for all overlapped primitives.
      */
-    DEVICE bool refine(const ThreadData& q, const int primitive) const
+    __device__ __forceinline__ bool refine(const ThreadData& q, const int primitive) const
         {
         return true;
         }
-    #endif
 
     //! Get the number of query volumes.
     /*!
      * \returns The number of query volumes.
      */
-    HOSTDEVICE unsigned int size() const
+    __host__ __device__ __forceinline__ unsigned int size() const
         {
         return N;
         }
 
-    Scalar4 *spheres;
-    unsigned int N;
+    const float4* spheres;
+    const unsigned int N;
     };
 
 } // end namespace neighbor
-
-#undef DEVICE
-#undef HOSTDEVICE
 
 #endif // NEIGHBOR_QUERY_OPS_H_

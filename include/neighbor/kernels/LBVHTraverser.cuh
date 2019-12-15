@@ -6,49 +6,16 @@
 #ifndef NEIGHBOR_LBVH_TRAVERSER_CUH_
 #define NEIGHBOR_LBVH_TRAVERSER_CUH_
 
-#include "hoomd/HOOMDMath.h"
-#include "LBVH.cuh"
-#include "BoundingVolumes.h"
+#include <cuda_runtime.h>
+
+#include "../LBVHData.h"
+#include "../LBVHTraverserData.h"
+#include "../BoundingVolumes.h"
 
 namespace neighbor
 {
 namespace gpu
 {
-
-//! Lightweight data structure to hold the compressed LBVH.
-struct LBVHCompressedData
-    {
-    int root;       //!< Root index of the LBVH
-    int4* data;     //!< Compressed LBVH data.
-    float3* lo;     //!< Lower bound used in compression.
-    float3* hi;     //!< Upper bound used in compression.
-    float3* bins;   //!< Bin spacing used in compression.
-    };
-
-//! Compress LBVH for rope traversal.
-template<class TransformOpT>
-void lbvh_compress_ropes(LBVHCompressedData ctree,
-                         const TransformOpT& transform,
-                         const LBVHData tree,
-                         unsigned int N_internal,
-                         unsigned int N_nodes,
-                         unsigned int block_size,
-                         cudaStream_t stream = 0);
-
-//! Traverse the LBVH using ropes.
-template<class OutputOpT, class QueryOpT>
-void lbvh_traverse_ropes(OutputOpT& out,
-                         const LBVHCompressedData& lbvh,
-                         const QueryOpT& query,
-                         const Scalar3 *d_images,
-                         unsigned int Nimages,
-                         unsigned int block_size,
-                         cudaStream_t stream = 0);
-
-/*
- * Templated function definitions should only be available in NVCC.
- */
-#ifdef NVCC
 namespace kernel
 {
 //! Kernel to compress LBVH for rope traversal
@@ -74,9 +41,9 @@ namespace kernel
  * The transformation is implemented by \a transform.
  */
 template<class TransformOpT>
-__global__ void lbvh_compress_ropes(LBVHCompressedData ctree,
+__global__ void lbvh_compress_ropes(const LBVHCompressedData ctree,
                                     const TransformOpT transform,
-                                    const LBVHData tree,
+                                    const ConstLBVHData tree,
                                     const unsigned int N_internal,
                                     const unsigned int N_nodes)
     {
@@ -160,12 +127,11 @@ __global__ void lbvh_compress_ropes(LBVHCompressedData ctree,
  * \param out Output operation for intersected primitives.
  * \param lbvh Compressed LBVH data to traverse.
  * \param query Query operation.
- * \param d_images Image vectors to traverse for \a d_spheres.
- * \param Nimages Number of image vectors.
- * \param N Number of test spheres.
+ * \param images Translation operation.
  *
  * \tparam OutputOpT The type of output operation.
  * \tparam QueryOpT The type of query operation.
+ * \tparam TranslateOpT The type of translation operation.
  *
  * The LBVH is traversed using the rope scheme. In this method, the
  * test sphere always descends to the left child of an intersected node,
@@ -176,8 +142,7 @@ __global__ void lbvh_compress_ropes(LBVHCompressedData ctree,
  * This operation is responsible for constructing the query volume, translating it,
  * and performing overlap operations with the BoundingBox volumes in the LBVH.
  *
- * Each query volume can optionally be translated by a set of \a d_images. The self-image
- * is automatically traversed and should not be included in \a d_images. Before
+ * Each query volume can optionally be translated using a set of \a images. Before
  * entering the traversal loop, each volume is translated and intersected against
  * the tree root. A set of bitflags is encoded for which images possibly overlap the
  * tree. (Some may only intersect in the self-image, while others may intersect multiple
@@ -185,12 +150,11 @@ __global__ void lbvh_compress_ropes(LBVHCompressedData ctree,
  * During traversal, an image processes the entire tree, and then advances to the next
  * image once traversal terminates. A maximum of 32 images is supported.
  */
-template<class OutputOpT, class QueryOpT>
-__global__ void lbvh_traverse_ropes(OutputOpT out,
+template<class OutputOpT, class QueryOpT, class TranslateOpT>
+__global__ void lbvh_traverse_ropes(const OutputOpT out,
                                     const LBVHCompressedData lbvh,
                                     const QueryOpT query,
-                                    const Scalar3 *d_images,
-                                    const unsigned int Nimages)
+                                    const TranslateOpT images)
     {
     // one thread per test
     const unsigned int idx = blockDim.x * blockIdx.x + threadIdx.x;
@@ -213,19 +177,38 @@ __global__ void lbvh_traverse_ropes(OutputOpT out,
 
     // find image flags against root before divergence
     unsigned int flags = 0;
-    const int nbits = ((int)Nimages <= 32) ? Nimages : 32;
+    const int nbits = (images.size() <= 32u) ? images.size() : 32;
     for (unsigned int i=0; i < nbits; ++i)
         {
-        const Scalar3 image = d_images[i];
+        const typename TranslateOpT::type image = images.get(i);
         const typename QueryOpT::Volume q = query.get(qdata,image);
         if (query.overlap(q,tree_box)) flags |= 1u << i;
         }
 
     // stackless search
-    typename QueryOpT::Volume q = query.get(qdata, make_scalar3(0,0,0));
-    int node = lbvh.root;
     do
         {
+        // look for the next image
+        int image_bit = __ffs(flags);
+        if (image_bit)
+            {
+            // shift the lsb by 1 to get the image index
+            --image_bit;
+
+            // unset the bit from this image
+            flags &= ~(1u << image_bit);
+            }
+        else
+            {
+            // no more images, quit
+            break;
+            }
+
+        // move the sphere to the next image
+        const typename TranslateOpT::type image = images.get(image_bit);
+        typename QueryOpT::Volume q = query.get(qdata, image);
+
+        int node = lbvh.root;
         while (node != LBVHSentinel)
             {
             // load node and decompress bounds so that they always *expand*
@@ -261,33 +244,13 @@ __global__ void lbvh_traverse_ropes(OutputOpT out,
                     }
                 }
             } // end stackless search
-
-        // look for the next image
-        int image_bit = __ffs(flags);
-        if (image_bit)
-            {
-            // shift the lsb by 1 to get the image index
-            --image_bit;
-
-            // move the sphere to the next image
-            const Scalar3 image = d_images[image_bit];
-            q = query.get(qdata, image);
-            node = lbvh.root;
-
-            // unset the bit from this image
-            flags &= ~(1u << image_bit);
-            }
-        else
-            {
-            // no more images, quit
-            break;
-            }
         } while(true);
 
     out.finalize(result);
     }
 } // end namespace kernel
 
+//! Compress LBVH for rope traversal.
 /*!
  * \param ctree Compressed LBVH.
  * \param transform Transformation operation.
@@ -301,11 +264,10 @@ __global__ void lbvh_traverse_ropes(OutputOpT out,
  *
  * \sa kernel::lbvh_compress_ropes
  */
-//! Compress LBVH for rope traversal.
 template<class TransformOpT>
-void lbvh_compress_ropes(LBVHCompressedData ctree,
+void lbvh_compress_ropes(const LBVHCompressedData& ctree,
                          const TransformOpT& transform,
-                         const LBVHData tree,
+                         const ConstLBVHData tree,
                          unsigned int N_internal,
                          unsigned int N_nodes,
                          unsigned int block_size,
@@ -326,45 +288,46 @@ void lbvh_compress_ropes(LBVHCompressedData ctree,
         (ctree, transform, tree, N_internal, N_nodes);
     }
 
+//! Traverse the LBVH using ropes.
 /*!
  * \param out Output operation for intersected primitives.
  * \param lbvh Compressed LBVH data to traverse.
- * \param d_spheres Test spheres to intersect with LBVH.
- * \param d_images Image vectors to traverse for \a d_spheres.
- * \param Nimages Number of image vectors.
- * \param N Number of test spheres.
+ * \param query Query operation.
+ * \param images Translation operation.
  * \param block_size Number of CUDA threads per block.
  * \param stream CUDA stream for kernel execution.
  *
  * \tparam OutputOpT The type of output operation.
  * \tparam QueryOpT The type of query operation.
+ * \tparam TranslateOpT The type of translation operation.
  *
  * \sa kernel::lbvh_traverse_ropes
  */
-template<class OutputOpT, class QueryOpT>
-void lbvh_traverse_ropes(OutputOpT& out,
+template<class OutputOpT, class QueryOpT, class TranslateOpT>
+void lbvh_traverse_ropes(const OutputOpT& out,
                          const LBVHCompressedData& lbvh,
                          const QueryOpT& query,
-                         const Scalar3 *d_images,
-                         unsigned int Nimages,
+                         const TranslateOpT& images,
                          unsigned int block_size,
                          cudaStream_t stream)
     {
+    // quit if there are no images
+    if (query.size() == 0 || images.size() == 0)
+        return;
+
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
         cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_traverse_ropes<OutputOpT,QueryOpT>);
+        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_traverse_ropes<OutputOpT,QueryOpT,TranslateOpT>);
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
 
     const unsigned int num_blocks = (query.size() + run_block_size - 1)/run_block_size;
-    kernel::lbvh_traverse_ropes<<<num_blocks, run_block_size, 0, stream>>>
-        (out, lbvh, query, d_images, Nimages);
+    kernel::lbvh_traverse_ropes<<<num_blocks, run_block_size, 0, stream>>>(out, lbvh, query, images);
     }
-#endif
 
 } // end namespace gpu
 } // end namespace neighbor

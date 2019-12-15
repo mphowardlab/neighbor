@@ -3,80 +3,19 @@
 
 // Maintainer: mphoward
 
-#ifndef NEIGHBOR_LBVH_CUH_
-#define NEIGHBOR_LBVH_CUH_
+#ifndef NEIGHBOR_KERNELS_LBVH_CUH_
+#define NEIGHBOR_KERNELS_LBVH_CUH_
 
-#include "hoomd/HOOMDMath.h"
+#include <cuda_runtime.h>
+#include <cub/cub.cuh>
 
-#include "BoundingVolumes.h"
+#include "../BoundingVolumes.h"
+#include "../LBVHData.h"
 
 namespace neighbor
 {
 namespace gpu
 {
-// LBVH sentinel has value of max signed int (~2 billion)
-const int LBVHSentinel=0x7fffffff;
-
-//! Linear bounding volume hierarchy raw data
-/*!
- * LBVHData is a lightweight struct representation of the LBVH. It is useful for passing tree data
- * to a CUDA kernel. It is valid to set a pointer to NULL if it is not required, but the caller
- * for doing so responsibly.
- */
-struct LBVHData
-    {
-    int* parent;                        //!< Parent node
-    int* left;                          //!< Left child
-    int* right;                         //!< Right child
-    const unsigned int* primitive;      //!< Primitives
-    float3* lo;                         //!< Lower bound of AABB
-    float3* hi;                         //!< Upper bound of AABB
-    int root;                           //!< Root index
-    };
-
-//! Generate the Morton codes
-template<class InsertOpT>
-void lbvh_gen_codes(unsigned int *d_codes,
-                    unsigned int *d_indexes,
-                    const InsertOpT& insert,
-                    const Scalar3 lo,
-                    const Scalar3 hi,
-                    const unsigned int N,
-                    const unsigned int block_size,
-                    cudaStream_t stream = 0);
-
-//! Sort the Morton codes.
-uchar2 lbvh_sort_codes(void *d_tmp,
-                       size_t &tmp_bytes,
-                       unsigned int *d_codes,
-                       unsigned int *d_sorted_codes,
-                       unsigned int *d_indexes,
-                       unsigned int *d_sorted_indexes,
-                       const unsigned int N,
-                       cudaStream_t stream = 0);
-
-//! Generate the tree hierarchy
-void lbvh_gen_tree(const LBVHData tree,
-                   const unsigned int *d_codes,
-                   const unsigned int N,
-                   const unsigned int block_size,
-                   cudaStream_t stream = 0);
-
-//! Bubble the bounding boxes up the tree hierarchy.
-template<class InsertOpT>
-void lbvh_bubble_aabbs(const LBVHData tree,
-                       const InsertOpT& insert,
-                       unsigned int *d_locks,
-                       const unsigned int N,
-                       const unsigned int block_size,
-                       cudaStream_t stream = 0);
-
-template<class InsertOpT>
-void lbvh_one_primitive(const LBVHData tree,
-                        const InsertOpT& insert,
-                        cudaStream_t stream = 0);
-
-#ifdef NVCC
 namespace kernel
 {
 //! Expand a 10-bit integer into 30 bits by inserting 2 zeros after each bit.
@@ -109,6 +48,48 @@ __device__ __forceinline__ unsigned int expandBits(unsigned int v)
 __device__ __forceinline__ unsigned int calcMortonCode(uint3 point)
     {
     return 4 * expandBits(point.x) + 2 * expandBits(point.y) + expandBits(point.z);
+    }
+
+//! Compute the number of bits shared by Morton codes for primitives \a i and \a j.
+/*!
+ * \param d_codes List of Morton codes.
+ * \param code_i Morton code corresponding to \a i.
+ * \param i First primitive.
+ * \param j Second primitive.
+ * \param N Number of primitives.
+ *
+ * \returns Number of bits in longest common prefix or -1 if \a j lies outside [0,N).
+ *
+ * The longest common prefix of the Morton codes for \a i and \j is computed
+ * using the __clz intrinsic. When \a i and \a j are the same, they share all 32
+ * bits in the int representation of the Morton code. In that case, the common
+ * prefix of \a i and \a j is used as a tie breaker.
+ *
+ * The user is required to supply \a code_i (even though it could also be looked
+ * up from \a d_codes) for performance reasons, since code_i can be cached by
+ * the caller if making multiple calls to ::delta for different \a j.
+ */
+__device__ __forceinline__ int delta(const unsigned int *d_codes,
+                                     const unsigned int code_i,
+                                     const int i,
+                                     const int j,
+                                     const unsigned int N)
+    {
+    if (j < 0 || j >= N)
+        {
+        return -1;
+        }
+
+    const unsigned int code_j = d_codes[j];
+
+    if (code_i == code_j)
+        {
+        return (32 + __clz(i ^ j));
+        }
+    else
+        {
+        return __clz(code_i ^ code_j);
+        }
     }
 
 //! Convert a fraction to [0,1023]
@@ -146,8 +127,8 @@ template<class InsertOpT>
 __global__ void lbvh_gen_codes(unsigned int *d_codes,
                                unsigned int *d_indexes,
                                const InsertOpT insert,
-                               const Scalar3 lo,
-                               const Scalar3 hi,
+                               const float3 lo,
+                               const float3 hi,
                                const unsigned int N)
     {
     // one thread per point
@@ -156,8 +137,7 @@ __global__ void lbvh_gen_codes(unsigned int *d_codes,
         return;
 
     // real space coordinate of aabb center
-    const BoundingBox b = insert.get(idx);
-    const float3 r = b.getCenter();
+    const float3 r = insert.get(idx).getCenter();
 
     // fractional coordinate
     const float3 f = make_float3((r.x - lo.x) / (hi.x - lo.x),
@@ -175,6 +155,92 @@ __global__ void lbvh_gen_codes(unsigned int *d_codes,
     d_indexes[idx] = idx;
     }
 
+//! Kernel to generate the tree hierarchy
+/*!
+ * \param tree LBVH tree (raw pointers)
+ * \param d_codes Sorted Morton codes for the primitives.
+ * \param N Number of primitives
+ *
+ * One thread is used per *internal* node. (The LBVH guarantees that there are
+ * exactly N-1 internal nodes.) The algorithm is given by Figure 4 of
+ * <a href="https://dl.acm.org/citation.cfm?id=2383801">Karras</a>.
+ */
+__global__ static void lbvh_gen_tree(const LBVHData tree,
+                                     const unsigned int *d_codes,
+                                     const unsigned int N)
+    {
+    // one thread per internal node (= N-1 threads)
+    const unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= N-1)
+        return;
+
+    const unsigned int code_i = d_codes[i];
+    const int forward_prefix = delta(d_codes, code_i, i, i+1, N);
+    const int backward_prefix = delta(d_codes, code_i, i, i-1, N);
+
+    // get direction of the range based on sign
+    const int d = (forward_prefix >= backward_prefix) - (forward_prefix < backward_prefix);
+
+    // get minimum prefix
+    const int min_prefix = delta(d_codes, code_i, i, i-d, N);
+
+    // get maximum prefix by binary search
+    int lmax = 2;
+    while( delta(d_codes, code_i, i, i + d*lmax, N) > min_prefix)
+        {
+        lmax = lmax << 1;
+        }
+    int l = 0; int t = lmax;
+    do
+        {
+        t = t >> 1;
+        if (delta(d_codes, code_i, i, i + (l+t)*d, N) > min_prefix)
+            l = l + t;
+        }
+    while (t > 1);
+    const int j = i + l*d;
+
+    // get the length of the common prefix
+    const int common_prefix = delta(d_codes, code_i, i, j, N);
+
+    // binary search to find split position
+    int s = 0; t = l;
+    do
+        {
+        t = (t + 1) >> 1;
+        // if proposed split lies within range
+        if (s+t < l)
+            {
+            const int split_prefix = delta(d_codes, code_i, i, i+(s+t)*d, N);
+
+            // if new split shares a longer number of bits, accept it
+            if (split_prefix > common_prefix)
+                {
+                s = s + t;
+                }
+            }
+        }
+    while (t > 1);
+    const int split = i + s*d + min(d,0);
+
+    const int left = (min(i,j) == split) ? split + (N-1) : split;
+    const int right = (max(i,j) == (split + 1)) ? split + N : split + 1;
+
+    // children
+    tree.left[i] = left;
+    tree.right[i] = right;
+
+    // parents
+    tree.parent[left] = i;
+    tree.parent[right] = i;
+
+    // root node (index 0) has no parent
+    if (i == 0)
+        {
+        tree.parent[0] = LBVHSentinel;
+        }
+    }
+
 //! Bubble the bounding boxes up the tree hierarchy.
 /*!
  * \param tree LBVH tree (raw pointers).
@@ -184,10 +250,8 @@ __global__ void lbvh_gen_codes(unsigned int *d_codes,
  *
  * \tparam InsertOpT the kind of insert operation
  *
- * One thread originally processes each primitive. In order to support mixed precision,
- * the Scalar4 representation of the primitive is converted to two float3s that define
- * the lower and upper bounds using CUDA intrinsics to round down or up. (If Scalar = float,
- * then these bounds are equal.) This bounding box is stored for the leaf. Then, each thread
+ * One thread originally processes each primitive. The primitive is represented by a BoundingBox
+ * defined using two float3s. This bounding box is stored for the leaf. Then, each thread
  * begins to process up the tree hierarchy.
  *
  * The second thread to reach each node processes the node, which ensures that all children
@@ -261,6 +325,17 @@ __global__ void lbvh_bubble_aabbs(const LBVHData tree,
         }
     }
 
+//! Kernel to set data for a one-primitive LBVH.
+/*!
+ * \param tree LBVH tree (raw pointers).
+ * \param insert The insert operation to obtain the ONE aabb.
+ *
+ * \tparam InsertOpT the kind of insert operation.
+ *
+ * The one-primitive LBVH needs to be handled in a special kernel
+ * because it violates assumptions about how to traverse the tree,
+ * and this would be overkill anyway.
+ */
 template<class InsertOpT>
 __global__ void lbvh_one_primitive(const LBVHData tree,
                                    const InsertOpT insert)
@@ -279,6 +354,7 @@ __global__ void lbvh_one_primitive(const LBVHData tree,
 
 } // end namespace kernel
 
+//! Generate Morton codes for the primitives.
 /*!
  * \param d_codes Generated Morton codes.
  * \param d_indexes Generated index for the primitive.
@@ -297,8 +373,8 @@ template<class InsertOpT>
 void lbvh_gen_codes(unsigned int *d_codes,
                     unsigned int *d_indexes,
                     const InsertOpT& insert,
-                    const Scalar3 lo,
-                    const Scalar3 hi,
+                    const float3 lo,
+                    const float3 hi,
                     const unsigned int N,
                     const unsigned int block_size,
                     cudaStream_t stream)
@@ -317,6 +393,85 @@ void lbvh_gen_codes(unsigned int *d_codes,
     kernel::lbvh_gen_codes<<<num_blocks, run_block_size, 0, stream>>>(d_codes, d_indexes, insert, lo, hi, N);
     }
 
+//! Sort the primitives into Morton code order.
+/*!
+ * \param d_tmp Temporary storage for CUB.
+ * \param tmp_bytes Temporary storage size (B) for CUB.
+ * \param d_codes Unsorted Morton codes.
+ * \param d_alt_codes Alternate array of Morton codes.
+ * \param d_indexes Unsorted primitive indexes.
+ * \param d_alt_indexes Alternate array of primitive indexes.
+ * \param N Number of primitives.
+ * \param stream CUDA stream for kernel execution.
+ *
+ * \returns Two flags (swap) with the location of the sorted codes and indexes. If swap.x
+ *          is 1, then the sorted codes are in \a d_alt_codes and need to be swapped. Similarly,
+ *          if swap.y is 1, then the sorted indexes are in \a d_alt_indexes.
+ *
+ * The Morton codes are sorted in ascending order using radix sort in the CUB library.
+ * This function must be called twice in order for the sort to occur. When \a d_tmp is NULL
+ * on the first call, CUB sizes the temporary storage that is required and sets it in \a tmp_bytes.
+ * Some versions of CUB were buggy and required \a d_tmp be allocated even
+ * when \a tmp_bytes was 0. To bypass this, allocate a small amount (say, 4B) when \a tmp_bytes is 0.
+ * The second call will then sort the Morton codes and indexes. The sorted data will be in the
+ * appropriate buffer, which can be determined by the returned flags.
+ */
+inline uchar2 lbvh_sort_codes(void *d_tmp,
+                              size_t &tmp_bytes,
+                              unsigned int *d_codes,
+                              unsigned int *d_alt_codes,
+                              unsigned int *d_indexes,
+                              unsigned int *d_alt_indexes,
+                              const unsigned int N,
+                              cudaStream_t stream)
+    {
+
+    cub::DoubleBuffer<unsigned int> d_keys(d_codes, d_alt_codes);
+    cub::DoubleBuffer<unsigned int> d_vals(d_indexes, d_alt_indexes);
+
+    cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, 30, stream);
+
+    // mark that the arrays should be flipped if the final result is not in the primary array
+    uchar2 swap = make_uchar2(0,0);
+    if (d_tmp != NULL)
+        {
+        swap.x = (d_keys.selector == 1);
+        swap.y = (d_vals.selector == 1);
+        }
+    return swap;
+    }
+
+//! Generate the tree hierarchy from the Morton codes.
+/*!
+ * \param tree LBVH tree (raw pointers).
+ * \param d_codes Sorted Morton codes for the primitives.
+ * \param N Number of primitives.
+ * \param block_size Number of CUDA threads per block.
+ * \param stream CUDA stream for kernel execution.
+ *
+ * \sa kernel::lbvh_gen_tree
+ */
+inline void lbvh_gen_tree(const LBVHData tree,
+                          const unsigned int *d_codes,
+                          const unsigned int N,
+                          const unsigned int block_size,
+                          cudaStream_t stream)
+    {
+    // clamp block size
+    static unsigned int max_block_size = UINT_MAX;
+    if (max_block_size == UINT_MAX)
+        {
+        cudaFuncAttributes attr;
+        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_gen_tree);
+        max_block_size = attr.maxThreadsPerBlock;
+        }
+    const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
+
+    const unsigned int num_blocks = ((N-1) + run_block_size - 1)/run_block_size;
+    kernel::lbvh_gen_tree<<<num_blocks, run_block_size, 0, stream>>>(tree, d_codes, N);
+    }
+
+//! Bubble the bounding boxes up the tree hierarchy.
 /*!
  * \param tree LBVH tree (raw pointers).
  * \param d_locks Temporary storage for state of internal nodes.
@@ -355,6 +510,16 @@ void lbvh_bubble_aabbs(const LBVHData tree,
     kernel::lbvh_bubble_aabbs<<<num_blocks, run_block_size, 0, stream>>>(tree, insert, d_locks, N);
     }
 
+//! Set data for a one-primitive LBVH.
+/*!
+ * \param tree LBVH tree (raw pointers).
+ * \param insert The insert operation to obtain the ONE aabb.
+ * \param stream CUDA stream for kernel execution.
+ *
+ * \tparam InsertOpT the kind of insert operation
+ *
+ * \sa kernel::lbvh_one_primitive
+ */
 template<class InsertOpT>
 void lbvh_one_primitive(const LBVHData tree,
                         const InsertOpT& insert,
@@ -362,9 +527,8 @@ void lbvh_one_primitive(const LBVHData tree,
     {
     kernel::lbvh_one_primitive<<<1, 1, 0, stream>>>(tree, insert);
     }
-#endif // NVCC
 
 } // end namespace gpu
 } // end namespace neighbor
 
-#endif // NEIGHBOR_LBVH_CUH_
+#endif // NEIGHBOR_KERNELS_LBVH_CUH_

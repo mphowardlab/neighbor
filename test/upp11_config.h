@@ -14,8 +14,7 @@
 #ifndef NEIGHBOR_TEST_UPP11_CONFIG_H_
 #define NEIGHBOR_TEST_UPP11_CONFIG_H_
 
-#include "hoomd/HOOMDMPI.h"
-#include "hoomd/extern/upp11/upp11.h"
+#include <upp11/upp11.h>
 
 #include <cmath>
 #include <string>
@@ -34,7 +33,7 @@
  */
 #define UP_ASSERT_CLOSE(a,b,eps) \
 upp11::TestCollection::getInstance().checkpoint(LOCATION, "UP_ASSERT_CLOSE"), \
-upp11::TestAssert(LOCATION).assertTrue(std::abs((a)-(b)) <= (eps) * std::min(std::abs((Scalar)a), std::abs((Scalar)b)), \
+upp11::TestAssert(LOCATION).assertTrue(std::abs((a)-(b)) <= (eps) * std::min(std::abs((float)a), std::abs((float)b)), \
                                        #a " (" + std::to_string(a) + ") close to " #b " (" + std::to_string(b) + ")")
 
 //! Macro to test if a floating-point value is close to zero
@@ -91,21 +90,5 @@ upp11::TestAssert(LOCATION).assertTrue(a < b, #a " (" + std::to_string(a) + ") <
 #define UP_ASSERT_LESS_EQUAL(a,b) \
 upp11::TestCollection::getInstance().checkpoint(LOCATION, "UP_ASSERT_LESS_EQUAL"), \
 upp11::TestAssert(LOCATION).assertTrue(a <= b, #a " (" + std::to_string(a) + ") <= " #b " (" + std::to_string(b) + ")")
-
-#ifdef ENABLE_MPI
-#define HOOMD_UP_MAIN() \
-int main(int argc, char **argv) \
-    { \
-    MPI_Init(&argc, &argv); \
-    int val = upp11::TestMain().main(argc, argv); \
-    MPI_Finalize(); \
-    return val; \
-    }
-#else
-#define HOOMD_UP_MAIN() \
-int main(int argc, char **argv) { \
-    return upp11::TestMain().main(argc, argv); \
-}
-#endif
 
 #endif // NEIGHBOR_TEST_UPP11_CONFIG_H_

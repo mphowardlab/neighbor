@@ -3,22 +3,14 @@
 
 # Maintainer: mphoward
 
-set(BENCH_LIST
-    lbvh
-    uniform_grid
-    )
+find_package(HOOMD REQUIRED)
 
-macro(compile_benchmark BENCH_EXE BENCH_SRC)
-    add_executable(${BENCH_EXE} ${BENCH_SRC})
-    target_link_libraries(${BENCH_EXE} PUBLIC HOOMD::_hoomd _${PROJECT_NAME} pybind11::embed)
-    fix_cudart_rpath(${BENCH_EXE})
+add_executable(lbvh_benchmark lbvh_benchmark.cc lbvh_benchmark.cu)
+target_link_libraries(lbvh_benchmark PRIVATE neighbor::neighbor HOOMD::_hoomd pybind11::embed)
+if(NEIGHBOR_CUDA_ARCH)
+    target_compile_options(lbvh_benchmark PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${NEIGHBOR_CUDA_ARCH},code=compute_${NEIGHBOR_CUDA_ARCH}>)
+endif()
 
-    install(TARGETS ${BENCH_EXE} DESTINATION bin)
-endmacro(compile_benchmark)
+install(TARGETS lbvh_benchmark
+        DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-foreach(CUR_BENCH ${BENCH_LIST})
-    set(CUR_BENCH_SRC ${CUR_BENCH}.cc)
-    set(CUR_BENCH_EXE benchmark_${CUR_BENCH})
-
-    compile_benchmark(${CUR_BENCH_EXE} ${CUR_BENCH_SRC})
-endforeach(CUR_BENCH)

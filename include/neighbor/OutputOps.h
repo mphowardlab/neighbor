@@ -6,11 +6,7 @@
 #ifndef NEIGHBOR_OUTPUT_OPS_H_
 #define NEIGHBOR_OUTPUT_OPS_H_
 
-#ifdef NVCC
-#define HOSTDEVICE __host__ __device__ __forceinline__
-#else
-#define HOSTDEVICE
-#endif
+#include <cuda_runtime.h>
 
 namespace neighbor
 {
@@ -55,11 +51,11 @@ struct CountNeighborsOp
         /*!
          * \param idx_ The thread index of the search sphere processed by the thread.
          */
-        HOSTDEVICE ThreadData(const unsigned int idx_)
+        __device__ __forceinline__ ThreadData(const unsigned int idx_)
             : idx(idx_), num_neigh(0)
             {}
 
-        int idx;                //!< Index of the search sphere being processed
+        const int idx;          //!< Index of the search sphere being processed
         unsigned int num_neigh; //!< Number of numbers found
         };
 
@@ -71,7 +67,7 @@ struct CountNeighborsOp
      * Setup functions may do additional processing of variables if needed.
      */
     template<class QueryDataT>
-    HOSTDEVICE ThreadData setup(const unsigned int idx, const QueryDataT& q) const
+    __device__ __forceinline__ ThreadData setup(const unsigned int idx, const QueryDataT& q) const
         {
         return ThreadData(idx);
         }
@@ -86,7 +82,7 @@ struct CountNeighborsOp
      * Note that this processing step occurs deep in the traversal, and so it is advised
      * to avoid unnecessarily divergent execution.
      */
-    HOSTDEVICE void process(ThreadData& t, const int primitive) const
+    __device__ __forceinline__ void process(ThreadData& t, const int primitive) const
         {
         ++t.num_neigh;
         }
@@ -99,12 +95,12 @@ struct CountNeighborsOp
      * It is called at the very end of the traversal kernel, and so allows additional
      * custom output operations to be injected without significant cost during the traversal.
      */
-    HOSTDEVICE void finalize(const ThreadData& t) const
+    __device__ __forceinline__ void finalize(const ThreadData& t) const
         {
         nneigh[t.idx] = t.num_neigh;
         }
 
-    unsigned int *nneigh;   //!< Number of neighbors per-search sphere
+    unsigned int* nneigh;   //!< Number of neighbors per-search sphere
     };
 
 //! Generate a neighbor list
@@ -126,13 +122,13 @@ struct NeighborListOp
     //! Thread-local data
     struct ThreadData
         {
-        HOSTDEVICE ThreadData(const unsigned int idx_, unsigned int first_)
+        __device__ __forceinline__ ThreadData(const unsigned int idx_, unsigned int first_)
             : idx(idx_), first(first_), num_neigh(0)
             {}
 
-        int idx;                //!< Index of primitive
-        unsigned int first;     //!< First index to use for writing neighbors
-        unsigned int num_neigh; //!< Number of neighbors for this thread
+        const int idx;              //!< Index of primitive
+        const unsigned int first;   //!< First index to use for writing neighbors
+        unsigned int num_neigh;     //!< Number of neighbors for this thread
         };
 
     //! Initialize the local ThreadData
@@ -140,7 +136,7 @@ struct NeighborListOp
      * \param idx Index of search sphere.
      */
     template<class QueryDataT>
-    HOSTDEVICE ThreadData setup(const unsigned int idx, const QueryDataT& q) const
+    __device__ __forceinline__ ThreadData setup(const unsigned int idx, const QueryDataT& q) const
         {
         return ThreadData(idx, max_neigh*idx);
         }
@@ -156,7 +152,7 @@ struct NeighborListOp
      * The number of neighbors is incremented regardless, but writing is defered until
      * finalize().
      */
-    HOSTDEVICE void process(ThreadData& t, const int primitive) const
+    __device__ __forceinline__ void process(ThreadData& t, const int primitive) const
         {
         if (t.num_neigh < max_neigh)
             neigh_list[t.first+t.num_neigh] = primitive;
@@ -167,26 +163,19 @@ struct NeighborListOp
     /*!
      * \param t The ThreadData being operated on.
      *
-     * The number of neighbors is written to global memory.
-     *
-     * \todo This method should also alert the caller if the number of neighbors
-     * exceeded the allocation.
+     * The number of neighbors is written to global memory. This number may be larger
+     * than the maximum allocation.
      */
-    HOSTDEVICE void finalize(const ThreadData& t) const
+    __device__ __forceinline__ void finalize(const ThreadData& t) const
         {
         nneigh[t.idx] = t.num_neigh;
-        if (t.num_neigh > max_neigh)
-            {
-            // write overflow condition
-            }
         }
 
-    unsigned int* neigh_list;   //!< Neighbors of each sphere
-    unsigned int* nneigh;       //!< Number of neighbors per search sphere
-    unsigned int max_neigh;     //!< Maximum number of neighbors allocated per sphere
+    unsigned int* neigh_list;       //!< Neighbors of each sphere
+    unsigned int* nneigh;           //!< Number of neighbors per search sphere
+    const unsigned int max_neigh;   //!< Maximum number of neighbors allocated per sphere
     };
 
 } // end namespace neighbor
 
-#undef HOSTDEVICE
 #endif // NEIGHBOR_OUTPUT_OPS_H_
