@@ -271,7 +271,7 @@ void lbvh_compress_ropes(const LBVHCompressedData& ctree,
                          unsigned int N_internal,
                          unsigned int N_nodes,
                          unsigned int block_size,
-                         cudaStream_t stream = 0)
+                         cudaStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
@@ -309,7 +309,7 @@ void lbvh_traverse_ropes(const OutputOpT& out,
                          const QueryOpT& query,
                          const TranslateOpT& images,
                          unsigned int block_size,
-                         cudaStream_t stream = 0)
+                         cudaStream_t stream)
     {
     // quit if there are no images
     if (query.size() == 0 || images.size() == 0)

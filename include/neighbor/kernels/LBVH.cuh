@@ -377,7 +377,7 @@ void lbvh_gen_codes(unsigned int *d_codes,
                     const float3 hi,
                     const unsigned int N,
                     const unsigned int block_size,
-                    cudaStream_t stream = 0)
+                    cudaStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
@@ -423,7 +423,7 @@ inline uchar2 lbvh_sort_codes(void *d_tmp,
                               unsigned int *d_indexes,
                               unsigned int *d_alt_indexes,
                               const unsigned int N,
-                              cudaStream_t stream = 0)
+                              cudaStream_t stream)
     {
 
     cub::DoubleBuffer<unsigned int> d_keys(d_codes, d_alt_codes);
@@ -455,7 +455,7 @@ inline void lbvh_gen_tree(const LBVHData tree,
                           const unsigned int *d_codes,
                           const unsigned int N,
                           const unsigned int block_size,
-                          cudaStream_t stream = 0)
+                          cudaStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
@@ -492,7 +492,7 @@ void lbvh_bubble_aabbs(const LBVHData tree,
                        unsigned int *d_locks,
                        const unsigned int N,
                        const unsigned int block_size,
-                       cudaStream_t stream = 0)
+                       cudaStream_t stream)
     {
     cudaMemsetAsync(d_locks, 0, (N-1)*sizeof(unsigned int), stream);
 
@@ -523,7 +523,7 @@ void lbvh_bubble_aabbs(const LBVHData tree,
 template<class InsertOpT>
 void lbvh_one_primitive(const LBVHData tree,
                         const InsertOpT& insert,
-                        cudaStream_t stream = 0)
+                        cudaStream_t stream)
     {
     kernel::lbvh_one_primitive<<<1, 1, 0, stream>>>(tree, insert);
     }
