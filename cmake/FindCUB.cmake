@@ -8,7 +8,10 @@
 # Also creates the CUB::CUB target that can be linked against.
 #
 
-find_path(CUB_INCLUDE_DIR NAMES cub/cub.cuh)
+find_path(CUB_INCLUDE_DIR
+          NAMES cub/cub.cuh
+          PATHS ${CUB_ROOT} $ENV{CUB_ROOT}
+          )
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(CUB REQUIRED_VARS CUB_INCLUDE_DIR)

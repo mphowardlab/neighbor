@@ -8,7 +8,10 @@
 # Also creates the UPP11::UPP11 target that can be linked against.
 #
 
-find_path(UPP11_INCLUDE_DIR NAMES upp11/upp11.h)
+find_path(UPP11_INCLUDE_DIR
+          NAMES upp11/upp11.h
+          PATHS ${UPP11_ROOT} $ENV{UPP11_ROOT}
+          )
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(UPP11 REQUIRED_VARS UPP11_INCLUDE_DIR)
