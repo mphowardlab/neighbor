@@ -108,7 +108,7 @@ class LBVHWrapper
             return lbvh_;
             }
 
-        //! Get the thrust vector holding the LBVH primitives
+        //! Get the vector holding the LBVH primitives
         const neighbor::shared_array<unsigned int>& getPrimitives() const;
 
         //! Set the autotuner parameters
