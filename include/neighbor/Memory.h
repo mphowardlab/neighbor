@@ -199,6 +199,102 @@ class shared_array
             }
     };
 
+//! Double-buffered device array.
+/*!
+ * This object holds two shared_array objects that can be used in a double-buffered style, e.g., in cub::DeviceRadixSort.
+ * There is a nominal "current" array and nominal "alternate" array. A bit can be toggled using ::flip() to change which
+ * shared_array corresponds to which. Hence, no pointers ever need to be exchanged, and code needing to toggle between
+ * the buffers can be simplified.
+ *
+ * \tparam T Data type to allocate.
+ */
+template<typename T>
+class buffered_array
+    {
+    public:
+        //! Empty constructor.
+        buffered_array()
+            : x_(0), y_(0), selector_(0)
+            {}
+
+        //! Constructor for fixed count.
+        /*!
+         * \param count Number of elements to allocate.
+         */
+        explicit buffered_array(size_t size)
+            : x_(size), y_(size), selector_(0)
+            {}
+
+        //! Swap operation.
+        /*!
+         * \param other An existing shared_array.
+         *
+         * The data in this shared_array is swapped with the data in \a other.
+         */
+        void swap(buffered_array& other)
+            {
+            std::swap(x_, other.x_);
+            std::swap(y_, other.y_);
+            std::swap(selector_, other.selector_);
+            }
+
+        //! Get the current (active) array.
+        /*!
+         * The x_ member array is current when the selector_ is 0.
+         */
+        shared_array<T>& current()
+            {
+            return (selector_ == 0) ? x_ : y_;
+            }
+
+        //! Get the currently (active) array.
+        /*!
+         * The x_ member array is current when the selector_ is 0.
+         */
+        shared_array<T> const& current() const
+            {
+            return (selector_ == 0) ? x_ : y_;
+            }
+
+        //! Get the alternate array.
+        /*!
+         * The y_ member array is alternate when the selector_ is 0.
+         */
+        shared_array<T>& alternate()
+            {
+            return (selector_ == 0) ? y_ : x_;
+            }
+
+        //! Get the alternate array.
+        /*!
+         * The y_ member array is alternate when the selector_ is 0.
+         */
+        shared_array<T> const& alternate() const
+            {
+            return (selector_ == 0) ? y_ : x_;
+            }
+
+        //! Flip the current and alternate arrays.
+        /*!
+         * This procedure is a very quick bit operation and does \b not change the arrays themselves.
+         */
+        void flip()
+            {
+            selector_ ^= 1;
+            }
+
+        //! Get the number of elements in the array.
+        size_t size() const
+            {
+            return x_.size();
+            }
+
+    private:
+        shared_array<T> x_; //!< First array
+        shared_array<T> y_; //!< Second array
+        int selector_;      //!< Bit setting if x_ (0) or y_ (1) is current
+    };
+
 } // end namespace neighbor
 
 #endif // NEIGHBOR_MEMORY_H_

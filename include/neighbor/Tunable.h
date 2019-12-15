@@ -9,7 +9,6 @@
 #include <cuda_runtime.h>
 #include <set>
 #include <vector>
-#include <iostream>
 
 //! Base for a class with a tunable method.
 /*!

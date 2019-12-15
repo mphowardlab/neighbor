@@ -430,7 +430,7 @@ void LBVHTraverser::traverse(const LaunchParameters& params,
 
     // setup if this is not a replay
     if (!m_replay)
-        setup(params, lbvh, transform);
+        compress(params, lbvh, transform);
 
     // compressed lbvh data
     LBVHCompressedData clbvh = data();

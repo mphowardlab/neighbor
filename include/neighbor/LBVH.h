@@ -6,6 +6,7 @@
 #ifndef NEIGHBOR_LBVH_H_
 #define NEIGHBOR_LBVH_H_
 
+#include <assert.h>
 #include <cuda_runtime.h>
 #include "Memory.h"
 #include "Tunable.h"
@@ -49,14 +50,25 @@ class LBVH : public Tunable<unsigned int>
         //! Setup an unallocated LBVH.
         LBVH();
 
-        //! Pre-setup function.
-        /*!
-         * This function can be called in advance to avoid some (but not all) calls that might block
-         * the build operation from executing asynchronously.
-         */
-        void setup(unsigned int N)
+        //! Setup LBVH memory for building.
+        template<class InsertOpT>
+        void setup(const LaunchParameters& params, const InsertOpT& insert)
             {
-            allocate(N);
+            allocate(params, insert.size());
+            }
+
+        //! Setup LBVH memory for building.
+        template<class InsertOpT>
+        void setup(cudaStream_t stream, const InsertOpT& insert)
+            {
+            setup(LaunchParameters(32, stream), insert);
+            }
+
+        //! Setup LBVH memory for building.
+        template<class InsertOpT>
+        void setup(const InsertOpT& insert)
+            {
+            setup(0, insert);
             }
 
         //! Build the LBVH in a stream with tunable parameters.
@@ -153,7 +165,7 @@ class LBVH : public Tunable<unsigned int>
         //! Get the original indexes of the primitives in each leaf node.
         const shared_array<unsigned int>& getPrimitives() const
             {
-            return m_sorted_indexes;
+            return m_indexes.current();
             }
 
         //! Get the pointer version of the read-only data in the tree.
@@ -163,7 +175,7 @@ class LBVH : public Tunable<unsigned int>
             tree.parent = m_parent.get();
             tree.left = m_left.get();
             tree.right = m_right.get();
-            tree.primitive = m_sorted_indexes.get();
+            tree.primitive = m_indexes.current().get();
             tree.lo = m_lo.get();
             tree.hi = m_hi.get();
             tree.root = m_root;
@@ -182,16 +194,14 @@ class LBVH : public Tunable<unsigned int>
         shared_array<float3> m_lo;  //!< Lower bound of AABB
         shared_array<float3> m_hi;  //!< Upper bound of AABB
 
-        shared_array<unsigned int> m_codes;            //!< Morton codes
-        shared_array<unsigned int> m_indexes;          //!< Primitive indexes
-        shared_array<unsigned int> m_sorted_codes;     //!< Sorted morton codes
-        shared_array<unsigned int> m_sorted_indexes;   //!< Sorted primitive indexes
-        shared_array<unsigned char> m_tmp;             //!< Temporary memory for sorting
+        buffered_array<unsigned int> m_codes;   //!< Morton codes
+        buffered_array<unsigned int> m_indexes; //!< Primitive indexes
+        shared_array<unsigned char> m_tmp;      //!< Temporary memory for sorting
 
         shared_array<unsigned int> m_locks; //!< Node locks for generating aabb hierarchy
 
         //! Allocate.
-        void allocate(unsigned int N);
+        void allocate(const LaunchParameters& params, unsigned int N);
 
         //! Get the pointer version of the data in the tree.
         const LBVHData data()
@@ -200,7 +210,7 @@ class LBVH : public Tunable<unsigned int>
             tree.parent = m_parent.get();
             tree.left = m_left.get();
             tree.right = m_right.get();
-            tree.primitive = m_sorted_indexes.get();
+            tree.primitive = m_indexes.current().get();
             tree.lo = m_lo.get();
             tree.hi = m_hi.get();
             tree.root = m_root;
@@ -232,16 +242,14 @@ LBVH::LBVH()
 template<class InsertOpT>
 void LBVH::build(const LaunchParameters& params, const InsertOpT& insert, const float3& lo, const float3& hi)
     {
-    const unsigned int N = insert.size();
-
-    // resize memory for the tree
-    allocate(N);
+    // resize memory for the tree (will do nothing if setup already called)
+    setup(params, insert);
 
     // if N = 0, don't do anything and quit, since this is an empty lbvh
-    if (N == 0) return;
+    if (m_N == 0) return;
 
     // single-particle just needs a small amount of data
-    if (N == 1)
+    if (m_N == 1)
         {
         LBVHData tree = data();
         gpu::lbvh_one_primitive(tree, insert, params.stream);
@@ -252,8 +260,8 @@ void LBVH::build(const LaunchParameters& params, const InsertOpT& insert, const 
     checkParameter(params);
 
     // calculate morton codes
-    gpu::lbvh_gen_codes(m_codes.get(),
-                        m_indexes.get(),
+    gpu::lbvh_gen_codes(m_codes.current().get(),
+                        m_indexes.current().get(),
                         insert,
                         lo,
                         hi,
@@ -268,41 +276,35 @@ void LBVH::build(const LaunchParameters& params, const InsertOpT& insert, const 
         size_t tmp_bytes = 0;
         gpu::lbvh_sort_codes(NULL,
                              tmp_bytes,
-                             m_codes.get(),
-                             m_sorted_codes.get(),
-                             m_indexes.get(),
-                             m_sorted_indexes.get(),
+                             m_codes.current().get(),
+                             m_codes.alternate().get(),
+                             m_indexes.current().get(),
+                             m_indexes.alternate().get(),
                              m_N,
                              params.stream);
 
-        // make requested temporary allocation (1 char = 1B)
-        // reallocation will block asynchronous builds
-        size_t alloc_size = (tmp_bytes > 0) ? tmp_bytes : 4;
-        if (alloc_size > m_tmp.size())
-            {
-            shared_array<unsigned char> tmp(alloc_size);
-            m_tmp.swap(tmp);
-            }
+        // allocation already be taken care of by setup() call above, so assume here.
+        assert(m_tmp.size() >= tmp_bytes);
 
         swap = gpu::lbvh_sort_codes((void*)m_tmp.get(),
                                     tmp_bytes,
-                                    m_codes.get(),
-                                    m_sorted_codes.get(),
-                                    m_indexes.get(),
-                                    m_sorted_indexes.get(),
+                                    m_codes.current().get(),
+                                    m_codes.alternate().get(),
+                                    m_indexes.current().get(),
+                                    m_indexes.alternate().get(),
                                     m_N,
                                     params.stream);
 
-        // sorting will synchronize the stream before returning, so this unfortunately blocks concurrent execution of builds
-        if (swap.x) m_sorted_codes.swap(m_codes);
-        if (swap.y) m_sorted_indexes.swap(m_indexes);
+        // flip the buffer selector if the sorted codes or indexes are in the alternate array
+        if (swap.x) m_codes.flip();
+        if (swap.y) m_indexes.flip();
         }
 
     // process hierarchy and bubble aabbs
     LBVHData tree = data();
 
     gpu::lbvh_gen_tree(tree,
-                       m_sorted_codes.get(),
+                       m_codes.current().get(),
                        m_N,
                        params.tunable,
                        params.stream);
@@ -316,7 +318,8 @@ void LBVH::build(const LaunchParameters& params, const InsertOpT& insert, const 
     }
 
 /*!
- * \param N Number of primitives
+ * \param params Kernel launch parameters (only used for stream).
+ * \param N Number of primitives.
  *
  * Initializes the memory for an LBVH holding \a N primitives. The memory
  * requirements are O(N). Every node is allocated 1 integer (4B) holding the parent
@@ -328,22 +331,26 @@ void LBVH::build(const LaunchParameters& params, const InsertOpT& insert, const 
  * to avoid the overhead of repeated malloc / free calls.
  *
  * \note
- * Additional calls to allocate are ignored if \a N has not changed from
- * the previous call.
+ * Additional calls to allocate are ignored if \a N has not changed from the previous call.
  */
-void LBVH::allocate(unsigned int N)
+void LBVH::allocate(const LaunchParameters& params, unsigned int N)
     {
+    // do nothing if N has not changed
+    if (N == m_N) return;
+
     m_root = 0;
     m_N = N;
     m_N_internal = (m_N > 0) ? m_N - 1 : 0;
     m_N_nodes = m_N + m_N_internal;
 
+    // all nodes
     if (m_N_nodes > m_parent.size())
         {
         shared_array<int> parent(m_N_nodes);
         m_parent.swap(parent);
         }
 
+    // internal nodes
     if (m_N_internal > m_left.size())
         {
         shared_array<int> left(m_N_internal);
@@ -356,6 +363,7 @@ void LBVH::allocate(unsigned int N)
         m_locks.swap(locks);
         }
 
+    // node bounds
     if (m_N_nodes > m_lo.size())
         {
         shared_array<float3> lo(m_N_nodes);
@@ -365,19 +373,31 @@ void LBVH::allocate(unsigned int N)
         m_hi.swap(hi);
         }
 
+    // sorting arrays
     if (m_N > m_codes.size())
         {
-        shared_array<unsigned int> codes(m_N);
+        buffered_array<unsigned int> codes(m_N);
         m_codes.swap(codes);
 
-        shared_array<unsigned int> indexes(m_N);
+        buffered_array<unsigned int> indexes(m_N);
         m_indexes.swap(indexes);
+        }
 
-        shared_array<unsigned int> sorted_codes(m_N);
-        m_sorted_codes.swap(sorted_codes);
-
-        shared_array<unsigned int> sorted_indexes(m_N);
-        m_sorted_indexes.swap(sorted_indexes);
+    // check for required size of CUB allocation
+    size_t tmp_bytes = 0;
+    gpu::lbvh_sort_codes(NULL,
+                         tmp_bytes,
+                         m_codes.current().get(),
+                         m_codes.alternate().get(),
+                         m_indexes.current().get(),
+                         m_indexes.alternate().get(),
+                         m_N,
+                         params.stream);
+    if (tmp_bytes == 0) tmp_bytes = 4; // make at least 4 bytes (old workaround)
+    if (tmp_bytes > m_tmp.size())
+        {
+        shared_array<unsigned char> tmp(tmp_bytes);
+        m_tmp.swap(tmp);
         }
     }
 
