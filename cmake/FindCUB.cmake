@@ -8,10 +8,18 @@
 # Also creates the CUB::CUB target that can be linked against.
 #
 
-find_path(CUB_INCLUDE_DIR
-          NAMES cub/cub.cuh
-          PATHS ${CUB_ROOT} $ENV{CUB_ROOT}
-          )
+# On older CMake, manually search CUB_ROOT first
+if(CMAKE_VERSION VERSION_LESS 3.12)
+    find_path(CUB_INCLUDE_DIR
+              NAMES cub/cub.cuh
+              PATHS ${CUB_ROOT} $ENV{CUB_ROOT}
+              NO_DEFAULT_PATH
+              )
+endif()
+
+# now look in the system directories if something hasn't been found
+# For CMake >= 3.12, this will also check CUB_ROOT and ENV{CUB_ROOT}
+find_path(CUB_INCLUDE_DIR NAMES cub/cub.cuh)
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(CUB REQUIRED_VARS CUB_INCLUDE_DIR)

@@ -8,10 +8,18 @@
 # Also creates the UPP11::UPP11 target that can be linked against.
 #
 
-find_path(UPP11_INCLUDE_DIR
-          NAMES upp11/upp11.h
-          PATHS ${UPP11_ROOT} $ENV{UPP11_ROOT}
-          )
+# On older CMake, manually search UPP11_ROOT first
+if(CMAKE_VERSION VERSION_LESS 3.12)
+    find_path(UPP11_INCLUDE_DIR
+              NAMES upp11/upp11.h
+              PATHS ${UPP11_ROOT} $ENV{UPP11_ROOT}
+              NO_DEFAULT_PATH
+              )
+endif()
+
+# now look in the system directories if something hasn't been found
+# For CMake >= 3.12, this should check UPP11_ROOT and ENV{UPP11_ROOT} first
+find_path(UPP11_INCLUDE_DIR NAMES upp11/upp11.h)
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(UPP11 REQUIRED_VARS UPP11_INCLUDE_DIR)
