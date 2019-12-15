@@ -185,7 +185,7 @@ uchar2 lbvh_sort_codes(void *d_tmp,
     if (d_tmp != NULL)
         {
         // force the stream to synchronize before checking result (in case CUB doesn't, not documented)
-        hipStreamSynchronize(stream);
+        //hipStreamSynchronize(stream);
 
         // mark that the gpu arrays should be flipped if the final result is not in the sorted array (1)
         swap.x = (d_keys.selector == 0);
