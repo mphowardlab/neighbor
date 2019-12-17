@@ -6,7 +6,6 @@
 #ifndef NEIGHBOR_RUNTIME_H_
 #define NEIGHBOR_RUNTIME_H_
 
-#include <iostream>
 #include <functional>
 #include <utility>
 
