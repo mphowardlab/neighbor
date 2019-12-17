@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_BOUNDING_VOLUMES_H_
 #define NEIGHBOR_BOUNDING_VOLUMES_H_
 
-#include <cuda_runtime.h>
+#include "Runtime.h"
 
 namespace neighbor
 {

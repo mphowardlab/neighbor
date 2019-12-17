@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_OUTPUT_OPS_H_
 #define NEIGHBOR_OUTPUT_OPS_H_
 
-#include <cuda_runtime.h>
+#include "Runtime.h"
 
 namespace neighbor
 {

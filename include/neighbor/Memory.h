@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_MEMORY_H_
 #define NEIGHBOR_MEMORY_H_
 
-#include <cuda_runtime.h>
+#include "Runtime.h"
 #include <memory>
 
 namespace neighbor
@@ -157,7 +157,7 @@ class shared_array
             {
             void operator()(T* ptr)
                 {
-                if(ptr) cudaFree(ptr);
+                if(ptr) gpu::free(ptr);
                 }
             };
 
@@ -165,7 +165,7 @@ class shared_array
         /*!
          * \param size Number of elements to allocate.
          *
-         * The requested memory is allocated using cudaMallocManaged. If an error occurs, no memory allocation occurs
+         * The requested memory is allocated using gpu::mallocManaged. If an error occurs, no memory allocation occurs
          * and an exception is raised. If \a size is 0, then the memory is freed.
          */
         void allocate(size_t size)
@@ -173,8 +173,8 @@ class shared_array
             if (size > 0)
                 {
                 T* data = nullptr;
-                cudaError_t code = cudaMallocManaged(&data, size*sizeof(T));
-                if (code == cudaSuccess)
+                gpu::error_t code = gpu::mallocManaged(reinterpret_cast<void**>(&data), size*sizeof(T));
+                if (code == gpu::success)
                     {
                     data_ = std::shared_ptr<T>(data, deleter());
                     size_ = size;

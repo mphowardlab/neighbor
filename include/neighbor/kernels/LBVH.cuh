@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_KERNELS_LBVH_CUH_
 #define NEIGHBOR_KERNELS_LBVH_CUH_
 
-#include <cuda_runtime.h>
+#include "../Runtime.h"
 #include <cub/cub.cuh>
 
 #include "../BoundingVolumes.h"
@@ -377,20 +377,21 @@ void lbvh_gen_codes(unsigned int *d_codes,
                     const float3 hi,
                     const unsigned int N,
                     const unsigned int block_size,
-                    cudaStream_t stream)
+                    gpu::stream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_gen_codes<InsertOpT>);
+        funcAttributes attr;
+        funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_gen_codes<InsertOpT>));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
-
     const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
-    kernel::lbvh_gen_codes<<<num_blocks, run_block_size, 0, stream>>>(d_codes, d_indexes, insert, lo, hi, N);
+
+    KernelLauncher launcher(num_blocks, run_block_size, stream);
+    launcher(kernel::lbvh_gen_codes<InsertOpT>, d_codes, d_indexes, insert, lo, hi, N);
     }
 
 //! Sort the primitives into Morton code order.
@@ -423,7 +424,7 @@ inline uchar2 lbvh_sort_codes(void *d_tmp,
                               unsigned int *d_indexes,
                               unsigned int *d_alt_indexes,
                               const unsigned int N,
-                              cudaStream_t stream)
+                              gpu::stream_t stream)
     {
 
     cub::DoubleBuffer<unsigned int> d_keys(d_codes, d_alt_codes);
@@ -455,20 +456,21 @@ inline void lbvh_gen_tree(const LBVHData tree,
                           const unsigned int *d_codes,
                           const unsigned int N,
                           const unsigned int block_size,
-                          cudaStream_t stream)
+                          gpu::stream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_gen_tree);
+        funcAttributes attr;
+        funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_gen_tree));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
-
     const unsigned int num_blocks = ((N-1) + run_block_size - 1)/run_block_size;
-    kernel::lbvh_gen_tree<<<num_blocks, run_block_size, 0, stream>>>(tree, d_codes, N);
+
+    KernelLauncher launcher(num_blocks, run_block_size, stream);
+    launcher(kernel::lbvh_gen_tree, tree, d_codes, N);
     }
 
 //! Bubble the bounding boxes up the tree hierarchy.
@@ -492,22 +494,23 @@ void lbvh_bubble_aabbs(const LBVHData tree,
                        unsigned int *d_locks,
                        const unsigned int N,
                        const unsigned int block_size,
-                       cudaStream_t stream)
+                       gpu::stream_t stream)
     {
-    cudaMemsetAsync(d_locks, 0, (N-1)*sizeof(unsigned int), stream);
+    memsetAsync(d_locks, 0, (N-1)*sizeof(unsigned int), stream);
 
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_bubble_aabbs<InsertOpT>);
+        funcAttributes attr;
+        funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_bubble_aabbs<InsertOpT>));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
-
     const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
-    kernel::lbvh_bubble_aabbs<<<num_blocks, run_block_size, 0, stream>>>(tree, insert, d_locks, N);
+
+    KernelLauncher launcher(num_blocks, run_block_size, stream);
+    launcher(kernel::lbvh_bubble_aabbs<InsertOpT>, tree, insert, d_locks, N);
     }
 
 //! Set data for a one-primitive LBVH.
@@ -523,9 +526,10 @@ void lbvh_bubble_aabbs(const LBVHData tree,
 template<class InsertOpT>
 void lbvh_one_primitive(const LBVHData tree,
                         const InsertOpT& insert,
-                        cudaStream_t stream)
+                        gpu::stream_t stream)
     {
-    kernel::lbvh_one_primitive<<<1, 1, 0, stream>>>(tree, insert);
+    KernelLauncher launcher(1,1,stream);
+    launcher(kernel::lbvh_one_primitive<InsertOpT>, tree, insert);
     }
 
 } // end namespace gpu

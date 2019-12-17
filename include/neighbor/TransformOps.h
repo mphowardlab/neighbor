@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_TRANSFORM_OPS_H_
 #define NEIGHBOR_TRANSFORM_OPS_H_
 
-#include <cuda_runtime.h>
+#include "Runtime.h"
 #define HOSTDEVICE __host__ __device__ __forceinline__
 
 namespace neighbor

@@ -6,8 +6,7 @@
 #ifndef NEIGHBOR_LBVH_TRAVERSER_H_
 #define NEIGHBOR_LBVH_TRAVERSER_H_
 
-#include <cuda_runtime.h>
-
+#include "Runtime.h"
 #include "Memory.h"
 #include "Tunable.h"
 
@@ -88,7 +87,7 @@ class LBVHTraverser : public Tunable<unsigned int>
          * The default block size is 32 threads.
          */
         template<class TransformOpT>
-        void setup(cudaStream_t stream, const LBVH& lbvh, const TransformOpT& transform)
+        void setup(gpu::stream_t stream, const LBVH& lbvh, const TransformOpT& transform)
             {
             setup(LaunchParameters(32,stream), lbvh, transform);
             }
@@ -100,7 +99,7 @@ class LBVHTraverser : public Tunable<unsigned int>
          *
          * The default block size is 32 threads.
          */
-        void setup(cudaStream_t stream, const LBVH& lbvh)
+        void setup(gpu::stream_t stream, const LBVH& lbvh)
             {
             setup(stream, lbvh, NullTransformOp());
             }
@@ -206,7 +205,7 @@ class LBVHTraverser : public Tunable<unsigned int>
          * The default block size is 32 threads.
          */
         template<class QueryOpT, class OutputOpT, class TranslateOpT, class TransformOpT>
-        void traverse(cudaStream_t stream,
+        void traverse(gpu::stream_t stream,
                       const LBVH& lbvh,
                       const QueryOpT& query,
                       const OutputOpT& out,
@@ -231,7 +230,7 @@ class LBVHTraverser : public Tunable<unsigned int>
          * The default block size is 32 threads.
          */
         template<class QueryOpT, class OutputOpT, class TranslateOpT>
-        void traverse(cudaStream_t stream,
+        void traverse(gpu::stream_t stream,
                       const LBVH& lbvh,
                       const QueryOpT& query,
                       const OutputOpT& out,
@@ -253,7 +252,7 @@ class LBVHTraverser : public Tunable<unsigned int>
          * The default block size is 32 threads.
          */
         template<class QueryOpT, class OutputOpT>
-        void traverse(cudaStream_t stream,
+        void traverse(gpu::stream_t stream,
                       const LBVH& lbvh,
                       const QueryOpT& query,
                       const OutputOpT& out)

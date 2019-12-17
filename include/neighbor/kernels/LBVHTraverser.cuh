@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_LBVH_TRAVERSER_CUH_
 #define NEIGHBOR_LBVH_TRAVERSER_CUH_
 
-#include <cuda_runtime.h>
+#include "../Runtime.h"
 
 #include "../LBVHData.h"
 #include "../LBVHTraverserData.h"
@@ -271,21 +271,21 @@ void lbvh_compress_ropes(const LBVHCompressedData& ctree,
                          unsigned int N_internal,
                          unsigned int N_nodes,
                          unsigned int block_size,
-                         cudaStream_t stream)
+                         gpu::stream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_compress_ropes<TransformOpT>);
+        funcAttributes attr;
+        funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_compress_ropes<TransformOpT>));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
-
     const unsigned int num_blocks = (N_nodes + run_block_size - 1)/run_block_size;
-    kernel::lbvh_compress_ropes<<<num_blocks, run_block_size, 0, stream>>>
-        (ctree, transform, tree, N_internal, N_nodes);
+
+    KernelLauncher launcher(num_blocks, run_block_size, stream);
+    launcher(kernel::lbvh_compress_ropes<TransformOpT>, ctree, transform, tree, N_internal, N_nodes);
     }
 
 //! Traverse the LBVH using ropes.
@@ -309,7 +309,7 @@ void lbvh_traverse_ropes(const OutputOpT& out,
                          const QueryOpT& query,
                          const TranslateOpT& images,
                          unsigned int block_size,
-                         cudaStream_t stream)
+                         gpu::stream_t stream)
     {
     // quit if there are no images
     if (query.size() == 0 || images.size() == 0)
@@ -319,14 +319,15 @@ void lbvh_traverse_ropes(const OutputOpT& out,
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, (const void*)kernel::lbvh_traverse_ropes<OutputOpT,QueryOpT,TranslateOpT>);
+        funcAttributes attr;
+        funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_traverse_ropes<OutputOpT,QueryOpT,TranslateOpT>));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
-
     const unsigned int num_blocks = (query.size() + run_block_size - 1)/run_block_size;
-    kernel::lbvh_traverse_ropes<<<num_blocks, run_block_size, 0, stream>>>(out, lbvh, query, images);
+
+    KernelLauncher launcher(num_blocks, run_block_size, stream);
+    launcher(kernel::lbvh_traverse_ropes<OutputOpT,QueryOpT,TranslateOpT>, out, lbvh, query, images);
     }
 
 } // end namespace gpu

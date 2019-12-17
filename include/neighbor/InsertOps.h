@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_INSERT_OPS_H_
 #define NEIGHBOR_INSERT_OPS_H_
 
-#include <cuda_runtime.h>
+#include "Runtime.h"
 
 #include "BoundingVolumes.h"
 
