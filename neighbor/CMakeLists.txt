@@ -41,7 +41,7 @@ set(_h_sources
 ###########################
 
 # setup library with cc sources
-pybind11_add_module(_${COMPONENT_NAME} SHARED ${_cu_sources} ${_cc_sources} ${_h_sources} NO_EXTRAS)
+pybind11_add_module(_${COMPONENT_NAME} SHARED ${_cu_sources} ${_cc_sources} ${_h_sources} NO_EXTRAS SYSTEM)
 
 # alias into the HOOMD namespace so that plugins and symlinked components both work
 add_library(HOOMD::_${COMPONENT_NAME} ALIAS _${COMPONENT_NAME})
