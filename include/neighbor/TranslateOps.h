@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_TRANSLATE_OPS_H_
 #define NEIGHBOR_TRANSLATE_OPS_H_
 
-#include "Runtime.h"
+#include "hipper_runtime.h"
 
 namespace neighbor
 {

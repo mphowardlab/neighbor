@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_KERNELS_LBVH_CUH_
 #define NEIGHBOR_KERNELS_LBVH_CUH_
 
-#include "../Runtime.h"
+#include "../hipper_runtime.h"
 #include <cub/cub.cuh>
 
 #include "../BoundingVolumes.h"
@@ -132,7 +132,7 @@ __global__ void lbvh_gen_codes(unsigned int *d_codes,
                                const unsigned int N)
     {
     // one thread per point
-    const unsigned int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    const unsigned int idx = hipper::threadRank();
     if (idx >= N)
         return;
 
@@ -170,7 +170,7 @@ __global__ static void lbvh_gen_tree(const LBVHData tree,
                                      const unsigned int N)
     {
     // one thread per internal node (= N-1 threads)
-    const unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
+    const unsigned int i = hipper::threadRank();
     if (i >= N-1)
         return;
 
@@ -273,7 +273,7 @@ __global__ void lbvh_bubble_aabbs(const LBVHData tree,
                                   const unsigned int N)
     {
     // one thread per point
-    const unsigned int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    const unsigned int idx = hipper::threadRank();
     if (idx >= N)
         return;
 
@@ -341,7 +341,7 @@ __global__ void lbvh_one_primitive(const LBVHData tree,
                                    const InsertOpT insert)
     {
     // one thread only
-    const unsigned int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    const unsigned int idx = hipper::threadRank();
     if (idx >= 1)
         return;
 
@@ -377,20 +377,20 @@ void lbvh_gen_codes(unsigned int *d_codes,
                     const float3 hi,
                     const unsigned int N,
                     const unsigned int block_size,
-                    gpu::stream_t stream)
+                    hipper::stream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        funcAttributes attr;
-        funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_gen_codes<InsertOpT>));
+        hipper::funcAttributes_t attr;
+        hipper::funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_gen_codes<InsertOpT>));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
     const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
 
-    KernelLauncher launcher(num_blocks, run_block_size, stream);
+    hipper::KernelLauncher launcher(num_blocks, run_block_size, stream);
     launcher(kernel::lbvh_gen_codes<InsertOpT>, d_codes, d_indexes, insert, lo, hi, N);
     }
 
@@ -424,7 +424,7 @@ inline uchar2 lbvh_sort_codes(void *d_tmp,
                               unsigned int *d_indexes,
                               unsigned int *d_alt_indexes,
                               const unsigned int N,
-                              gpu::stream_t stream)
+                              hipper::stream_t stream)
     {
 
     cub::DoubleBuffer<unsigned int> d_keys(d_codes, d_alt_codes);
@@ -456,20 +456,20 @@ inline void lbvh_gen_tree(const LBVHData tree,
                           const unsigned int *d_codes,
                           const unsigned int N,
                           const unsigned int block_size,
-                          gpu::stream_t stream)
+                          hipper::stream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        funcAttributes attr;
-        funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_gen_tree));
+        hipper::funcAttributes_t attr;
+        hipper::funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_gen_tree));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
     const unsigned int num_blocks = ((N-1) + run_block_size - 1)/run_block_size;
 
-    KernelLauncher launcher(num_blocks, run_block_size, stream);
+    hipper::KernelLauncher launcher(num_blocks, run_block_size, stream);
     launcher(kernel::lbvh_gen_tree, tree, d_codes, N);
     }
 
@@ -494,22 +494,22 @@ void lbvh_bubble_aabbs(const LBVHData tree,
                        unsigned int *d_locks,
                        const unsigned int N,
                        const unsigned int block_size,
-                       gpu::stream_t stream)
+                       hipper::stream_t stream)
     {
-    memsetAsync(d_locks, 0, (N-1)*sizeof(unsigned int), stream);
+    hipper::memsetAsync(d_locks, 0, (N-1)*sizeof(unsigned int), stream);
 
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        funcAttributes attr;
-        funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_bubble_aabbs<InsertOpT>));
+        hipper::funcAttributes_t attr;
+        hipper::funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_bubble_aabbs<InsertOpT>));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
     const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
 
-    KernelLauncher launcher(num_blocks, run_block_size, stream);
+    hipper::KernelLauncher launcher(num_blocks, run_block_size, stream);
     launcher(kernel::lbvh_bubble_aabbs<InsertOpT>, tree, insert, d_locks, N);
     }
 
@@ -526,9 +526,9 @@ void lbvh_bubble_aabbs(const LBVHData tree,
 template<class InsertOpT>
 void lbvh_one_primitive(const LBVHData tree,
                         const InsertOpT& insert,
-                        gpu::stream_t stream)
+                        hipper::stream_t stream)
     {
-    KernelLauncher launcher(1,1,stream);
+    hipper::KernelLauncher launcher(1,1,stream);
     launcher(kernel::lbvh_one_primitive<InsertOpT>, tree, insert);
     }
 

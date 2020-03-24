@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_LBVH_DATA_H_
 #define NEIGHBOR_LBVH_DATA_H_
 
-#include "Runtime.h"
+#include "hipper_runtime.h"
 
 namespace neighbor
 {

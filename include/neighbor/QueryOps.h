@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_QUERY_OPS_H_
 #define NEIGHBOR_QUERY_OPS_H_
 
-#include "Runtime.h"
+#include "hipper_runtime.h"
 
 #include "BoundingVolumes.h"
 

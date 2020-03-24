@@ -29,6 +29,7 @@ add_library(neighbor::neighbor ALIAS neighbor)
 target_include_directories(neighbor INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
                                               $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(neighbor INTERFACE CUB::CUB)
+target_compile_definitions(neighbor INTERFACE HIPPER_CUDA)
 
 # add tests
 if(NEIGHBOR_TEST)

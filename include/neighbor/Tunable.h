@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_TUNER_H_
 #define NEIGHBOR_TUNER_H_
 
-#include "Runtime.h"
+#include "hipper_runtime.h"
 #include <set>
 #include <vector>
 
@@ -90,12 +90,12 @@ class Tunable
              * \param tunable_ Tunable parameter.
              * \param stream_ CUDA stream for execution.
              */
-            LaunchParameters(T tunable_, gpu::stream_t stream_)
+            LaunchParameters(T tunable_, hipper::stream_t stream_)
                 : tunable(tunable_), stream(stream_)
                 {}
 
-            T tunable;              //!< Tunable parameter (e.g., block size)
-            gpu::stream_t stream;   //!< Stream for execution
+            T tunable;                  //!< Tunable parameter (e.g., block size)
+            hipper::stream_t stream;    //!< Stream for execution
             };
 
         //! Check if a parameter is valid.

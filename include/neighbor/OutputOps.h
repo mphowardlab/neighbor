@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_OUTPUT_OPS_H_
 #define NEIGHBOR_OUTPUT_OPS_H_
 
-#include "Runtime.h"
+#include "hipper_runtime.h"
 
 namespace neighbor
 {

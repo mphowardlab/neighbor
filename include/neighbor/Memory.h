@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_MEMORY_H_
 #define NEIGHBOR_MEMORY_H_
 
-#include "Runtime.h"
+#include "hipper_runtime.h"
 #include <memory>
 
 namespace neighbor
@@ -157,7 +157,7 @@ class shared_array
             {
             void operator()(T* ptr)
                 {
-                if(ptr) gpu::free(ptr);
+                if(ptr) hipper::free(ptr);
                 }
             };
 
@@ -165,7 +165,7 @@ class shared_array
         /*!
          * \param size Number of elements to allocate.
          *
-         * The requested memory is allocated using gpu::mallocManaged. If an error occurs, no memory allocation occurs
+         * The requested memory is allocated using hipper::mallocManaged. If an error occurs, no memory allocation occurs
          * and an exception is raised. If \a size is 0, then the memory is freed.
          */
         void allocate(size_t size)
@@ -173,8 +173,8 @@ class shared_array
             if (size > 0)
                 {
                 T* data = nullptr;
-                gpu::error_t code = gpu::mallocManaged(reinterpret_cast<void**>(&data), size*sizeof(T));
-                if (code == gpu::success)
+                hipper::error_t code = hipper::mallocManaged(reinterpret_cast<void**>(&data), size*sizeof(T));
+                if (code == hipper::success)
                     {
                     data_ = std::shared_ptr<T>(data, deleter());
                     size_ = size;
