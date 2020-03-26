@@ -630,17 +630,67 @@ inline error_t funcSetSharedMemConfig(const void* func, sharedMemConfig_t config
     return HIPPER(FuncSetSharedMemConfig)(func, castSharedMemConfig(config));
     }
 
+//! Thread index in block.
+__device__ inline dim3 threadIndex()
+    {
+    #if defined(HIPPER_CUDA)
+    return threadIdx;
+    #elif defined(HIPPER_HIP)
+    return dim3(hipThreadIdx_x, hipThreadIdx_y, hipThreadIdx_z);
+    #endif
+    }
+
+//! Number of threads in block.
+__device__ inline dim3 blockSize()
+    {
+    #if defined(HIPPER_CUDA)
+    return blockDim;
+    #elif defined(HIPPER_HIP)
+    return dim3(hipBlockDim_x, hipBlockDim_y, hipBlockDim_z);
+    #endif
+    }
+
+//! Block index in grid.
+__device__ inline dim3 blockIndex()
+    {
+    #if defined(HIPPER_CUDA)
+    return blockIdx;
+    #elif defined(HIPPER_HIP)
+    return dim3(hipBlockIdx_x, hipBlockIdx_y, hipBlockIdx_z);
+    #endif
+    }
+
+//! Number of blocks in grid.
+__device__ inline dim3 gridSize()
+    {
+    #if defined(HIPPER_CUDA)
+    return gridDim;
+    #elif defined(HIPPER_HIP)
+    return dim3(hipGridDim_x, hipGridDim_y, hipGridDim_z);
+    #endif
+    }
+
 //! Map the launch dimensions to a one-dimensional rank.
 template<char GridDim=1, char BlockDim=1>
 __device__ int threadRank() = delete;
 template<>
-__device__ inline int threadRank<1,1>()
+__device__ int threadRank<1,1>()
     {
-    #if defined(HIPPER_CUDA)
-    return blockIdx.x*blockDim.x + threadIdx.x;
-    #elif defined(HIPPER_HIP)
-    return hipBlockIdx_x*hipBlockDim_x + hipThreadIdx_x;
-    #endif
+    return blockIndex().x*blockSize().x + threadIndex().x;
+    }
+template<>
+__device__ int threadRank<1,2>()
+    {
+    const dim3 bDim = blockSize();
+    const dim3 tIdx = threadIndex();
+    return blockIndex().x*bDim.x*(bDim.y + tIdx.y) + tIdx.x;
+    }
+template<>
+__device__ int threadRank<1,3>()
+    {
+    const dim3 bDim = blockSize();
+    const dim3 tIdx = threadIndex();
+    return blockIndex().x*bDim.x*(bDim.y*(bDim.z + tIdx.z) + tIdx.y) + tIdx.x;
     }
 
 //! Launch a compute kernel on the GPU
