@@ -132,7 +132,7 @@ __global__ void lbvh_gen_codes(unsigned int *d_codes,
                                const unsigned int N)
     {
     // one thread per point
-    const unsigned int idx = hipper::threadRank();
+    const unsigned int idx = hipper::threadRank<1,1>();
     if (idx >= N)
         return;
 
@@ -170,7 +170,7 @@ __global__ static void lbvh_gen_tree(const LBVHData tree,
                                      const unsigned int N)
     {
     // one thread per internal node (= N-1 threads)
-    const unsigned int i = hipper::threadRank();
+    const unsigned int i = hipper::threadRank<1,1>();
     if (i >= N-1)
         return;
 
@@ -273,7 +273,7 @@ __global__ void lbvh_bubble_aabbs(const LBVHData tree,
                                   const unsigned int N)
     {
     // one thread per point
-    const unsigned int idx = hipper::threadRank();
+    const unsigned int idx = hipper::threadRank<1,1>();
     if (idx >= N)
         return;
 
@@ -341,7 +341,7 @@ __global__ void lbvh_one_primitive(const LBVHData tree,
                                    const InsertOpT insert)
     {
     // one thread only
-    const unsigned int idx = hipper::threadRank();
+    const unsigned int idx = hipper::threadRank<1,1>();
     if (idx >= 1)
         return;
 

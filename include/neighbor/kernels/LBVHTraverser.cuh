@@ -48,7 +48,7 @@ __global__ void lbvh_compress_ropes(const LBVHCompressedData ctree,
                                     const unsigned int N_nodes)
     {
     // one thread per node
-    const int idx = hipper::threadRank();
+    const int idx = hipper::threadRank<1,1>();
     if (idx >= (int)N_nodes)
         return;
 
@@ -157,7 +157,7 @@ __global__ void lbvh_traverse_ropes(const OutputOpT out,
                                     const TranslateOpT images)
     {
     // one thread per test
-    const unsigned int idx = hipper::threadRank();
+    const unsigned int idx = hipper::threadRank<1,1>();
     if (idx >= query.size())
         return;
 
