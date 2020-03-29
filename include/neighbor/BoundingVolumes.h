@@ -7,6 +7,7 @@
 #define NEIGHBOR_BOUNDING_VOLUMES_H_
 
 #include "hipper_runtime.h"
+#include "ApproximateMath.h"
 
 namespace neighbor
 {
@@ -53,8 +54,8 @@ struct BoundingBox
      */
     __device__ __forceinline__ BoundingBox(const double3& lo_, const double3& hi_)
         {
-        lo = make_float3(__double2float_rd(lo_.x), __double2float_rd(lo_.y), __double2float_rd(lo_.z));
-        hi = make_float3(__double2float_ru(hi_.x), __double2float_ru(hi_.y), __double2float_ru(hi_.z));
+        lo = make_float3(approx::double2float_rd(lo_.x), approx::double2float_rd(lo_.y), approx::double2float_rd(lo_.z));
+        hi = make_float3(approx::double2float_ru(hi_.x), approx::double2float_ru(hi_.y), approx::double2float_ru(hi_.z));
         }
 
     //! Get the center of the box
@@ -119,7 +120,7 @@ struct BoundingSphere
     __device__ __forceinline__ BoundingSphere(const float3& o, const float r)
         {
         origin = o;
-        Rsq = __fmul_ru(r,r);
+        Rsq = approx::fmul_ru(r,r);
         }
 
     //! Double-precision constructor.
@@ -134,16 +135,16 @@ struct BoundingSphere
      */
     __device__ __forceinline__ BoundingSphere(const double3& o, const double r)
         {
-        const float3 lo = make_float3(__double2float_rd(o.x),
-                                      __double2float_rd(o.y),
-                                      __double2float_rd(o.z));
-        const float3 hi = make_float3(__double2float_ru(o.x),
-                                      __double2float_ru(o.y),
-                                      __double2float_ru(o.z));
-        const float delta = fmaxf(fmaxf(__fsub_ru(hi.x,lo.x),__fsub_ru(hi.y,lo.y)),__fsub_ru(hi.z,lo.z));
-        const float R = __fadd_ru(__double2float_ru(r),delta);
+        const float3 lo = make_float3(approx::double2float_rd(o.x),
+                                      approx::double2float_rd(o.y),
+                                      approx::double2float_rd(o.z));
+        const float3 hi = make_float3(approx::double2float_ru(o.x),
+                                      approx::double2float_ru(o.y),
+                                      approx::double2float_ru(o.z));
+        const float delta = fmaxf(fmaxf(approx::fsub_ru(hi.x,lo.x),approx::fsub_ru(hi.y,lo.y)),approx::fsub_ru(hi.z,lo.z));
+        const float R = approx::fadd_ru(approx::double2float_ru(r),delta);
         origin = make_float3(lo.x, lo.y, lo.z);
-        Rsq = __fmul_ru(R,R);
+        Rsq = approx::fmul_ru(R,R);
         }
 
     //! Test for overlap between a sphere and a BoundingBox.
@@ -162,10 +163,10 @@ struct BoundingSphere
      */
     __device__ __forceinline__ bool overlap(const BoundingBox& box) const
         {
-        const float3 dr = make_float3(__fsub_rd(fminf(fmaxf(origin.x, box.lo.x), box.hi.x), origin.x),
-                                      __fsub_rd(fminf(fmaxf(origin.y, box.lo.y), box.hi.y), origin.y),
-                                      __fsub_rd(fminf(fmaxf(origin.z, box.lo.z), box.hi.z), origin.z));
-        const float dr2 = __fmaf_rd(dr.x, dr.x, __fmaf_rd(dr.y, dr.y, __fmul_rd(dr.z,dr.z)));
+        const float3 dr = make_float3(approx::fsub_rd(fminf(fmaxf(origin.x, box.lo.x), box.hi.x), origin.x),
+                                      approx::fsub_rd(fminf(fmaxf(origin.y, box.lo.y), box.hi.y), origin.y),
+                                      approx::fsub_rd(fminf(fmaxf(origin.z, box.lo.z), box.hi.z), origin.z));
+        const float dr2 = approx::fmaf_rd(dr.x, dr.x, approx::fmaf_rd(dr.y, dr.y, approx::fmul_rd(dr.z,dr.z)));
 
         return (dr2 <= Rsq);
         }

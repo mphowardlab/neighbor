@@ -8,6 +8,7 @@
 
 #include "../hipper_runtime.h"
 
+#include "../ApproximateMath.h"
 #include "../LBVHData.h"
 #include "../LBVHTraverserData.h"
 #include "../BoundingVolumes.h"
@@ -59,17 +60,17 @@ __global__ void lbvh_compress_ropes(const LBVHCompressedData ctree,
         tree_lo = tree.lo[tree.root];
         tree_hi = tree.hi[tree.root];
         // compute box size, rounding up to ensure fully covered
-        float3 L = make_float3(__fsub_ru(tree_hi.x, tree_lo.x),
-                               __fsub_ru(tree_hi.y, tree_lo.y),
-                               __fsub_ru(tree_hi.z, tree_lo.z));
+        float3 L = make_float3(approx::fsub_ru(tree_hi.x, tree_lo.x),
+                               approx::fsub_ru(tree_hi.y, tree_lo.y),
+                               approx::fsub_ru(tree_hi.z, tree_lo.z));
         if (L.x <= 0.f) L.x = 1.0f;
         if (L.y <= 0.f) L.y = 1.0f;
         if (L.z <= 0.f) L.z = 1.0f;
 
         // round down the bin scale factor so that it always *underestimates* the offset
-        tree_bininv = make_float3(__fdiv_rd(1023.f,L.x),
-                                  __fdiv_rd(1023.f,L.y),
-                                  __fdiv_rd(1023.f,L.z));
+        tree_bininv = make_float3(approx::fdiv_rd(1023.f,L.x),
+                                  approx::fdiv_rd(1023.f,L.y),
+                                  approx::fdiv_rd(1023.f,L.z));
         }
     __syncthreads();
 
@@ -95,16 +96,16 @@ __global__ void lbvh_compress_ropes(const LBVHCompressedData ctree,
     // compress node data into one byte per box dim
     // low bounds are encoded relative to the low of the box, always rounding down
     const float3 lo = tree.lo[idx];
-    const uint3 lo_bin = make_uint3((unsigned int)floorf(__fmul_rd(__fsub_rd(lo.x,tree_lo.x),tree_bininv.x)),
-                                    (unsigned int)floorf(__fmul_rd(__fsub_rd(lo.y,tree_lo.y),tree_bininv.y)),
-                                    (unsigned int)floorf(__fmul_rd(__fsub_rd(lo.z,tree_lo.z),tree_bininv.z)));
+    const uint3 lo_bin = make_uint3((unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(lo.x,tree_lo.x),tree_bininv.x)),
+                                    (unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(lo.y,tree_lo.y),tree_bininv.y)),
+                                    (unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(lo.z,tree_lo.z),tree_bininv.z)));
     const unsigned int lo_bin3 = (lo_bin.x << 20) +  (lo_bin.y << 10) + lo_bin.z;
 
     // high bounds are encoded relative to the high of the box, always rounding down
     const float3 hi = tree.hi[idx];
-    const uint3 hi_bin = make_uint3((unsigned int)floorf(__fmul_rd(__fsub_rd(tree_hi.x,hi.x),tree_bininv.x)),
-                                    (unsigned int)floorf(__fmul_rd(__fsub_rd(tree_hi.y,hi.y),tree_bininv.y)),
-                                    (unsigned int)floorf(__fmul_rd(__fsub_rd(tree_hi.z,hi.z),tree_bininv.z)));
+    const uint3 hi_bin = make_uint3((unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(tree_hi.x,hi.x),tree_bininv.x)),
+                                    (unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(tree_hi.y,hi.y),tree_bininv.y)),
+                                    (unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(tree_hi.z,hi.z),tree_bininv.z)));
     const unsigned int hi_bin3 = (hi_bin.x << 20) + (hi_bin.y << 10) + hi_bin.z;
 
     // node holds left child for internal nodes (>= 0) or primitive for leaf (< 0)
@@ -118,7 +119,7 @@ __global__ void lbvh_compress_ropes(const LBVHCompressedData ctree,
         {
         *ctree.lo = tree_lo;
         *ctree.hi = tree_hi;
-        *ctree.bins = make_float3(__frcp_rd(tree_bininv.x),__frcp_rd(tree_bininv.y),__frcp_rd(tree_bininv.z));
+        *ctree.bins = make_float3(approx::frcp_rd(tree_bininv.x),approx::frcp_rd(tree_bininv.y),approx::frcp_rd(tree_bininv.z));
         }
     }
 
@@ -214,14 +215,14 @@ __global__ void lbvh_traverse_ropes(const OutputOpT out,
             // load node and decompress bounds so that they always *expand*
             const int4 aabb = __ldg(lbvh.data + node);
             const unsigned int lo = aabb.x;
-            const float3 lof = make_float3(__fadd_rd(tree_box.lo.x, __fmul_rd((lo >> 20) & 0x3ffu,tree_bins.x)),
-                                           __fadd_rd(tree_box.lo.y, __fmul_rd((lo >> 10) & 0x3ffu,tree_bins.y)),
-                                           __fadd_rd(tree_box.lo.z, __fmul_rd((lo      ) & 0x3ffu,tree_bins.z)));
+            const float3 lof = make_float3(approx::fadd_rd(tree_box.lo.x, approx::fmul_rd((lo >> 20) & 0x3ffu,tree_bins.x)),
+                                           approx::fadd_rd(tree_box.lo.y, approx::fmul_rd((lo >> 10) & 0x3ffu,tree_bins.y)),
+                                           approx::fadd_rd(tree_box.lo.z, approx::fmul_rd((lo      ) & 0x3ffu,tree_bins.z)));
 
             const unsigned int hi = aabb.y;
-            const float3 hif = make_float3(__fsub_ru(tree_box.hi.x, __fmul_rd((hi >> 20) & 0x3ffu,tree_bins.x)),
-                                           __fsub_ru(tree_box.hi.y, __fmul_rd((hi >> 10) & 0x3ffu,tree_bins.y)),
-                                           __fsub_ru(tree_box.hi.z, __fmul_rd((hi      ) & 0x3ffu,tree_bins.z)));
+            const float3 hif = make_float3(approx::fsub_ru(tree_box.hi.x, approx::fmul_rd((hi >> 20) & 0x3ffu,tree_bins.x)),
+                                           approx::fsub_ru(tree_box.hi.y, approx::fmul_rd((hi >> 10) & 0x3ffu,tree_bins.y)),
+                                           approx::fsub_ru(tree_box.hi.z, approx::fmul_rd((hi      ) & 0x3ffu,tree_bins.z)));
             const int left = aabb.z;
 
             // advance to rope as a preliminary

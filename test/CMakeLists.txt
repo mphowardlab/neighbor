@@ -4,6 +4,7 @@
 # Maintainer: mphoward
 
 set(TEST_LIST
+    approx_math_test.cu
     lbvh_test.cu
     )
 
