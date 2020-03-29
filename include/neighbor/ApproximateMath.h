@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_APPROXIMATE_MATH_H_
 #define NEIGHBOR_APPROXIMATE_MATH_H_
 
-#include <cuda_runtime.h>
+#include "hipper_runtime.h"
 
 #define DEVICE __device__ __forceinline__
 
@@ -36,10 +36,11 @@ namespace approx
  * It tries to return the closest representable float to \a x that satisfies this condition
  * without incurring significant overhead.
  *
- * On CUDA devices, the conversion is done using a device intrinsic.
+ * The conversion is done using a device intrinsic.
  */
 DEVICE float double2float_rd(double x)
     {
+    // CUDA and HIP both support this intrinsic.
     return __double2float_rd(x);
     }
 
@@ -52,10 +53,11 @@ DEVICE float double2float_rd(double x)
  * It tries to return the closest representable float to \a x that satisfies this condition
  * without incurring significant overhead.
  *
- * On CUDA devices, the conversion is done using a device intrinsic.
+ * The conversion is done using a device intrinsic.
  */
 DEVICE float double2float_ru(double x)
     {
+    // CUDA and HIP both support this intrinsic.
     return __double2float_ru(x);
     }
 
@@ -69,10 +71,16 @@ DEVICE float double2float_ru(double x)
  * the IEEE-754 result in round-down mode.
  *
  * On CUDA devices, this is exactly satisfied using a device intrinsic.
+ * Otherwise, this returns the nextafter float toward -FLT_MAX, which may be the
+ * same value or the next smaller value.
  */
 DEVICE float fadd_rd(float x, float y)
     {
+    #ifdef HIPPER_PLATFORM_NVCC
     return __fadd_rd(x,y);
+    #else
+    return nextafterf(x+y, -FLT_MAX);
+    #endif
     }
 
 //! Add two floats, rounding the result up.
@@ -85,10 +93,16 @@ DEVICE float fadd_rd(float x, float y)
  * the IEEE-754 result in round-up mode.
  *
  * On CUDA devices, this is exactly satisfied using a device intrinsic.
+ * Otherwise, this returns the nextafter float toward FLT_MAX, which may be the
+ * same value or the next greater value.
  */
 DEVICE float fadd_ru(float x, float y)
     {
+    #ifdef HIPPER_PLATFORM_NVCC
     return __fadd_ru(x,y);
+    #else
+    return nextafterf(x+y, FLT_MAX);
+    #endif
     }
 
 //! Subtract two floats, rounding the result down.
@@ -101,10 +115,16 @@ DEVICE float fadd_ru(float x, float y)
  * the IEEE-754 result in round-down mode.
  *
  * On CUDA devices, this is exactly satisfied using a device intrinsic.
+ * Otherwise, this returns the nextafter float toward -FLT_MAX, which may be the
+ * same value or the next smaller value.
  */
 DEVICE float fsub_rd(float x, float y)
     {
+    #ifdef HIPPER_PLATFORM_NVCC
     return __fsub_rd(x,y);
+    #else
+    return nextafterf(x-y, -FLT_MAX);
+    #endif
     }
 
 //! Subtract two floats, rounding the result up.
@@ -117,10 +137,16 @@ DEVICE float fsub_rd(float x, float y)
  * the IEEE-754 result in round-up mode.
  *
  * On CUDA devices, this is exactly satisfied using a device intrinsic.
+ * Otherwise, this returns the nextafter float toward FLT_MAX, which may be the
+ * same value or the next greater value.
  */
 DEVICE float fsub_ru(float x, float y)
     {
+    #ifdef HIPPER_PLATFORM_NVCC
     return __fsub_ru(x,y);
+    #else
+    return nextafterf(x-y, FLT_MAX);
+    #endif
     }
 
 //! Multiply two floats, rounding the result down.
@@ -133,10 +159,16 @@ DEVICE float fsub_ru(float x, float y)
  * the IEEE-754 result in round-down mode.
  *
  * On CUDA devices, this is exactly satisfied using a device intrinsic.
+ * Otherwise, this returns the nextafter float toward -FLT_MAX, which may be the
+ * same value or the next smaller value.
  */
 DEVICE float fmul_rd(float x, float y)
     {
+    #ifdef HIPPER_PLATFORM_NVCC
     return __fmul_rd(x,y);
+    #else
+    return nextafterf(x*y, -FLT_MAX);
+    #endif
     }
 
 //! Multiply two floats, rounding the result up.
@@ -149,10 +181,16 @@ DEVICE float fmul_rd(float x, float y)
  * the IEEE-754 result in round-up mode.
  *
  * On CUDA devices, this is exactly satisfied using a device intrinsic.
+ * Otherwise, this returns the nextafter float toward FLT_MAX, which may be the
+ * same value or the next greater value.
  */
 DEVICE float fmul_ru(float x, float y)
     {
+    #ifdef HIPPER_PLATFORM_NVCC
     return __fmul_ru(x,y);
+    #else
+    return nextafterf(x*y, FLT_MAX);
+    #endif
     }
 
 //! Divide two floats, rounding the result down.
@@ -165,10 +203,16 @@ DEVICE float fmul_ru(float x, float y)
  * the IEEE-754 result in round-down mode.
  *
  * On CUDA devices, this is exactly satisfied using a device intrinsic.
+ * Otherwise, this returns the nextafter float toward -FLT_MAX, which may be the
+ * same value or the next smaller value.
  */
 DEVICE float fdiv_rd(float x, float y)
     {
+    #ifdef HIPPER_PLATFORM_NVCC
     return __fdiv_rd(x,y);
+    #else
+    return nextafterf(x/y, -FLT_MAX);
+    #endif
     }
 
 //! Divide two floats, rounding the result up.
@@ -181,10 +225,16 @@ DEVICE float fdiv_rd(float x, float y)
  * the IEEE-754 result in round-up mode.
  *
  * On CUDA devices, this is exactly satisfied using a device intrinsic.
+ * Otherwise, this returns the nextafter float toward FLT_MAX, which may be the
+ * same value or the next greater value.
  */
 DEVICE float fdiv_ru(float a, float b)
     {
+    #ifdef HIPPER_PLATFORM_NVCC
     return __fdiv_ru(a,b);
+    #else
+    return nextafterf(x/y, FLT_MAX);
+    #endif
     }
 
 //! Take the reciprocal of a float, rounding the result down.
@@ -196,10 +246,16 @@ DEVICE float fdiv_ru(float a, float b)
  * the IEEE-754 result in round-down mode.
  *
  * On CUDA devices, this is exactly satisfied using a device intrinsic.
+ * Otherwise, this returns the nextafter float toward -FLT_MAX, which may be the
+ * same value or the next smaller value.
  */
 DEVICE float frcp_rd(float x)
     {
+    #ifdef HIPPER_PLATFORM_NVCC
     return __frcp_rd(x);
+    #else
+    return nextafterf(1.0f/x, -FLT_MAX);
+    #endif
     }
 
 //! Take the reciprocal of a float, rounding the result up.
@@ -211,10 +267,16 @@ DEVICE float frcp_rd(float x)
  * the IEEE-754 result in round-up mode.
  *
  * On CUDA devices, this is exactly satisfied using a device intrinsic.
+ * Otherwise, this returns the nextafter float toward FLT_MAX, which may be the
+ * same value or the next greater value.
  */
 DEVICE float frcp_ru(float x)
     {
+    #ifdef HIPPER_PLATFORM_NVCC
     return __frcp_ru(x);
+    #else
+    return nextafterf(1.0f/x, FLT_MAX);
+    #endif
     }
 
 //! Fused multiply-add, rounding the result down.
@@ -228,10 +290,16 @@ DEVICE float frcp_ru(float x)
  * the IEEE-754 result in round-down mode.
  *
  * On CUDA devices, this is exactly satisfied using a device intrinsic.
+ * Otherwise, this returns the nextafter float toward -FLT_MAX, which may be the
+ * same value or the next smaller value.
  */
 DEVICE float fmaf_rd(float x, float y, float z)
     {
+    #ifdef HIPPER_PLATFORM_NVCC
     return __fmaf_rd(x,y,z);
+    #else
+    return nextafterf(fmaf(x,y,z), -FLT_MAX);
+    #endif
     }
 
 //! Fused multiply-add, rounding the result up.
@@ -245,14 +313,21 @@ DEVICE float fmaf_rd(float x, float y, float z)
  * the IEEE-754 result in round-up mode.
  *
  * On CUDA devices, this is exactly satisfied using a device intrinsic.
+ * Otherwise, this returns the nextafter float toward FLT_MAX, which may be the
+ * same value or the next greater value.
  */
 DEVICE float fmaf_ru(float x, float y, float z)
     {
+    #ifdef HIPPER_PLATFORM_NVCC
     return __fmaf_ru(x,y,z);
+    #else
+    return nextafterf(fmaf(x,y,z), FLT_MAX);
+    #endif
     }
 } // end namespace approx
 } // end namespace neighbor
 
 #undef DEVICE
+#undef HIPPER_PLATFORM_NVCC
 
 #endif // NEIGHBOR_APPROXIMATE_MATH_H_

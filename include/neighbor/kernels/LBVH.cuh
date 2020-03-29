@@ -7,10 +7,10 @@
 #define NEIGHBOR_KERNELS_LBVH_CUH_
 
 #include "../hipper_runtime.h"
-#if defined(HIPPER_HIP)
-#include <hipcub/hipcub.hpp>
-#elif defined(HIPPER_CUDA)
+#if defined(HIPPER_CUDA)
 #include <cub/cub.cuh>
+#elif defined(HIPPER_HIP)
+#include <hipcub/hipcub.hpp>
 #endif
 
 #include "../BoundingVolumes.h"

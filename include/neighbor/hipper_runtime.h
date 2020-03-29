@@ -42,6 +42,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <utility>
 
+// set platform based on what mode is being used
+#if (defined(HIPPER_CUDA) && defined(__NVCC__)) || (defined(HIPPER_HIP) && defined(__HIP_PLATFORM_NVCC__))
+#define HIPPER_PLATFORM_NVCC
+#elif (defined(HIPPER_HIP) && defined(__HCC__))
+#define HIPPER_PLATFORM_HCC
+#endif
+
+// set device compilation flag based on CUDA or HIP flags (using HIP criteria)
+#if (defined(HIPPER_CUDA) && defined(__CUDA_ARCH__) && __CUDA_ARCH__ != 0) || (defined(HIPPER_HIP) && defined(__HIP_DEVICE_COMPILE__))
+#define HIPPER_DEVICE_COMPILE 1
+#endif
+
 namespace hipper
 {
 /*!
