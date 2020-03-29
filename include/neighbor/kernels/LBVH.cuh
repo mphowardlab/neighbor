@@ -7,7 +7,11 @@
 #define NEIGHBOR_KERNELS_LBVH_CUH_
 
 #include "../hipper_runtime.h"
+#if defined(HIPPER_HIP)
+#include <hipcub/hipcub.hpp>
+#elif defined(HIPPER_CUDA)
 #include <cub/cub.cuh>
+#endif
 
 #include "../BoundingVolumes.h"
 #include "../LBVHData.h"
@@ -426,7 +430,9 @@ inline uchar2 lbvh_sort_codes(void *d_tmp,
                               const unsigned int N,
                               hipper::stream_t stream)
     {
-
+    #if defined(HIPPER_HIP)
+    namespace cub = hipcub;
+    #endif
     cub::DoubleBuffer<unsigned int> d_keys(d_codes, d_alt_codes);
     cub::DoubleBuffer<unsigned int> d_vals(d_indexes, d_alt_indexes);
 

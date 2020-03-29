@@ -5,8 +5,16 @@
 
 cmake_minimum_required(VERSION 3.9)
 
-project(neighbor VERSION 0.3.0 LANGUAGES CXX CUDA)
+project(neighbor VERSION 0.3.0 LANGUAGES CXX)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
+
+# decide whether to use HIP layer or CUDA (default)
+option(NEIGHBOR_HIP "Use HIP layer?" OFF)
+if(NEIGHBOR_HIP)
+    include(EnableHIP)
+else()
+    enable_language(CUDA)
+endif()
 
 # check if neighbor is being used directly or via add_subdirectory
 # this sets the default options for whether headers, tests, and benchmarks should be used
@@ -19,17 +27,21 @@ option(NEIGHBOR_INSTALL "Install neighbor header files?" ${NEIGHBOR_MASTER_PROJE
 option(NEIGHBOR_TEST "Build neighbor test suite?" ${NEIGHBOR_MASTER_PROJECT})
 option(NEIGHBOR_BENCHMARK "Build neighbor benchmarks?" ${NEIGHBOR_MASTER_PROJECT})
 
-# find CUB, which is a dependency
-find_package(CUB REQUIRED)
-
 # setup the neighbor header-only library
 include(GNUInstallDirs)
 add_library(neighbor INTERFACE)
 add_library(neighbor::neighbor ALIAS neighbor)
 target_include_directories(neighbor INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
                                               $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-target_link_libraries(neighbor INTERFACE CUB::CUB)
-target_compile_definitions(neighbor INTERFACE HIPPER_CUDA)
+if(NEIGHBOR_HIP)
+    find_package(HIPCUB REQUIRED)
+    target_link_libraries(neighbor INTERFACE HIP::CUB)
+    target_compile_definitions(neighbor INTERFACE HIPPER_HIP)
+else()
+    find_package(CUB REQUIRED)
+    target_link_libraries(neighbor INTERFACE CUDA::CUB)
+    target_compile_definitions(neighbor INTERFACE HIPPER_CUDA)
+endif()
 
 # add tests
 if(NEIGHBOR_TEST)
@@ -38,7 +50,7 @@ if(NEIGHBOR_TEST)
 endif()
 
 # add benchmark
-if(NEIGHBOR_BENCHMARK)
+if(NOT NEIGHBOR_HIP AND NEIGHBOR_BENCHMARK)
     add_subdirectory(benchmark)
 endif()
 
@@ -58,6 +70,7 @@ if(NEIGHBOR_INSTALL)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/neighborConfig.cmake
                   ${CMAKE_CURRENT_BINARY_DIR}/neighborConfigVersion.cmake
                   cmake/FindCUB.cmake
+                  cmake/FindHIPCUB.cmake
             DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/cmake/neighbor)
 
     install(TARGETS neighbor EXPORT neighborTargets)

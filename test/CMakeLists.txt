@@ -7,17 +7,25 @@ set(TEST_LIST
     lbvh_test.cu
     )
 
-# tests require CUB and UPP11 to compile
+# tests require UPP11
 find_package(UPP11 REQUIRED)
 
 foreach(TEST_SRC ${TEST_LIST})
     get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
 
-    add_executable(${TEST_NAME} ${TEST_SRC})
-    target_link_libraries(${TEST_NAME} PRIVATE neighbor::neighbor UPP11::UPP11)
-    if(NEIGHBOR_CUDA_ARCH)
-        target_compile_options(${TEST_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${NEIGHBOR_CUDA_ARCH},code=compute_${NEIGHBOR_CUDA_ARCH}>)
+    if(NEIGHBOR_HIP)
+        set(TEST_NVCC_OPTIONS )
+        if(NEIGHBOR_CUDA_ARCH)
+            set(TEST_NVCC_OPTIONS "-gencode=arch=compute_${NEIGHBOR_CUDA_ARCH},code=compute_${NEIGHBOR_CUDA_ARCH}")
+        endif()
+        hip_add_executable(${TEST_NAME} ${TEST_SRC} NVCC_OPTIONS ${TEST_NVCC_OPTIONS})
+    else()
+        add_executable(${TEST_NAME} ${TEST_SRC})
+        if(NEIGHBOR_CUDA_ARCH)
+            target_compile_options(${TEST_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${NEIGHBOR_CUDA_ARCH},code=compute_${NEIGHBOR_CUDA_ARCH}>)
+        endif()
     endif()
+    target_link_libraries(${TEST_NAME} PRIVATE neighbor::neighbor UPP11::UPP11)
 
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endforeach()

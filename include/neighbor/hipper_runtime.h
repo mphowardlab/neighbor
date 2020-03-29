@@ -32,10 +32,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // include appropriate runtime
 #if defined(HIPPER_CUDA) && !defined(HIPPER_HIP)
 #include <cuda_runtime.h>
-#include <cuda_profiler_api.h>
 #define HIPPER(name) cuda##name
 #elif !defined(HIPPER_CUDA) && defined(HIPPER_HIP)
-#include <hip_runtime.h>
+#include <hip/hip_runtime.h>
 #define HIPPER(name) hip##name
 #else
 #error "Device platform must be either HIPPER_CUDA or HIPPER_HIP."
@@ -312,11 +311,13 @@ inline error_t deviceSetCacheConfig(funcCache_t cacheConfig)
     return HIPPER(DeviceSetCacheConfig)(castFuncCache(cacheConfig));
     }
 
+#if 0 // not currently supported in HIP, although it is supposed to be
 //! Set resource limits.
 inline error_t deviceSetLimit(limit_t lim, size_t value)
     {
     return HIPPER(DeviceSetLimit)(castLimit(lim), value);
     }
+#endif
 
 //! Sets the shared memory configuration for the current device.
 inline error_t deviceSetSharedMemConfig(sharedMemConfig_t config)
@@ -342,11 +343,17 @@ inline error_t getDeviceCount(int* count)
     return HIPPER(GetDeviceCount)(count);
     }
 
+#if HIPPER_USE_DEPRECATED // hipCtxGetFlags is deprecated
 //! Gets the flags for the current device.
 inline error_t getDeviceFlags(unsigned int* flags)
     {
-    return HIPPER(GetDeviceFlags)(flags);
+    #if defined(HIPPER_CUDA)
+    return cudaGetDeviceFlags(flags);
+    #elif defined(HIPPER_HIP)
+    return hipCtxGetFlags(flags);
+    #endif
     }
+#endif
 
 //! Returns information about the compute-device.
 inline error_t getDeviceProperties(deviceProp_t* prop, int device)
@@ -593,17 +600,18 @@ inline error_t memsetAsync(void* ptr, int value, size_t count, stream_t stream =
  * \defgroup profile Profiler Control
  * @{
  */
+#if HIPPER_USE_DEPRECATED // hip profiling is deprecated for roctracer
 //! Enable profiling.
 inline error_t profilerStart(void)
     {
     return HIPPER(ProfilerStart)();
     }
-
 //! Disable profiling.
 inline error_t profilerStop(void)
     {
     return HIPPER(ProfilerStop)();
     }
+#endif
 /*! @} */
 
 /*!
@@ -622,12 +630,6 @@ inline error_t funcGetAttributes(funcAttributes_t* attr, const void* func)
 inline error_t funcSetCacheConfig(const void* func, funcCache_t cacheConfig)
     {
     return HIPPER(FuncSetCacheConfig)(func, castFuncCache(cacheConfig));
-    }
-
-//! Sets the shared memory configuration for a device function.
-inline error_t funcSetSharedMemConfig(const void* func, sharedMemConfig_t config)
-    {
-    return HIPPER(FuncSetSharedMemConfig)(func, castSharedMemConfig(config));
     }
 
 //! Thread index in block.

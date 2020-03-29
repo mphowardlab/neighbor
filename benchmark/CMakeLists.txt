@@ -3,6 +3,10 @@
 
 # Maintainer: mphoward
 
+if(NEIGHBOR_HIP)
+    message(FATAL_ERROR "Benchmarks cannot be built with HIP.")
+endif()
+
 find_package(HOOMD REQUIRED)
 
 add_executable(lbvh_benchmark lbvh_benchmark.cc lbvh_benchmark.cu)
@@ -13,4 +17,3 @@ endif()
 
 install(TARGETS lbvh_benchmark
         DESTINATION ${CMAKE_INSTALL_BINDIR})
-
