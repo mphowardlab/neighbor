@@ -7,6 +7,9 @@
 #define NEIGHBOR_APPROXIMATE_MATH_H_
 
 #include "hipper_runtime.h"
+#ifndef HIPPER_PLATFORM_NVCC
+#include <cfloat>
+#endif
 
 #define DEVICE __device__ __forceinline__
 
@@ -228,10 +231,10 @@ DEVICE float fdiv_rd(float x, float y)
  * Otherwise, this returns the nextafter float toward FLT_MAX, which may be the
  * same value or the next greater value.
  */
-DEVICE float fdiv_ru(float a, float b)
+DEVICE float fdiv_ru(float x, float y)
     {
     #ifdef HIPPER_PLATFORM_NVCC
-    return __fdiv_ru(a,b);
+    return __fdiv_ru(x,y);
     #else
     return nextafterf(x/y, FLT_MAX);
     #endif
