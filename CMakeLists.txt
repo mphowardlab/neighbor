@@ -4,6 +4,9 @@
 # Maintainer: mphoward
 
 cmake_minimum_required(VERSION 3.9)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.12)
+    cmake_policy(SET CMP0074 NEW)
+endif()
 
 project(neighbor VERSION 0.3.0 LANGUAGES CXX)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
