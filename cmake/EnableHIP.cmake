@@ -3,6 +3,11 @@
 
 # Maintainer: mphoward
 
+# don't search if HIP has already been found
+if(HIP_FOUND)
+    return()
+endif()
+
 if(NOT DEFINED HIP_PATH)
     if(NOT DEFINED ENV{HIP_PATH})
         set(HIP_PATH "/opt/rocm/hip" CACHE PATH "Path to which HIP has been installed")
