@@ -90,7 +90,11 @@ enum error
     errorInvalidDevice = HIPPER(ErrorInvalidDevice),
     #if defined(HIPPER_CUDA)
     errorInvalidImage = cudaErrorInvalidKernelImage,
+    #if CUDART_VERSION >= 10020
     errorInvalidContext = cudaErrorDeviceUninitialized,
+    #else // there was a typo in older CUDA
+    errorInvalidContext = cudaErrorDeviceUninitilialized,
+    #endif
     errorMapFailed = cudaErrorMapBufferObjectFailed,
     errorUnmapFailed = cudaErrorUnmapBufferObjectFailed,
     errorNoBinaryForGPU = cudaErrorNoKernelImageForDevice,
