@@ -12,7 +12,7 @@
 if(CMAKE_VERSION VERSION_LESS 3.12)
     find_path(CUB_INCLUDE_DIR
               NAMES cub/cub.cuh
-              PATHS ${CUB_ROOT} $ENV{CUB_ROOT}
+              PATHS ${CUB_ROOT} ENV CUB_ROOT
               NO_DEFAULT_PATH
               )
 endif()

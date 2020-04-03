@@ -12,14 +12,16 @@
 if(CMAKE_VERSION VERSION_LESS 3.12)
     find_path(HIPCUB_INCLUDE_DIR
               NAMES hipcub/hipcub.hpp
-              PATHS ${HIPCUB_ROOT} $ENV{HIPCUB_ROOT}
+              PATHS ${HIPCUB_ROOT} ENV HIPCUB_ROOT
               NO_DEFAULT_PATH
               )
 endif()
 
 # now look in the system directories if something hasn't been found
 # For CMake >= 3.12, this will also check CUB_ROOT and ENV{CUB_ROOT}
-find_path(HIPCUB_INCLUDE_DIR NAMES hipcub/hipcub.hpp)
+find_path(HIPCUB_INCLUDE_DIR
+          NAMES hipcub/hipcub.hpp
+          PATHS ${HIP_ROOT_DIR} /opt/rocm/include)
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(HIPCUB REQUIRED_VARS HIPCUB_INCLUDE_DIR)
