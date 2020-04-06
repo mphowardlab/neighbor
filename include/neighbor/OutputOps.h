@@ -51,7 +51,7 @@ struct CountNeighborsOp
         /*!
          * \param idx_ The thread index of the search sphere processed by the thread.
          */
-        __device__ __forceinline__ ThreadData(const unsigned int idx_)
+        __device__ ThreadData(const unsigned int idx_)
             : idx(idx_), num_neigh(0)
             {}
 
@@ -122,7 +122,7 @@ struct NeighborListOp
     //! Thread-local data
     struct ThreadData
         {
-        __device__ __forceinline__ ThreadData(const unsigned int idx_, unsigned int first_)
+        __device__ ThreadData(const unsigned int idx_, unsigned int first_)
             : idx(idx_), first(first_), num_neigh(0)
             {}
 

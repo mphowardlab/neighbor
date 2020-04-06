@@ -32,14 +32,14 @@ struct BoundingBox
     /*!
      * This constructor may not assign anything, as it causes issues inside kernels.
      */
-    BoundingBox() {}
+    __device__ BoundingBox() {}
 
     //! Single-precision constructor
     /*!
      * \param lo_ Lower bound of box.
      * \param hi_ Upper bound of box.
      */
-    __device__ __forceinline__ BoundingBox(const float3& lo_, const float3& hi_)
+    __device__ BoundingBox(const float3& lo_, const float3& hi_)
         : lo(lo_), hi(hi_)
         {}
 
@@ -52,7 +52,7 @@ struct BoundingBox
      *
      * \todo This needs a __host__ implementation that does not rely on CUDA intrinsics.
      */
-    __device__ __forceinline__ BoundingBox(const double3& lo_, const double3& hi_)
+    __device__ BoundingBox(const double3& lo_, const double3& hi_)
         {
         lo = make_float3(approx::double2float_rd(lo_.x), approx::double2float_rd(lo_.y), approx::double2float_rd(lo_.z));
         hi = make_float3(approx::double2float_ru(hi_.x), approx::double2float_ru(hi_.y), approx::double2float_ru(hi_.z));
@@ -106,7 +106,7 @@ struct BoundingSphere
     /*!
      * This constructor may not assign anything, as it causes issues inside kernels.
      */
-    BoundingSphere() {}
+    __device__ BoundingSphere() {}
 
     //! Single-precision constructor.
     /*!
@@ -117,7 +117,7 @@ struct BoundingSphere
      *
      * \todo This needs a __host__ implementation.
      */
-    __device__ __forceinline__ BoundingSphere(const float3& o, const float r)
+    __device__ BoundingSphere(const float3& o, const float r)
         {
         origin = o;
         Rsq = approx::fmul_ru(r,r);
@@ -133,7 +133,7 @@ struct BoundingSphere
      *
      * \todo This needs a __host__ implementation.
      */
-    __device__ __forceinline__ BoundingSphere(const double3& o, const double r)
+    __device__ BoundingSphere(const double3& o, const double r)
         {
         const float3 lo = make_float3(approx::double2float_rd(o.x),
                                       approx::double2float_rd(o.y),
