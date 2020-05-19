@@ -3,7 +3,7 @@
 
 // Maintainer: mphoward
 
-#include "neighbor/hipper_runtime.h"
+#include <hipper/hipper_runtime.h>
 
 #include "neighbor/neighbor.h"
 

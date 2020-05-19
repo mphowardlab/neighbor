@@ -7,7 +7,7 @@
 #define NEIGHBOR_LBVH_H_
 
 #include <assert.h>
-#include "hipper_runtime.h"
+#include <hipper/hipper_runtime.h>
 
 #include "Memory.h"
 #include "Tunable.h"

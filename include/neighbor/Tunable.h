@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_TUNER_H_
 #define NEIGHBOR_TUNER_H_
 
-#include "hipper_runtime.h"
+#include <hipper/hipper_runtime.h>
 #include <set>
 #include <vector>
 

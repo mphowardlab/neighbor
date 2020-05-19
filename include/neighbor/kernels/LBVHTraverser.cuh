@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_LBVH_TRAVERSER_CUH_
 #define NEIGHBOR_LBVH_TRAVERSER_CUH_
 
-#include "../hipper_runtime.h"
+#include <hipper/hipper_runtime.h>
 
 #include "../ApproximateMath.h"
 #include "../LBVHData.h"

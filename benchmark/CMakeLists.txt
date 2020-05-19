@@ -5,6 +5,8 @@
 
 if(NEIGHBOR_HIP)
     message(FATAL_ERROR "Benchmarks cannot be built with HIP.")
+else()
+    enable_language(CUDA)
 endif()
 
 find_package(HOOMD REQUIRED)

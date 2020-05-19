@@ -2,16 +2,24 @@
 
 set(NEIGHBOR_INCLUDE_DIR "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_INCLUDEDIR@")
 set(NEIGHBOR_HIP "@NEIGHBOR_HIP@")
+set(NEIGHBOR_INTERNAL_HIPPER "@NEIGHBOR_INTERNAL_HIPPER@")
 
-include(CMakeFindDependencyMacro)
-
-# find cub
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
-if(NEIGHBOR_HIP)
-    find_dependency(HIPCUB REQUIRED)
-else()
-    find_dependency(CUB REQUIRED)
-endif()
-
-include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
 check_required_components("@PROJECT_NAME@")
+
+if(NOT TARGET neighbor::neighbor)
+    set(NEIGHBOR_INCLUDE_DIRS "${NEIGHBOR_INCLUDE_DIR}")
+
+    # find dependencies
+    include(CMakeFindDependencyMacro)
+    list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
+    if(NOT NEIGHBOR_INTERNAL_HIPPER)
+        find_dependency(hipper)
+    endif()
+    if(NEIGHBOR_HIP)
+        find_dependency(HIPCUB)
+    else()
+        find_dependency(CUB)
+    endif()
+
+    include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
+endif()

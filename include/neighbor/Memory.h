@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_MEMORY_H_
 #define NEIGHBOR_MEMORY_H_
 
-#include "hipper_runtime.h"
+#include <hipper/hipper_runtime.h>
 #include <memory>
 
 namespace neighbor

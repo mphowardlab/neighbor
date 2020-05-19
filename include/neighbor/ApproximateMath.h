@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_APPROXIMATE_MATH_H_
 #define NEIGHBOR_APPROXIMATE_MATH_H_
 
-#include "hipper_runtime.h"
+#include <hipper/hipper_runtime.h>
 #ifndef HIPPER_PLATFORM_NVCC
 #include <cfloat>
 #endif

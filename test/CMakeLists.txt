@@ -8,6 +8,13 @@ set(TEST_LIST
     lbvh_test.cu
     )
 
+# setup language
+if(NEIGHBOR_HIP)
+    include(EnableHIP)
+else()
+    enable_language(CUDA)
+endif()
+
 # tests require UPP11
 find_package(UPP11 REQUIRED)
 

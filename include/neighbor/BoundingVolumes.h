@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_BOUNDING_VOLUMES_H_
 #define NEIGHBOR_BOUNDING_VOLUMES_H_
 
-#include "hipper_runtime.h"
+#include <hipper/hipper_runtime.h>
 #include "ApproximateMath.h"
 
 namespace neighbor

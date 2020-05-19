@@ -6,7 +6,7 @@
 #ifndef NEIGHBOR_KERNELS_LBVH_CUH_
 #define NEIGHBOR_KERNELS_LBVH_CUH_
 
-#include "../hipper_runtime.h"
+#include <hipper/hipper_runtime.h>
 #if defined(HIPPER_CUDA)
 #include <cub/cub.cuh>
 #elif defined(HIPPER_HIP)
