@@ -16,7 +16,19 @@ else()
 endif()
 
 # tests require UPP11
-find_package(UPP11 REQUIRED)
+find_package(UPP11 QUIET)
+
+if(NOT UPP11_Found)
+    message(STATUS "Downloading UPP11...")
+    set(url https://raw.githubusercontent.com/DronMDF/upp11/master/upp11.h)
+    file(DOWNLOAD ${url} "${CMAKE_CURRENT_BINARY_DIR}/upp11/upp11.h" STATUS status)
+    list(GET status 0 error)
+    if(error)
+        message(FATAL_ERROR "... could not download from ${url}.")
+    endif()
+    set(UPP11_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR})
+    find_package(UPP11 REQUIRED)
+endif()
 
 foreach(TEST_SRC ${TEST_LIST})
     get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
