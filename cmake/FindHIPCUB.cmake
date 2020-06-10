@@ -12,7 +12,9 @@
 if(CMAKE_VERSION VERSION_LESS 3.12)
     find_path(HIPCUB_INCLUDE_DIR
               NAMES hipcub/hipcub.hpp
-              PATHS ${HIPCUB_ROOT} ENV HIPCUB_ROOT
+              PATHS ${HIPCUB_ROOT}
+                    ENV HIPCUB_ROOT
+                    ENV ROCM_PATH
               NO_DEFAULT_PATH
               )
 endif()
