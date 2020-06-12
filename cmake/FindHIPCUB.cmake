@@ -23,8 +23,8 @@ endif()
 find_path(HIPCUB_INCLUDE_DIR
           NAMES hipcub/hipcub.hpp
           PATHS ${HIP_ROOT_DIR}
-                /opt/rocm
                 ENV ROCM_PATH
+                /opt/rocm
           PATH_SUFFIXES include)
 
 include(FindPackageHandleStandardArgs)
