@@ -22,8 +22,10 @@ endif()
 # For CMake >= 3.12, this will also check CUB_ROOT and ENV{CUB_ROOT}
 find_path(HIPCUB_INCLUDE_DIR
           NAMES hipcub/hipcub.hpp
-          PATHS ${HIP_ROOT_DIR} /opt/rocm/include
-                ENV ROCM_PATH)
+          PATHS ${HIP_ROOT_DIR}
+                ENV ROCM_PATH
+                /opt/rocm
+          PATH_SUFFIXES include)
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(HIPCUB REQUIRED_VARS HIPCUB_INCLUDE_DIR)
