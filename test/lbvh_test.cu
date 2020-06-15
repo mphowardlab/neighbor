@@ -151,7 +151,14 @@ UP_TEST( lbvh_test )
             int4 node = data[2];
 
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 0);
+            #ifdef NEIGHBOR_INTRINSIC_ROUND
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 1023);
+            #else
+            /* approximate rounding pushes this bound, but it is still watertight
+             * because it means a smaller value is subtracted from the upper bound
+             */
+            UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 1022);
+            #endif
             UP_ASSERT_EQUAL((int)node.z, ~2);
             UP_ASSERT_EQUAL((int)node.w, 3);
             }
@@ -168,7 +175,14 @@ UP_TEST( lbvh_test )
             {
             int4 node = data[4];
 
+            #ifdef NEIGHBOR_INTRINSIC_ROUND
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 1023);
+            #else
+            /* approximate rounding pushes this bound, but it is still watertight
+             * because it means a smaller value is added to set the lower bound
+             */
+            UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 1022);
+            #endif
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 0);
             UP_ASSERT_EQUAL((int)node.z, ~0);
             UP_ASSERT_EQUAL((int)node.w, neighbor::LBVHSentinel);
