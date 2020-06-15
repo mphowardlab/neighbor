@@ -7,7 +7,14 @@
 #define NEIGHBOR_APPROXIMATE_MATH_H_
 
 #include <hipper/hipper_runtime.h>
-#ifndef HIPPER_PLATFORM_NVCC
+
+// only use intrinsics in CUDA
+#ifdef HIPPER_PLATFORM_NVCC
+#define NEIGHBOR_INTRINSIC_ROUND
+#endif
+
+// cfloat needed for FLT_MAX
+#ifndef NEIGHBOR_INTRINSIC_ROUND
 #include <cfloat>
 #endif
 
@@ -33,35 +40,37 @@ namespace approx
 //! Convert a double to a float, rounding down.
 /*!
  * \param x The double to convert.
- * \return A float that is guaranteed to be below the value of \a x.
+ * \return A float that is less than or equal to the value of \a x.
  *
- * This function guarantees that the returned value will be less than the value of \a x.
- * It tries to return the closest representable float to \a x that satisfies this condition
- * without incurring significant overhead.
- *
- * The conversion is done using a device intrinsic.
+ * On CUDA devices, this is performed using the built-in intrinsic.
+ * Otherwise, the same value is returned using a sequence of instructions.
  */
 DEVICE float double2float_rd(double x)
     {
-    // CUDA and HIP both support this intrinsic.
+    #ifdef NEIGHBOR_INTRINSIC_ROUND
     return __double2float_rd(x);
+    #else
+    float y = static_cast<float>(x);
+    return (static_cast<double>(y) <= x) ? y : nextafterf(y, -FLT_MAX);
+    #endif
     }
 
 //! Convert a double to a float, rounding up.
 /*!
  * \param x The double to convert.
- * \return A float that is guaranteed to be above the value of \a x.
+ * \return A float that is greater than or equal to the value of \a x.
  *
- * This function guarantees that the returned value will be less than the value of \a x.
- * It tries to return the closest representable float to \a x that satisfies this condition
- * without incurring significant overhead.
- *
- * The conversion is done using a device intrinsic.
+ * On CUDA devices, this is performed using the built-in intrinsic.
+ * Otherwise, the same value is returned using a sequence of instructions.
  */
 DEVICE float double2float_ru(double x)
     {
-    // CUDA and HIP both support this intrinsic.
+    #ifdef NEIGHBOR_INTRINSIC_ROUND
     return __double2float_ru(x);
+    #else
+    float y = static_cast<float>(x);
+    return (static_cast<double>(y) >= x) ? y : nextafterf(y, FLT_MAX);
+    #endif
     }
 
 //! Add two floats, rounding the result down.
@@ -79,7 +88,7 @@ DEVICE float double2float_ru(double x)
  */
 DEVICE float fadd_rd(float x, float y)
     {
-    #ifdef HIPPER_PLATFORM_NVCC
+    #ifdef NEIGHBOR_INTRINSIC_ROUND
     return __fadd_rd(x,y);
     #else
     return nextafterf(x+y, -FLT_MAX);
@@ -101,7 +110,7 @@ DEVICE float fadd_rd(float x, float y)
  */
 DEVICE float fadd_ru(float x, float y)
     {
-    #ifdef HIPPER_PLATFORM_NVCC
+    #ifdef NEIGHBOR_INTRINSIC_ROUND
     return __fadd_ru(x,y);
     #else
     return nextafterf(x+y, FLT_MAX);
@@ -123,7 +132,7 @@ DEVICE float fadd_ru(float x, float y)
  */
 DEVICE float fsub_rd(float x, float y)
     {
-    #ifdef HIPPER_PLATFORM_NVCC
+    #ifdef NEIGHBOR_INTRINSIC_ROUND
     return __fsub_rd(x,y);
     #else
     return nextafterf(x-y, -FLT_MAX);
@@ -145,7 +154,7 @@ DEVICE float fsub_rd(float x, float y)
  */
 DEVICE float fsub_ru(float x, float y)
     {
-    #ifdef HIPPER_PLATFORM_NVCC
+    #ifdef NEIGHBOR_INTRINSIC_ROUND
     return __fsub_ru(x,y);
     #else
     return nextafterf(x-y, FLT_MAX);
@@ -167,7 +176,7 @@ DEVICE float fsub_ru(float x, float y)
  */
 DEVICE float fmul_rd(float x, float y)
     {
-    #ifdef HIPPER_PLATFORM_NVCC
+    #ifdef NEIGHBOR_INTRINSIC_ROUND
     return __fmul_rd(x,y);
     #else
     return nextafterf(x*y, -FLT_MAX);
@@ -189,7 +198,7 @@ DEVICE float fmul_rd(float x, float y)
  */
 DEVICE float fmul_ru(float x, float y)
     {
-    #ifdef HIPPER_PLATFORM_NVCC
+    #ifdef NEIGHBOR_INTRINSIC_ROUND
     return __fmul_ru(x,y);
     #else
     return nextafterf(x*y, FLT_MAX);
@@ -200,7 +209,7 @@ DEVICE float fmul_ru(float x, float y)
 /*!
  * \param x First value.
  * \param y Second value.
- * \returns The product \f$x/y\f$.
+ * \returns The quotient \f$x/y\f$.
  *
  * This function guarantees that the resulting quotient will be less than or equal to
  * the IEEE-754 result in round-down mode.
@@ -211,7 +220,7 @@ DEVICE float fmul_ru(float x, float y)
  */
 DEVICE float fdiv_rd(float x, float y)
     {
-    #ifdef HIPPER_PLATFORM_NVCC
+    #ifdef NEIGHBOR_INTRINSIC_ROUND
     return __fdiv_rd(x,y);
     #else
     return nextafterf(x/y, -FLT_MAX);
@@ -222,7 +231,7 @@ DEVICE float fdiv_rd(float x, float y)
 /*!
  * \param x First value.
  * \param y Second value.
- * \returns The product \f$x/y\f$.
+ * \returns The quotient \f$x/y\f$.
  *
  * This function guarantees that the resulting quotient will be greater than or equal to
  * the IEEE-754 result in round-up mode.
@@ -233,7 +242,7 @@ DEVICE float fdiv_rd(float x, float y)
  */
 DEVICE float fdiv_ru(float x, float y)
     {
-    #ifdef HIPPER_PLATFORM_NVCC
+    #ifdef NEIGHBOR_INTRINSIC_ROUND
     return __fdiv_ru(x,y);
     #else
     return nextafterf(x/y, FLT_MAX);
@@ -254,7 +263,7 @@ DEVICE float fdiv_ru(float x, float y)
  */
 DEVICE float frcp_rd(float x)
     {
-    #ifdef HIPPER_PLATFORM_NVCC
+    #ifdef NEIGHBOR_INTRINSIC_ROUND
     return __frcp_rd(x);
     #else
     return nextafterf(1.0f/x, -FLT_MAX);
@@ -275,7 +284,7 @@ DEVICE float frcp_rd(float x)
  */
 DEVICE float frcp_ru(float x)
     {
-    #ifdef HIPPER_PLATFORM_NVCC
+    #ifdef NEIGHBOR_INTRINSIC_ROUND
     return __frcp_ru(x);
     #else
     return nextafterf(1.0f/x, FLT_MAX);
@@ -298,7 +307,7 @@ DEVICE float frcp_ru(float x)
  */
 DEVICE float fmaf_rd(float x, float y, float z)
     {
-    #ifdef HIPPER_PLATFORM_NVCC
+    #ifdef NEIGHBOR_INTRINSIC_ROUND
     return __fmaf_rd(x,y,z);
     #else
     return nextafterf(fmaf(x,y,z), -FLT_MAX);
@@ -321,7 +330,7 @@ DEVICE float fmaf_rd(float x, float y, float z)
  */
 DEVICE float fmaf_ru(float x, float y, float z)
     {
-    #ifdef HIPPER_PLATFORM_NVCC
+    #ifdef NEIGHBOR_INTRINSIC_ROUND
     return __fmaf_ru(x,y,z);
     #else
     return nextafterf(fmaf(x,y,z), FLT_MAX);
@@ -331,6 +340,5 @@ DEVICE float fmaf_ru(float x, float y, float z)
 } // end namespace neighbor
 
 #undef DEVICE
-#undef HIPPER_PLATFORM_NVCC
 
 #endif // NEIGHBOR_APPROXIMATE_MATH_H_
