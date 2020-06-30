@@ -151,7 +151,7 @@ UP_TEST( lbvh_test )
             int4 node = data[2];
 
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 0);
-            #ifdef NEIGHBOR_INTRINSIC_ROUND
+            #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 1023);
             #else
             /* approximate rounding pushes this bound, but it is still watertight
@@ -175,7 +175,7 @@ UP_TEST( lbvh_test )
             {
             int4 node = data[4];
 
-            #ifdef NEIGHBOR_INTRINSIC_ROUND
+            #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 1023);
             #else
             /* approximate rounding pushes this bound, but it is still watertight

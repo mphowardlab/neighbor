@@ -57,12 +57,20 @@ endif()
 foreach(TEST_SRC ${TEST_LIST})
     get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
 
+    # test compiled under HIP or CUDA
     if(NEIGHBOR_HIP)
         hip_add_executable(${TEST_NAME} ${TEST_SRC} HIPCC_OPTIONS ${TEST_HIPCC_OPTIONS} NVCC_OPTIONS ${TEST_NVCC_OPTIONS})
     else()
         add_executable(${TEST_NAME} ${TEST_SRC})
     endif()
     target_link_libraries(${TEST_NAME} PRIVATE neighbor::neighbor UPP11::UPP11)
-
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+
+    # under CUDA, also force the test without intrinsics
+    if(NOT NEIGHBOR_HIP)
+        add_executable(${TEST_NAME}_nointrinsic ${TEST_SRC})
+        target_compile_definitions(${TEST_NAME}_nointrinsic PRIVATE NEIGHBOR_NO_INTRINSIC_ROUND)
+        target_link_libraries(${TEST_NAME}_nointrinsic PRIVATE neighbor::neighbor UPP11::UPP11)
+        add_test(NAME ${TEST_NAME}_nointrinsic COMMAND ${TEST_NAME}_nointrinsic)
+    endif()
 endforeach()

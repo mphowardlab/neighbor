@@ -8,13 +8,21 @@
 
 #include <hipper/hipper_runtime.h>
 
-// only use intrinsics in CUDA
-#ifdef HIPPER_PLATFORM_NVCC
-#define NEIGHBOR_INTRINSIC_ROUND
+/*
+ * Intrinsics only work in CUDA, so defining NEIGHBOR_NO_INTRINSIC_ROUND
+ * indicates to use approximate math functions that are supported in HIP.
+ *
+ * Note that even in CUDA defining NEIGHBOR_NO_INTRINSIC_ROUND will force
+ * the use of the approximate functions, which may be useful for testing
+ * purposes. However, the intrinsics should be more performant, so this
+ * is opt-in only, and the default is to use intrinsics in CUDA.
+ */
+#ifndef HIPPER_PLATFORM_NVCC
+#define NEIGHBOR_NO_INTRINSIC_ROUND
 #endif
 
 // cfloat needed for FLT_MAX
-#ifndef NEIGHBOR_INTRINSIC_ROUND
+#ifdef NEIGHBOR_NO_INTRINSIC_ROUND
 #include <cfloat>
 #endif
 
@@ -47,7 +55,7 @@ namespace approx
  */
 DEVICE float double2float_rd(double x)
     {
-    #ifdef NEIGHBOR_INTRINSIC_ROUND
+    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __double2float_rd(x);
     #else
     float y = static_cast<float>(x);
@@ -65,7 +73,7 @@ DEVICE float double2float_rd(double x)
  */
 DEVICE float double2float_ru(double x)
     {
-    #ifdef NEIGHBOR_INTRINSIC_ROUND
+    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __double2float_ru(x);
     #else
     float y = static_cast<float>(x);
@@ -88,7 +96,7 @@ DEVICE float double2float_ru(double x)
  */
 DEVICE float fadd_rd(float x, float y)
     {
-    #ifdef NEIGHBOR_INTRINSIC_ROUND
+    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __fadd_rd(x,y);
     #else
     return nextafterf(x+y, -FLT_MAX);
@@ -110,7 +118,7 @@ DEVICE float fadd_rd(float x, float y)
  */
 DEVICE float fadd_ru(float x, float y)
     {
-    #ifdef NEIGHBOR_INTRINSIC_ROUND
+    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __fadd_ru(x,y);
     #else
     return nextafterf(x+y, FLT_MAX);
@@ -132,7 +140,7 @@ DEVICE float fadd_ru(float x, float y)
  */
 DEVICE float fsub_rd(float x, float y)
     {
-    #ifdef NEIGHBOR_INTRINSIC_ROUND
+    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __fsub_rd(x,y);
     #else
     return nextafterf(x-y, -FLT_MAX);
@@ -154,7 +162,7 @@ DEVICE float fsub_rd(float x, float y)
  */
 DEVICE float fsub_ru(float x, float y)
     {
-    #ifdef NEIGHBOR_INTRINSIC_ROUND
+    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __fsub_ru(x,y);
     #else
     return nextafterf(x-y, FLT_MAX);
@@ -176,7 +184,7 @@ DEVICE float fsub_ru(float x, float y)
  */
 DEVICE float fmul_rd(float x, float y)
     {
-    #ifdef NEIGHBOR_INTRINSIC_ROUND
+    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __fmul_rd(x,y);
     #else
     return nextafterf(x*y, -FLT_MAX);
@@ -198,7 +206,7 @@ DEVICE float fmul_rd(float x, float y)
  */
 DEVICE float fmul_ru(float x, float y)
     {
-    #ifdef NEIGHBOR_INTRINSIC_ROUND
+    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __fmul_ru(x,y);
     #else
     return nextafterf(x*y, FLT_MAX);
@@ -220,7 +228,7 @@ DEVICE float fmul_ru(float x, float y)
  */
 DEVICE float fdiv_rd(float x, float y)
     {
-    #ifdef NEIGHBOR_INTRINSIC_ROUND
+    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __fdiv_rd(x,y);
     #else
     return nextafterf(x/y, -FLT_MAX);
@@ -242,7 +250,7 @@ DEVICE float fdiv_rd(float x, float y)
  */
 DEVICE float fdiv_ru(float x, float y)
     {
-    #ifdef NEIGHBOR_INTRINSIC_ROUND
+    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __fdiv_ru(x,y);
     #else
     return nextafterf(x/y, FLT_MAX);
@@ -263,7 +271,7 @@ DEVICE float fdiv_ru(float x, float y)
  */
 DEVICE float frcp_rd(float x)
     {
-    #ifdef NEIGHBOR_INTRINSIC_ROUND
+    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __frcp_rd(x);
     #else
     return nextafterf(1.0f/x, -FLT_MAX);
@@ -284,7 +292,7 @@ DEVICE float frcp_rd(float x)
  */
 DEVICE float frcp_ru(float x)
     {
-    #ifdef NEIGHBOR_INTRINSIC_ROUND
+    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __frcp_ru(x);
     #else
     return nextafterf(1.0f/x, FLT_MAX);
@@ -307,7 +315,7 @@ DEVICE float frcp_ru(float x)
  */
 DEVICE float fmaf_rd(float x, float y, float z)
     {
-    #ifdef NEIGHBOR_INTRINSIC_ROUND
+    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __fmaf_rd(x,y,z);
     #else
     return nextafterf(fmaf(x,y,z), -FLT_MAX);
@@ -330,7 +338,7 @@ DEVICE float fmaf_rd(float x, float y, float z)
  */
 DEVICE float fmaf_ru(float x, float y, float z)
     {
-    #ifdef NEIGHBOR_INTRINSIC_ROUND
+    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __fmaf_ru(x,y,z);
     #else
     return nextafterf(fmaf(x,y,z), FLT_MAX);
