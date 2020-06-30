@@ -7,7 +7,8 @@
 #define NEIGHBOR_LBVH_H_
 
 #include <assert.h>
-#include <cuda_runtime.h>
+#include <hipper/hipper_runtime.h>
+
 #include "Memory.h"
 #include "Tunable.h"
 
@@ -59,7 +60,7 @@ class LBVH : public Tunable<unsigned int>
 
         //! Setup LBVH memory for building.
         template<class InsertOpT>
-        void setup(cudaStream_t stream, const InsertOpT& insert)
+        void setup(hipper::stream_t stream, const InsertOpT& insert)
             {
             setup(LaunchParameters(32, stream), insert);
             }
@@ -87,7 +88,7 @@ class LBVH : public Tunable<unsigned int>
          * The tunable block size defaults to 32 threads per block.
          */
         template<class InsertOpT>
-        void build(cudaStream_t stream, const InsertOpT& insert, const float3& lo, const float3& hi)
+        void build(hipper::stream_t stream, const InsertOpT& insert, const float3& lo, const float3& hi)
             {
             build(LaunchParameters(32,stream), insert, lo, hi);
             }

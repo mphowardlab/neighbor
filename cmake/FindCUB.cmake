@@ -5,14 +5,14 @@
 # CUB_FOUND - Set True if CUB is found.
 # CUB_INCLUDE_DIRS - Set to CUB include directory if found.
 #
-# Also creates the CUB::CUB target that can be linked against.
+# Also creates the CUDA::CUB target that can be linked against.
 #
 
 # On older CMake, manually search CUB_ROOT first
 if(CMAKE_VERSION VERSION_LESS 3.12)
     find_path(CUB_INCLUDE_DIR
               NAMES cub/cub.cuh
-              PATHS ${CUB_ROOT} $ENV{CUB_ROOT}
+              PATHS ${CUB_ROOT} ENV CUB_ROOT
               NO_DEFAULT_PATH
               )
 endif()
@@ -28,8 +28,8 @@ mark_as_advanced(CUB_FOUND CUB_INCLUDE_DIR)
 if(CUB_FOUND)
     set(CUB_INCLUDE_DIRS ${CUB_INCLUDE_DIR})
 
-    if(NOT TARGET CUB::CUB)
-        add_library(CUB::CUB INTERFACE IMPORTED)
-        set_target_properties(CUB::CUB PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${CUB_INCLUDE_DIR}")
+    if(NOT TARGET CUDA::CUB)
+        add_library(CUDA::CUB INTERFACE IMPORTED)
+        set_target_properties(CUDA::CUB PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${CUB_INCLUDE_DIR}")
     endif()
 endif()

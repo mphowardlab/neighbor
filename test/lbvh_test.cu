@@ -3,7 +3,7 @@
 
 // Maintainer: mphoward
 
-#include <cuda_runtime.h>
+#include <hipper/hipper_runtime.h>
 
 #include "neighbor/neighbor.h"
 
@@ -17,9 +17,9 @@ UP_TEST( lbvh_test )
     {
     std::shared_ptr<neighbor::LBVH> lbvh;
 
-    // make some cuda streams to test with
-    cudaStream_t streams[2];
-    cudaStreamCreate(&streams[0]); // different stream
+    // make some GPU streams to test with
+    hipper::stream_t streams[2];
+    hipper::streamCreate(&streams[0]); // different stream
     streams[1] = 0; // default stream
 
     // points for tree
@@ -65,7 +65,7 @@ UP_TEST( lbvh_test )
         lbvh = std::make_shared<neighbor::LBVH>();
             {
             lbvh->build(streams[i], neighbor::PointInsertOp(points.get(), 3), min, max);
-            cudaStreamSynchronize(streams[i]);
+            hipper::streamSynchronize(streams[i]);
             }
 
         UP_ASSERT_EQUAL(lbvh->getN(), 3);
@@ -125,7 +125,7 @@ UP_TEST( lbvh_test )
             neighbor::CountNeighborsOp count(hits.get());
             neighbor::SphereQueryOp query(spheres.get(), spheres.size());
             traverser.traverse(*lbvh, query, count);
-            cudaDeviceSynchronize();
+            hipper::deviceSynchronize();
             }
 
         auto data = traverser.getData();
@@ -134,8 +134,8 @@ UP_TEST( lbvh_test )
             int4 node = data[0];
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 0);
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 0);
-            UP_ASSERT_EQUAL(node.z, 1);
-            UP_ASSERT_EQUAL(node.w, neighbor::LBVHSentinel);
+            UP_ASSERT_EQUAL((int)node.z, 1);
+            UP_ASSERT_EQUAL((int)node.w, neighbor::LBVHSentinel);
             }
         // Node 1
             {
@@ -143,17 +143,24 @@ UP_TEST( lbvh_test )
 
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 0);
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 511);
-            UP_ASSERT_EQUAL(node.z, 2);
-            UP_ASSERT_EQUAL(node.w, 4);
+            UP_ASSERT_EQUAL((int)node.z, 2);
+            UP_ASSERT_EQUAL((int)node.w, 4);
             }
         // Node 2
             {
             int4 node = data[2];
 
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 0);
+            #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 1023);
-            UP_ASSERT_EQUAL(node.z, ~2);
-            UP_ASSERT_EQUAL(node.w, 3);
+            #else
+            /* approximate rounding pushes this bound, but it is still watertight
+             * because it means a smaller value is subtracted from the upper bound
+             */
+            UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 1022);
+            #endif
+            UP_ASSERT_EQUAL((int)node.z, ~2);
+            UP_ASSERT_EQUAL((int)node.w, 3);
             }
         // Node 3
             {
@@ -161,17 +168,24 @@ UP_TEST( lbvh_test )
 
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 511);
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 511);
-            UP_ASSERT_EQUAL(node.z, ~1);
-            UP_ASSERT_EQUAL(node.w, 4);
+            UP_ASSERT_EQUAL((int)node.z, ~1);
+            UP_ASSERT_EQUAL((int)node.w, 4);
             }
         // Node 4
             {
             int4 node = data[4];
 
+            #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 1023);
+            #else
+            /* approximate rounding pushes this bound, but it is still watertight
+             * because it means a smaller value is added to set the lower bound
+             */
+            UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 1022);
+            #endif
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 0);
-            UP_ASSERT_EQUAL(node.z, ~0);
-            UP_ASSERT_EQUAL(node.w, neighbor::LBVHSentinel);
+            UP_ASSERT_EQUAL((int)node.z, ~0);
+            UP_ASSERT_EQUAL((int)node.w, neighbor::LBVHSentinel);
             }
 
         // each node should have the correct number of hits
@@ -203,7 +217,7 @@ UP_TEST( lbvh_test )
                                           spheres.size());
 
             traverser.traverse(streams[i], *lbvh, query, nl_op);
-            cudaStreamSynchronize(streams[i]);
+            hipper::streamSynchronize(streams[i]);
             }
 
         // check output
@@ -264,7 +278,7 @@ UP_TEST( lbvh_test )
             neighbor::MapTransformOp transform(map.get());
 
             traverser.traverse(*lbvh, query, nl_op, neighbor::SelfOp(), transform);
-            cudaDeviceSynchronize();
+            hipper::deviceSynchronize();
             }
 
         // check output
@@ -296,7 +310,7 @@ UP_TEST( lbvh_test )
             }
         }
 
-    cudaStreamDestroy(streams[0]);
+    hipper::streamDestroy(streams[0]);
     }
 
 // Test that LBVH traverser handles images correctly
@@ -315,7 +329,7 @@ UP_TEST( lbvh_periodic_test )
     const float3 max = make_float3( 2., 2., 2.);
     const float3 min = make_float3(-2.,-2.,-2.);
     lbvh->build(neighbor::PointInsertOp(points.get(), points.size()), min, max);
-    cudaDeviceSynchronize();
+    hipper::deviceSynchronize();
 
     // query spheres for tree that intersect through boundaries
     neighbor::shared_array<float4> spheres(2);
@@ -349,7 +363,7 @@ UP_TEST( lbvh_periodic_test )
                                       spheres.size());
 
         traverser.traverse(*lbvh, query, count);
-        cudaDeviceSynchronize();
+        hipper::deviceSynchronize();
 
         UP_ASSERT_EQUAL(hits[0], 0);
         UP_ASSERT_EQUAL(hits[1], 0);
@@ -365,7 +379,7 @@ UP_TEST( lbvh_periodic_test )
         neighbor::ImageListOp<float3> translate(images.get(), images.size());
 
         traverser.traverse(*lbvh, query, count, translate);
-        cudaDeviceSynchronize();
+        hipper::deviceSynchronize();
 
         UP_ASSERT_EQUAL(hits[0], 2);
         UP_ASSERT_EQUAL(hits[1], 2);
@@ -396,7 +410,7 @@ UP_TEST( lbvh_validate )
     const float3 lo = make_float3(-0.5*L.x, -0.5*L.y, -0.5*L.z);
     const float3 hi = make_float3( 0.5*L.x,  0.5*L.y,  0.5*L.z);
     lbvh->build(neighbor::PointInsertOp(points.get(), N), lo, hi);
-    cudaDeviceSynchronize();
+    hipper::deviceSynchronize();
 
     // query spheres for tree
     neighbor::shared_array<float4> spheres(N);
@@ -437,7 +451,7 @@ UP_TEST( lbvh_validate )
                                                 images.size());
 
         traverser.traverse(*lbvh, query, count, translate);
-        cudaDeviceSynchronize();
+        hipper::deviceSynchronize();
         }
 
     // generate list of reference collisions
@@ -510,7 +524,7 @@ UP_TEST( lbvh_small_test )
     const float3 max = make_float3(1024, 1024, 1024);
     const float3 min = make_float3(0, 0, 0);
     lbvh->build(neighbor::PointInsertOp(points.get(), 1), min, max);
-    cudaDeviceSynchronize();
+    hipper::deviceSynchronize();
         {
         UP_ASSERT_EQUAL(lbvh->getN(), 1);
         UP_ASSERT_EQUAL(lbvh->getRoot(), 0);
@@ -549,15 +563,15 @@ UP_TEST( lbvh_small_test )
                                           spheres.size());
 
             traverser.traverse(*lbvh, query, count);
-            cudaDeviceSynchronize();
+            hipper::deviceSynchronize();
             }
 
         auto data = traverser.getData();
         // only one node, just check its index contents
             {
             int4 node = data[0];
-            UP_ASSERT_EQUAL(node.z, ~0);
-            UP_ASSERT_EQUAL(node.w, neighbor::LBVHSentinel);
+            UP_ASSERT_EQUAL((int)node.z, ~0);
+            UP_ASSERT_EQUAL((int)node.w, neighbor::LBVHSentinel);
             }
 
         // each node should have the correct number of hits
