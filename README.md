@@ -12,27 +12,49 @@ volume hierarchies. For additional details, please refer to the following public
 
 ## Dependencies
 
+For installation:
+
 * CMake >= 3.9
-* CUDA toolkit and an NVIDIA GPU with compute capability >= 3.5.
+
+To use with NVIDIA GPUs:
+
+* [CUDA](https://docs.nvidia.com/cuda) toolkit.
 * [CUB](https://github.com/NVlabs/cub).
+
+To use with AMD GPUs:
+
+* [HIP](https://github.com/ROCm-Developer-Tools/HIP).
+* [hipCUB](https://github.com/ROCmSoftwarePlatform/hipCUB).
+
+Optionally:
+
+* [hipper](https://github.com/mphowardlab/hipper) header-only GPU runtime
+  interoperability layer. If not found, it will be added as a git submodule.
+* [upp11](https://github.com/DronMDF/upp11) header-only test library. If
+  not found, it will be downloaded automatically to the build directory.
 
 ## Compiling
 
-The neighbor library is header-only. It can either be installed via CMake
+The neighbor library is header-only. It can be installed via CMake:
 ```
 cmake ..
 make install
 ```
-or it can be included as part of an existing project.
+(It can be included as part of an existing project, or simply downloaded.)
+CMake projects can discover the installation using `find_package` in `CONFIG`
+mode and should link against the `neighbor::neighbor` target.
 
-If the library is being built directly by CMake, benchmarks and tests
-can optionally be built.
+neighbor will select between a CUDA or HIP build using the `NEIGHBOR_HIP` define.
+If `NEIGHBOR_HIP=ON`, neighbor will use HIP for the GPU runtime, and both
+NVIDIA and AMD GPUs are supported. If `NEIGHBOR_HIP=OFF`, neighbor will use
+CUDA for the GPU runtime. If only NVIDIA GPUs are targeted, performance may
+be slightly improved by setting `NEIGHBOR_HIP=OFF`.
 
 ## Testing
 
-You can validate your installation using the included test suite. To build
-the test suite, you must point CMake to the [upp11](https://github.com/DronMDF/upp11)
-header-only test library. Then run the tests using `ctest`.
+If neighbor is being built directly by CMake, tests can optionally be built
+with a working CUDA or HIP installation by setting `NEIGHBOR_TEST=ON`. Run the
+included test suite with `ctest`.
 
 ## Versioning
 
