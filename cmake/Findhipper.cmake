@@ -1,35 +1,48 @@
-# Find the hipper header
-#
-# The following variables are set if hipper is found.
-#
-# hipper_FOUND - Set True if hipper is found.
-# hipper_INCLUDE_DIRS - Set to hipper include directory if found.
-#
-# Also creates the hipper::hipper target that can be linked against.
-#
+#[=======================================================================[.rst:
+Findhipper
+----------
 
-# On older CMake, manually search hipper_ROOT first
-if(CMAKE_VERSION VERSION_LESS 3.12)
-    find_path(hipper_INCLUDE_DIR
-              NAMES hipper/hipper_runtime.h
-              PATHS ${HIPPER_ROOT} ENV HIPPER_ROOT
-              NO_DEFAULT_PATH
-              )
-endif()
+Find the hipper GPU runtime library interface.
 
-# now look in the system directories if something hasn't been found
-# For CMake >= 3.12, this will also check HIPPER_ROOT and ENV{HIPPER_ROOT}
-find_path(hipper_INCLUDE_DIR NAMES hipper/hipper_runtime.h)
+The location of the library can be hinted using ``hipper_ROOT`` or ``ENV{hipper_ROOT}``.
 
-include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(hipper REQUIRED_VARS hipper_INCLUDE_DIR)
-mark_as_advanced(hipper_FOUND hipper_INCLUDE_DIR)
+The following variables are set:
+
+``hipper_FOUND``
+  Variable indicating if hipper is found.
+``hipper_INCLUDE_DIRS``
+  Include path(s) for hipper header.
+
+The following :prop_tgt:`IMPORTED` targets are defined:
+
+``hipper::hipper``
+  Target for hipper library.
+
+#]=======================================================================]
 
 if(hipper_FOUND)
-    set(hipper_INCLUDE_DIRS ${hipper_INCLUDE_DIR})
+    return()
+endif()
 
-    if(NOT TARGET hipper::hipper)
-        add_library(hipper::hipper INTERFACE IMPORTED)
-        set_target_properties(hipper::hipper PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${hipper_INCLUDE_DIR}")
-    endif()
+# try to find hipper runtime header
+find_path(hipper_INCLUDE_DIR
+          NAMES hipper/hipper_runtime.h
+          PATHS ${hipper_ROOT} ENV hipper_ROOT
+          PATH_SUFFIXES include
+          NO_DEFAULT_PATH
+          )
+find_path(hipper_INCLUDE_DIR
+          NAMES hipper/hipper_runtime.h
+          PATH_SUFFIXES include)
+mark_as_advanced(hipper_INCLUDE_DIR)
+
+# process package
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(hipper REQUIRED_VARS hipper_INCLUDE_DIR)
+set(hipper_INCLUDE_DIRS ${hipper_INCLUDE_DIR})
+
+# make an imported target available
+if(hipper_FOUND AND NOT TARGET hipper::hipper)
+    add_library(hipper::hipper INTERFACE IMPORTED)
+    set_target_properties(hipper::hipper PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${hipper_INCLUDE_DIRS}")
 endif()
