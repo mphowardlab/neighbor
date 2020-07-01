@@ -35,13 +35,11 @@ target_include_directories(neighbor INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_
 
 # hipper dependency
 option(NEIGHBOR_INTERNAL_HIPPER "Use internal copy of hipper?" ON)
-add_library(hipper INTERFACE)
-add_library(neighbor::hipper ALIAS hipper)
 if(NOT NEIGHBOR_INTERNAL_HIPPER)
     if(NOT TARGET hipper::hipper)
         find_package(hipper REQUIRED)
     endif()
-    target_link_libraries(hipper INTERFACE hipper::hipper)
+    target_link_libraries(neighbor INTERFACE hipper::hipper)
 else()
     find_package(Git QUIET)
     if(GIT_FOUND AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/.git")
@@ -52,10 +50,12 @@ else()
     else()
         message(FATAL_ERROR "Unable to checkout internal copy of hipper using git submodule.")
     endif()
+    add_library(hipper INTERFACE)
+    add_library(neighbor::hipper ALIAS hipper)
     target_include_directories(hipper INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/extern/hipper/include>
                                                 $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/neighbor>)
+    target_link_libraries(neighbor INTERFACE neighbor::hipper)
 endif()
-target_link_libraries(neighbor INTERFACE neighbor::hipper)
 
 # cub dependency
 if(NEIGHBOR_HIP)
@@ -102,7 +102,10 @@ if(NEIGHBOR_INSTALL)
                   cmake/Findhipper.cmake
             DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/cmake/neighbor)
 
-    install(TARGETS neighbor hipper EXPORT neighborTargets)
+    install(TARGETS neighbor EXPORT neighborTargets)
+    if(NEIGHBOR_INTERNAL_HIPPER)
+        install(TARGETS hipper EXPORT neighborTargets)
+    endif()
 
     install(EXPORT neighborTargets
             NAMESPACE neighbor::
