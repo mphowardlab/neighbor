@@ -6,7 +6,11 @@
 #include "UniformGrid.cuh"
 #include <thrust/execution_policy.h>
 #include <thrust/fill.h>
+#if __CUDACC_VER_MAJOR__ >= 11
+#include <cub/cub.cuh>
+#else
 #include "hoomd/extern/cub/cub/cub.cuh"
+#endif
 
 namespace neighbor
 {

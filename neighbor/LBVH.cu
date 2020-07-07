@@ -5,7 +5,11 @@
 
 #include "LBVH.cuh"
 #include "InsertOps.h"
+#if __CUDACC_VER_MAJOR__ >= 11
+#include <cub/cub.cuh>
+#else
 #include "hoomd/extern/cub/cub/cub.cuh"
+#endif
 
 // macros for rounding HOOMD-blue Scalar to float for mixed precision
 #ifdef SINGLE_PRECISION
