@@ -7,11 +7,7 @@
 #define NEIGHBOR_KERNELS_LBVH_CUH_
 
 #include <hipper/hipper_runtime.h>
-#if defined(HIPPER_CUDA)
-#include <cub/cub.cuh>
-#elif defined(HIPPER_HIP)
-#include <hipcub/hipcub.hpp>
-#endif
+#include <hipper/hipper_cub.h>
 
 #include "../BoundingVolumes.h"
 #include "../LBVHData.h"
@@ -430,13 +426,10 @@ inline uchar2 lbvh_sort_codes(void *d_tmp,
                               const unsigned int N,
                               hipper::stream_t stream)
     {
-    #if defined(HIPPER_HIP)
-    namespace cub = hipcub;
-    #endif
-    cub::DoubleBuffer<unsigned int> d_keys(d_codes, d_alt_codes);
-    cub::DoubleBuffer<unsigned int> d_vals(d_indexes, d_alt_indexes);
+    hipper::cub::DoubleBuffer<unsigned int> d_keys(d_codes, d_alt_codes);
+    hipper::cub::DoubleBuffer<unsigned int> d_vals(d_indexes, d_alt_indexes);
 
-    cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, 30, stream);
+    hipper::cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, 30, stream);
 
     // mark that the arrays should be flipped if the final result is not in the primary array
     uchar2 swap = make_uchar2(0,0);
