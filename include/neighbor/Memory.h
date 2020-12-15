@@ -8,6 +8,7 @@
 
 #include <hipper/hipper_runtime.h>
 #include <memory>
+#include <stdexcept>
 
 namespace neighbor
 {

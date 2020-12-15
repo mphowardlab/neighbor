@@ -18,6 +18,8 @@
 #include "LBVHTraverserData.h"
 #include "kernels/LBVHTraverser.cuh"
 
+#include <stdexcept>
+
 namespace neighbor
 {
 
