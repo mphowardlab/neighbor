@@ -436,7 +436,7 @@ void LBVHTraverser::traverse(const LaunchParameters& params,
 
     // traversal data
     gpu::lbvh_traverse_ropes(out,
-                             data(),
+                             clbvh,
                              query,
                              images,
                              params.tunable,
