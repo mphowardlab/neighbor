@@ -18,6 +18,8 @@
 #include "LBVHTraverserData.h"
 #include "kernels/LBVHTraverser.cuh"
 
+#include <stdexcept>
+
 namespace neighbor
 {
 
@@ -377,10 +379,15 @@ LBVHTraverser::LBVHTraverser()
 template<class TransformOpT>
 void LBVHTraverser::setup(const LaunchParameters& params, const LBVH& lbvh, const TransformOpT& transform)
     {
-    if (lbvh.getN() == 0) return;
+    // invalidate old setup
+    reset();
 
-    compress(params, lbvh, transform);
-    m_replay = true;
+    // compress new lbvh
+    if (lbvh.getN() != 0)
+        {
+        compress(params, lbvh, transform);
+        m_replay = true;
+        }
     }
 
 /*!
@@ -436,7 +443,7 @@ void LBVHTraverser::traverse(const LaunchParameters& params,
 
     // traversal data
     gpu::lbvh_traverse_ropes(out,
-                             data(),
+                             clbvh,
                              query,
                              images,
                              params.tunable,

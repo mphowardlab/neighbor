@@ -10,6 +10,7 @@ endif()
 
 project(neighbor VERSION 0.3.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # decide whether to use HIP layer or CUDA (default)

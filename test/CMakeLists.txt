@@ -13,6 +13,7 @@ if(NEIGHBOR_HIP)
     include(EnableHIP)
 else()
     enable_language(CUDA)
+    set(CMAKE_CUDA_STANDARD 14)
 endif()
 
 # tests require UPP11
@@ -63,6 +64,14 @@ if(NEIGHBOR_AMD_ARCH)
     foreach(_arch ${NEIGHBOR_AMD_ARCH})
         set(TEST_HIPCC_OPTIONS "--amdgpu-target=${_arch}")
     endforeach()
+endif()
+
+# enable compiler warnings
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wconversion -Wno-sign-conversion -Wno-unknown-pragmas -Wno-deprecated-declarations")
+    if(NOT NEIGHBOR_HIP)
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=code_is_unreachable -Xcompiler=-Wall -Xcompiler=-Wconversion")
+    endif()
 endif()
 
 foreach(TEST_SRC ${TEST_LIST})
