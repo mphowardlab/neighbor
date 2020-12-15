@@ -377,10 +377,15 @@ LBVHTraverser::LBVHTraverser()
 template<class TransformOpT>
 void LBVHTraverser::setup(const LaunchParameters& params, const LBVH& lbvh, const TransformOpT& transform)
     {
-    if (lbvh.getN() == 0) return;
+    // invalidate old setup
+    reset();
 
-    compress(params, lbvh, transform);
-    m_replay = true;
+    // compress new lbvh
+    if (lbvh.getN() != 0)
+        {
+        compress(params, lbvh, transform);
+        m_replay = true;
+        }
     }
 
 /*!
