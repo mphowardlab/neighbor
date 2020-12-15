@@ -123,7 +123,7 @@ UP_TEST( lbvh_test )
         neighbor::shared_array<unsigned int> hits(spheres.size());
             {
             neighbor::CountNeighborsOp count(hits.get());
-            neighbor::SphereQueryOp query(spheres.get(), spheres.size());
+            neighbor::SphereQueryOp query(spheres.get(), (unsigned int)spheres.size());
             traverser.traverse(*lbvh, query, count);
             hipper::deviceSynchronize();
             }
@@ -214,7 +214,7 @@ UP_TEST( lbvh_test )
                                            max_neigh);
 
             neighbor::SphereQueryOp query(spheres.get(),
-                                          spheres.size());
+                                          (unsigned int)spheres.size());
 
             traverser.traverse(streams[i], *lbvh, query, nl_op);
             hipper::streamSynchronize(streams[i]);
@@ -273,7 +273,7 @@ UP_TEST( lbvh_test )
                                            max_neigh);
 
             neighbor::SphereQueryOp query(spheres.get(),
-                                          spheres.size());
+                                          (unsigned int)spheres.size());
 
             neighbor::MapTransformOp transform(map.get());
 
@@ -321,14 +321,14 @@ UP_TEST( lbvh_periodic_test )
     // points for tree
     neighbor::shared_array<float3> points(3);
         {
-        points[0] = make_float3( 1.9, 1.9, 1.9);
-        points[1] = make_float3(  0., 0.,  0.);
-        points[2] = make_float3(-1.9,-1.9,-1.9);
+        points[0] = make_float3( 1.9f, 1.9f, 1.9f);
+        points[1] = make_float3(  0.f, 0.f,  0.f);
+        points[2] = make_float3(-1.9f,-1.9f,-1.9f);
         }
 
-    const float3 max = make_float3( 2., 2., 2.);
-    const float3 min = make_float3(-2.,-2.,-2.);
-    lbvh->build(neighbor::PointInsertOp(points.get(), points.size()), min, max);
+    const float3 max = make_float3( 2.f, 2.f, 2.f);
+    const float3 min = make_float3(-2.f,-2.f,-2.f);
+    lbvh->build(neighbor::PointInsertOp(points.get(), (unsigned int)points.size()), min, max);
     hipper::deviceSynchronize();
 
     // query spheres for tree that intersect through boundaries
@@ -336,9 +336,9 @@ UP_TEST( lbvh_periodic_test )
     neighbor::shared_array<float3> images(27);
         {
         // p2
-        spheres[0] = make_float4(-1.9, 1.9, 1.9, 0.5);
+        spheres[0] = make_float4(-1.9f, 1.9f, 1.9f, 0.5f);
         // p1
-        spheres[1] = make_float4( 1.9,-1.9,-1.9, 0.5);
+        spheres[1] = make_float4( 1.9f,-1.9f,-1.9f, 0.5f);
 
         unsigned int idx=0;
         for (int ix=-1; ix <= 1; ++ix)
@@ -347,7 +347,7 @@ UP_TEST( lbvh_periodic_test )
                 {
                 for (int iz=-1; iz <= 1; ++iz)
                     {
-                    images[idx++] = make_float3(4*ix, 4*iy, 4*iz);
+                    images[idx++] = make_float3((float)(4*ix),(float)(4*iy),(float)(4*iz));
                     }
                 }
             }
@@ -360,7 +360,7 @@ UP_TEST( lbvh_periodic_test )
         neighbor::CountNeighborsOp count(hits.get());
 
         neighbor::SphereQueryOp query(spheres.get(),
-                                      spheres.size());
+                                      (unsigned int)spheres.size());
 
         traverser.traverse(*lbvh, query, count);
         hipper::deviceSynchronize();
@@ -374,9 +374,9 @@ UP_TEST( lbvh_periodic_test )
         neighbor::CountNeighborsOp count(hits.get());
 
         neighbor::SphereQueryOp query(spheres.get(),
-                                      spheres.size());
+                                      (unsigned int)spheres.size());
 
-        neighbor::ImageListOp<float3> translate(images.get(), images.size());
+        neighbor::ImageListOp<float3> translate(images.get(), (unsigned int)images.size());
 
         traverser.traverse(*lbvh, query, count, translate);
         hipper::deviceSynchronize();
@@ -407,8 +407,8 @@ UP_TEST( lbvh_validate )
             }
         }
 
-    const float3 lo = make_float3(-0.5*L.x, -0.5*L.y, -0.5*L.z);
-    const float3 hi = make_float3( 0.5*L.x,  0.5*L.y,  0.5*L.z);
+    const float3 lo = make_float3(-0.5f*L.x, -0.5f*L.y, -0.5f*L.z);
+    const float3 hi = make_float3( 0.5f*L.x,  0.5f*L.y,  0.5f*L.z);
     lbvh->build(neighbor::PointInsertOp(points.get(), N), lo, hi);
     hipper::deviceSynchronize();
 
@@ -432,7 +432,7 @@ UP_TEST( lbvh_validate )
                 {
                 for (int iz=-1; iz <= 1; ++iz)
                     {
-                    images[idx++] = make_float3(L.x*ix, L.y*iy, L.z*iz);
+                    images[idx++] = make_float3(L.x*((float)ix), L.y*((float)iy), L.z*((float)iz));
                     }
                 }
             }
@@ -445,10 +445,10 @@ UP_TEST( lbvh_validate )
         neighbor::CountNeighborsOp count(hits.get());
 
         neighbor::SphereQueryOp query(spheres.get(),
-                                      spheres.size());
+                                      (unsigned int)spheres.size());
 
         neighbor::ImageListOp<float3> translate(images.get(),
-                                                images.size());
+                                                (unsigned int)images.size());
 
         traverser.traverse(*lbvh, query, count, translate);
         hipper::deviceSynchronize();
@@ -560,7 +560,7 @@ UP_TEST( lbvh_small_test )
             neighbor::CountNeighborsOp count(hits.get());
 
             neighbor::SphereQueryOp query(spheres.get(),
-                                          spheres.size());
+                                          (unsigned int)spheres.size());
 
             traverser.traverse(*lbvh, query, count);
             hipper::deviceSynchronize();
