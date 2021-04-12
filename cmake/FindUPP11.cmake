@@ -1,3 +1,7 @@
+# Copyright (c) 2018-2020, Michael P. Howard
+# Copyright (c) 2021, Auburn University
+# This file is released under the Modified BSD License.
+
 # Find the UPP11 test library
 #
 # The following variables are set if UPP11 is found.

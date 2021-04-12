@@ -1,7 +1,6 @@
-// Copyright (c) 2018-2019, Michael P. Howard.
+// Copyright (c) 2018-2020, Michael P. Howard
+// Copyright (c) 2021, Auburn University
 // This file is released under the Modified BSD License.
-
-// Maintainer: mphoward
 
 #ifndef NEIGHBOR_NEIGHBOR_H_
 #define NEIGHBOR_NEIGHBOR_H_

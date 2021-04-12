@@ -1,3 +1,7 @@
+# Copyright (c) 2018-2020, Michael P. Howard
+# Copyright (c) 2021, Auburn University
+# This file is released under the Modified BSD License.
+
 # Find the HIP CUB library
 #
 # The following variables are set if hipCUB is found.
