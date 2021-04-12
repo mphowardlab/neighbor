@@ -1,7 +1,6 @@
-# Copyright (c) 2018-2019, Michael P. Howard.
+# Copyright (c) 2018-2020, Michael P. Howard
+# Copyright (c) 2021, Auburn University
 # This file is released under the Modified BSD License.
-
-# Maintainer: mphoward
 
 if(NEIGHBOR_HIP)
     message(FATAL_ERROR "Benchmarks cannot be built with HIP.")

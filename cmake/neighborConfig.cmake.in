@@ -1,3 +1,7 @@
+# Copyright (c) 2018-2020, Michael P. Howard
+# Copyright (c) 2021, Auburn University
+# This file is released under the Modified BSD License.
+
 @PACKAGE_INIT@
 
 set(NEIGHBOR_INCLUDE_DIR "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_INCLUDEDIR@")
