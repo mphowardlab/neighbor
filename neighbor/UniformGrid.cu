@@ -217,10 +217,10 @@ uchar2 uniform_grid_sort_points(void *d_tmp,
                                 cudaStream_t stream)
     {
 
-    cub::DoubleBuffer<unsigned int> d_keys(d_cells, d_sorted_cells);
-    cub::DoubleBuffer<unsigned int> d_vals(d_indexes, d_sorted_indexes);
+    HOOMD_CUB::DoubleBuffer<unsigned int> d_keys(d_cells, d_sorted_cells);
+    HOOMD_CUB::DoubleBuffer<unsigned int> d_vals(d_indexes, d_sorted_indexes);
 
-    cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, 8*sizeof(unsigned int), stream);
+    HOOMD_CUB::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, 8*sizeof(unsigned int), stream);
 
     uchar2 swap = make_uchar2(0,0);
     if (d_tmp != NULL)
@@ -275,7 +275,7 @@ void uniform_grid_find_cells(unsigned int *d_first,
                              cudaStream_t stream)
     {
     // initially, fill all cells as empty
-    thrust::fill(thrust::cuda::par.on(stream), d_first, d_first+Ncells, UniformGridSentinel);
+    HOOMD_THRUST::fill(HOOMD_THRUST::cuda::par.on(stream), d_first, d_first+Ncells, UniformGridSentinel);
     cudaMemsetAsync(d_size, 0, sizeof(unsigned int)*Ncells, stream);
 
     // get the range of primitives covered by each cell
