@@ -1,5 +1,5 @@
 # Copyright (c) 2018-2020, Michael P. Howard
-# Copyright (c) 2021, Auburn University
+# Copyright (c) 2021-2026, Auburn University
 # This file is released under the Modified BSD License.
 
 # Find the UPP11 test library
@@ -12,17 +12,6 @@
 # Also creates the UPP11::UPP11 target that can be linked against.
 #
 
-# On older CMake, manually search UPP11_ROOT first
-if(CMAKE_VERSION VERSION_LESS 3.12)
-    find_path(UPP11_INCLUDE_DIR
-              NAMES upp11/upp11.h
-              PATHS ${UPP11_ROOT} $ENV{UPP11_ROOT}
-              NO_DEFAULT_PATH
-              )
-endif()
-
-# now look in the system directories if something hasn't been found
-# For CMake >= 3.12, this should check UPP11_ROOT and ENV{UPP11_ROOT} first
 find_path(UPP11_INCLUDE_DIR NAMES upp11/upp11.h)
 
 include(FindPackageHandleStandardArgs)

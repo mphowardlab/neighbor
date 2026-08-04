@@ -1,28 +1,43 @@
 # Copyright (c) 2018-2020, Michael P. Howard
-# Copyright (c) 2021, Auburn University
+# Copyright (c) 2021-2026, Auburn University
 # This file is released under the Modified BSD License.
 
-# Maintainer: mphoward
-
-cmake_minimum_required(VERSION 3.9)
-if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.12)
-    cmake_policy(SET CMP0074 NEW)
-endif()
+cmake_minimum_required(VERSION 3.21)
 
 project(neighbor VERSION 0.3.2 LANGUAGES CXX)
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
+
+# configure C++ compiler
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-sign-conversion -Wno-unknown-pragmas -Wno-deprecated-declarations -Wno-unused-result -Wconversion")
+    if (CMAKE_COMPILER_IS_GNUCXX)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
+    else()
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
+    endif()
+endif()
 
 # decide whether to use HIP layer or CUDA (default)
 option(NEIGHBOR_HIP "Use HIP layer?" OFF)
 
 # check if neighbor is being used directly or via add_subdirectory
 set(NEIGHBOR_MASTER_PROJECT OFF)
+
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     set(NEIGHBOR_MASTER_PROJECT ON)
-    set(NEIGHBOR_CUDA_ARCH "60;70" CACHE STRING "Target CUDA architecture.")
-    set(NEIGHBOR_AMD_ARCH "gfx900;gfx906;gfx908" CACHE STRING "Target AMD architecture.")
+    if (NEIGHBOR_HIP)
+        set(CMAKE_HIP_STANDARD 17)
+        set(CMAKE_HIP_ARCHITECTURES gfx942 CACHE STRING "Target AMD architectures.")
+        set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -Wno-unused-result -diag-suppress 2810")
+        enable_language(HIP)
+    else()
+        set(CMAKE_CUDA_STANDARD 17)
+        set(CMAKE_CUDA_ARCHITECTURES 80 CACHE STRING "Target CUDA architectures.")
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Wno-unused-result -diag-suppress 2810")
+        enable_language(CUDA)
+    endif()
 endif()
 option(NEIGHBOR_INSTALL "Install neighbor header files?" ${NEIGHBOR_MASTER_PROJECT})
 option(NEIGHBOR_TEST "Build neighbor test suite?" ${NEIGHBOR_MASTER_PROJECT})
@@ -59,15 +74,10 @@ else()
     target_link_libraries(neighbor INTERFACE neighbor::hipper)
 endif()
 
-# cub dependency
+# configure HIP CUB dependency
 if(NEIGHBOR_HIP)
     find_package(HIPCUB REQUIRED)
     target_link_libraries(neighbor INTERFACE HIP::CUB)
-    target_compile_definitions(neighbor INTERFACE HIPPER_HIP)
-else()
-    find_package(CUB REQUIRED)
-    target_link_libraries(neighbor INTERFACE CUDA::CUB)
-    target_compile_definitions(neighbor INTERFACE HIPPER_CUDA)
 endif()
 
 # add tests
@@ -99,7 +109,6 @@ if(NEIGHBOR_INSTALL)
 
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/neighborConfig.cmake
                   ${CMAKE_CURRENT_BINARY_DIR}/neighborConfigVersion.cmake
-                  cmake/FindCUB.cmake
                   cmake/FindHIPCUB.cmake
                   cmake/Findhipper.cmake
             DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/cmake/neighbor)
