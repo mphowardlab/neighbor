@@ -48,7 +48,11 @@ class LBVH : public Tunable<unsigned int>
     {
     public:
         //! Setup an unallocated LBVH.
-        LBVH();
+        LBVH()
+            : Tunable<unsigned int>(32, 1024, 32),
+              m_root(LBVHSentinel), m_N(0), m_N_internal(0), m_N_nodes(0)
+            {
+            }
 
         //! Setup LBVH memory for building.
         template<class InsertOpT>
@@ -219,14 +223,6 @@ class LBVH : public Tunable<unsigned int>
     };
 
 /*!
- * The constructor defers memory initialization to the first call to ::build.
- */
-LBVH::LBVH()
-    : Tunable<unsigned int>(32, 1024, 32),
-      m_root(LBVHSentinel), m_N(0), m_N_internal(0), m_N_nodes(0)
-    {}
-
-/*!
  * \param params Launch parameters for kernel execution, including tunable block size and stream.
  * \param insert The insert operation holding the primitives.
  * \param lo Lower bound of the scene.
@@ -333,7 +329,7 @@ void LBVH::build(const LaunchParameters& params, const InsertOpT& insert, const 
  * \note
  * Additional calls to allocate are ignored if \a N has not changed from the previous call.
  */
-void LBVH::allocate(const LaunchParameters& params, unsigned int N)
+inline void LBVH::allocate(const LaunchParameters& params, unsigned int N)
     {
     // do nothing if N has not changed
     if (N == m_N) return;

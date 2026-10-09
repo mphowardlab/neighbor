@@ -61,7 +61,11 @@ class LBVHTraverser : public Tunable<unsigned int>
     {
     public:
         //! Constructor.
-        LBVHTraverser();
+        LBVHTraverser()
+            : Tunable<unsigned int>(32, 1024, 32),
+              m_lbvh_lo(1), m_lbvh_hi(1), m_bins(1), m_replay(false)
+            {
+            }
 
         //! Setup LBVH for traversal in a stream with tunable parameter and a primitive transform operation.
         template<class TransformOpT>
@@ -353,12 +357,6 @@ class LBVHTraverser : public Tunable<unsigned int>
             return clbvh;
             }
     };
-
-LBVHTraverser::LBVHTraverser()
-    : Tunable<unsigned int>(32, 1024, 32),
-      m_lbvh_lo(1), m_lbvh_hi(1), m_bins(1), m_replay(false)
-    {
-    }
 
 /*!
  * \param params Launch parameters for kernel execution, including tunable block size and stream.
