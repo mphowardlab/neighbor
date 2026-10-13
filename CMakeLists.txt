@@ -4,7 +4,7 @@
 
 cmake_minimum_required(VERSION 3.21)
 
-project(neighbor VERSION 0.3.2 LANGUAGES CXX)
+project(neighbor VERSION 0.3.2 LANGUAGES CXX C)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # configure C++ compiler
