@@ -8,9 +8,7 @@
 #include <memory>
 #include <vector>
 
-#include "hoomd/HOOMDMath.h"
-
-#ifdef NVCC
+#ifdef __NVCC__
 #include "neighbor/BoundingVolumes.h"
 #endif
 
@@ -21,19 +19,19 @@ namespace neighbor
     class LBVHTraverser;
     }
 
-//! Particle insert operation using HOOMD scalars
+//! Particle insert operation
 struct ParticleInsertOp
     {
-    ParticleInsertOp(const Scalar4* particles_, unsigned int N_)
+    ParticleInsertOp(const float4* particles_, unsigned int N_)
         : particles(particles_), N(N_)
         {}
 
-    #ifdef NVCC
+    #ifdef __NVCC__
     __device__ __forceinline__
     neighbor::BoundingBox get(const unsigned int idx) const
         {
-        const Scalar4 particle = particles[idx];
-        const Scalar3 p = make_scalar3(particle.x, particle.y, particle.z);
+        const float4 particle = particles[idx];
+        const float3 p = make_float3(particle.x, particle.y, particle.z);
         return neighbor::BoundingBox(p,p);
         }
 
@@ -44,19 +42,19 @@ struct ParticleInsertOp
         return N;
         }
 
-    const Scalar4* particles;
+    const float4* particles;
     const unsigned int N;
     };
 
-//! Particle query op using spheres defined by HOOMD scalars
+//! Particle query op using spheres
 struct ParticleQueryOp
     {
-    ParticleQueryOp(const Scalar4* spheres_, unsigned int N_)
+    ParticleQueryOp(const float4* spheres_, unsigned int N_)
         : spheres(spheres_), N(N_)
         {}
 
-    #ifdef NVCC
-    typedef Scalar4 ThreadData;
+    #ifdef __NVCC__
+    typedef float4 ThreadData;
     typedef neighbor::BoundingSphere Volume;
 
     __device__ __forceinline__ ThreadData setup(const unsigned int idx) const
@@ -64,9 +62,9 @@ struct ParticleQueryOp
         return spheres[idx];
         }
 
-    __device__ __forceinline__ Volume get(const ThreadData& q, const Scalar3 image) const
+    __device__ __forceinline__ Volume get(const ThreadData& q, const float3 image) const
         {
-        const Scalar3 t = make_scalar3(q.x + image.x, q.y + image.y, q.z + image.z);
+        const float3 t = make_float3(q.x + image.x, q.y + image.y, q.z + image.z);
         return neighbor::BoundingSphere(t,q.w);
         }
 
@@ -87,7 +85,7 @@ struct ParticleQueryOp
         return N;
         }
 
-    const Scalar4* spheres;
+    const float4* spheres;
     const unsigned int N;
     };
 
@@ -98,8 +96,8 @@ class LBVHWrapper
         //! Constructor
         LBVHWrapper();
 
-        //! Build using pointers and scalars
-        void build(const Scalar4* pos, unsigned int N, const Scalar3& lo, const Scalar3& hi, unsigned int param);
+        //! Build using pointers and floats
+        void build(const float4* pos, unsigned int N, const float3& lo, const float3& hi, unsigned int param);
 
         //! Get the underlying neighbor::LBVH object
         std::shared_ptr<neighbor::LBVH> get()
@@ -124,12 +122,12 @@ class LBVHTraverserWrapper
         //! Constructor
         LBVHTraverserWrapper();
 
-        //! Traversal method using pointers and scalars
+        //! Traversal method using pointers and floats
         void traverse(unsigned int* hits,
-                      const Scalar4* spheres,
+                      const float4* spheres,
                       unsigned int N,
                       std::shared_ptr<neighbor::LBVH> lbvh,
-                      const Scalar3* images,
+                      const float3* images,
                       unsigned int Nimages,
                       unsigned int param);
 
