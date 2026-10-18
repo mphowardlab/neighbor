@@ -33,7 +33,7 @@ LBVHWrapper::LBVHWrapper()
     lbvh_ = std::make_shared<neighbor::LBVH>();
     }
 
-void LBVHWrapper::build(const float4* pos, unsigned int N, const float3& lo, const float3& hi, unsigned int param)
+void LBVHWrapper::build(const float3* pos, unsigned int N, const float3& lo, const float3& hi, unsigned int param)
     {
     float3 lof = make_float3(double2float_rd(lo.x), double2float_rd(lo.y), double2float_rd(lo.z));
     float3 hif = make_float3(double2float_ru(hi.x), double2float_ru(hi.y), double2float_ru(hi.z));

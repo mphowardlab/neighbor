@@ -8,7 +8,6 @@
 
 #include <algorithm>
 #include <chrono>
-#include <cstring>
 #include <functional>
 #include <numeric>
 #include <iostream>
@@ -42,9 +41,9 @@ double profile(const std::function <void ()>& f, unsigned int samples)
 //! Snapshot read from a GSD file
 struct Snapshot
     {
-    unsigned int N;                 //!< Number of particles
-    float3 L;                       //!< Simulation box lengths
-    std::vector<float4> positions;  //!< Particle positions
+    unsigned int N;                             //!< Number of particles
+    float3 L;                                   //!< Simulation box lengths
+    neighbor::shared_array<float3> positions;   //!< Particle positions
     };
 
 //! Find the data chunk of the given name at the given frame
@@ -97,14 +96,8 @@ static Snapshot read_snapshot(const std::string& filename, uint64_t frame)
         // number of particles and its positions
         const gsd_index_entry* pos_entry = read_chunk(handle, frame, "particles/position");
         snap.N = static_cast<unsigned int>(pos_entry->N);
-        std::vector<float> xyz(3 * snap.N);
-        gsd_read_chunk(&handle, xyz.data(), pos_entry);
-
-        snap.positions.resize(snap.N);
-        for (unsigned int i = 0; i < snap.N; ++i)
-            {
-            snap.positions[i] = make_float4(xyz[3*i], xyz[3*i+1], xyz[3*i+2], 0.f);
-            }
+        snap.positions = neighbor::shared_array<float3>(snap.N);
+        gsd_read_chunk(&handle, snap.positions.get(), pos_entry);
         }
     catch (...)
         {
@@ -226,9 +219,6 @@ int main(int argc, char * argv[])
             const Snapshot snap = read_snapshot(filename, frame);
             const unsigned int N = snap.N;
 
-            neighbor::shared_array<float4> postype(N);
-            std::memcpy(postype.get(), snap.positions.data(), N*sizeof(float4));
-
             const float3 lo = make_float3(-0.5f*snap.L.x, -0.5f*snap.L.y, -0.5f*snap.L.z);
             const float3 hi = make_float3(0.5f*snap.L.x, 0.5f*snap.L.y, 0.5f*snap.L.z);
 
@@ -237,7 +227,7 @@ int main(int argc, char * argv[])
 
             // tune the lbvh block size
             const unsigned int lbvh_param = tune(lbvh.getTunableParameters(),
-                                                 [&](unsigned int param){lbvh.build(postype.get(), N, lo, hi, param);},
+                                                 [&](unsigned int param){lbvh.build(snap.positions.get(), N, lo, hi, param);},
                                                  5);
             std::cout << "LBVH tuner: " << lbvh_param << std::endl;
 
@@ -246,7 +236,7 @@ int main(int argc, char * argv[])
             
             for (size_t i=0; i < times.size(); ++i)
                 {
-                times[i] = profile([&]{lbvh.build(postype.get(), N, lo, hi, lbvh_param);}, 500);
+                times[i] = profile([&]{lbvh.build(snap.positions.get(), N, lo, hi, lbvh_param);}, 500);
                 }
             
             std::sort(times.begin(), times.end());
@@ -263,7 +253,7 @@ int main(int argc, char * argv[])
             for (unsigned int i=0; i < N; ++i)
                 {
                 unsigned int tag = primitives[i];
-                const float4 pos = postype[tag];
+                const float3 pos = snap.positions[tag];
                 spheres[i] = make_float4(pos.x, pos.y, pos.z, float(rcut));
                 }
 

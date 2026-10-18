@@ -22,7 +22,7 @@ namespace neighbor
 //! Particle insert operation
 struct ParticleInsertOp
     {
-    ParticleInsertOp(const float4* particles_, unsigned int N_)
+    ParticleInsertOp(const float3* particles_, unsigned int N_)
         : particles(particles_), N(N_)
         {}
 
@@ -30,8 +30,7 @@ struct ParticleInsertOp
     __device__ __forceinline__
     neighbor::BoundingBox get(const unsigned int idx) const
         {
-        const float4 particle = particles[idx];
-        const float3 p = make_float3(particle.x, particle.y, particle.z);
+        const float3 p = particles[idx];
         return neighbor::BoundingBox(p,p);
         }
 
@@ -42,7 +41,7 @@ struct ParticleInsertOp
         return N;
         }
 
-    const float4* particles;
+    const float3* particles;
     const unsigned int N;
     };
 
@@ -97,7 +96,7 @@ class LBVHWrapper
         LBVHWrapper();
 
         //! Build using pointers and floats
-        void build(const float4* pos, unsigned int N, const float3& lo, const float3& hi, unsigned int param);
+        void build(const float3* pos, unsigned int N, const float3& lo, const float3& hi, unsigned int param);
 
         //! Get the underlying neighbor::LBVH object
         std::shared_ptr<neighbor::LBVH> get()
