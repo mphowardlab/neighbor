@@ -89,12 +89,20 @@ static Snapshot read_snapshot(const std::string& filename, uint64_t frame)
         {
         // simulation box
         const gsd_index_entry* box_entry = read_chunk(handle, frame, "configuration/box");
+        if (box_entry->type != GSD_TYPE_FLOAT)
+            {
+            throw std::runtime_error("configuration/box must be single precision");
+            }
         float box[6];
         gsd_read_chunk(&handle, box, box_entry);
         snap.L = make_float3(box[0], box[1], box[2]);
         
         // number of particles and its positions
         const gsd_index_entry* pos_entry = read_chunk(handle, frame, "particles/position");
+        if (pos_entry->type != GSD_TYPE_FLOAT)
+            {
+            throw std::runtime_error("particles/position must be single precision");
+            }
         snap.N = static_cast<unsigned int>(pos_entry->N);
         snap.positions = neighbor::shared_array<float3>(snap.N);
         gsd_read_chunk(&handle, snap.positions.get(), pos_entry);
@@ -298,6 +306,11 @@ int main(int argc, char * argv[])
             std::cout << "min: " << min << ", max: " << max << ", mean: " << mean << std::endl;
             std::cout << std::endl;
             }
+        }
+    catch(const std::exception& e)
+        {
+        std::cerr << "**error** " << e.what() << std::endl;
+        return 1;
         }
     catch(...)
         {
