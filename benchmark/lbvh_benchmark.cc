@@ -4,33 +4,15 @@
 
 #include "lbvh_benchmark.cuh"
 
-#include "hoomd/Autotuner.h"
-#include "hoomd/ClockSource.h"
-#include "hoomd/ExecutionConfiguration.h"
-#include "hoomd/GSDReader.h"
-#include "hoomd/SystemDefinition.h"
+#include <gsd/gsd.h>
 
 #include <algorithm>
+#include <chrono>
 #include <functional>
 #include <numeric>
 #include <iostream>
 #include <fstream>
 #include <iomanip>
-
-//! Convenience wrapper to return an exit code in MPI-compiled HOOMD.
-/*!
- * \param val Exit code
- *
- * In MPI builds, this function first calls MPI_Finalize before
- * returning the exit code.
- */
-int safe_exit(int val)
-    {
-    #ifdef ENABLE_MPI
-    MPI_Finalize();
-    #endif // ENABLE_MPI
-    return val;
-    }
 
 //! Profile a function call
 /*!
@@ -40,37 +22,165 @@ int safe_exit(int val)
  *
  * The GPU is synchronized before profiling. \a f is then called \a samples times,
  * and then the GPU is synchronized again. The total elapsed time in milliseconds is
- * computed. It is recommended to warmup and then freeze any autotuner parameters
- * before profiling.
+ * computed. It is recommended to tune the launch parameters before profiling.
  */
 double profile(const std::function <void ()>& f, unsigned int samples)
     {
-    ClockSource t;
-
     cudaDeviceSynchronize();
-    uint64_t start = t.getTime();
+    const auto start = std::chrono::steady_clock::now();
     for (unsigned int i=0; i < samples; ++i)
         {
         f();
         }
     cudaDeviceSynchronize();
-    uint64_t elapsed = t.getTime() - start;
+    const auto end = std::chrono::steady_clock::now();
 
-    return double(elapsed)/1e6/double(samples);
+    return std::chrono::duration<double, std::milli>(end - start).count() / double(samples);
+    }
+
+//! Snapshot read from a GSD file
+struct Snapshot
+    {
+    unsigned int N;                             //!< Number of particles
+    float3 L;                                   //!< Simulation box lengths
+    neighbor::shared_array<float3> positions;   //!< Particle positions
+    };
+
+//! Find the data chunk of the given name at the given frame
+/*!
+ * \param handle Open GSD handle.
+ * \param frame Frame index to read from.
+ * \param name Name of the data chunk.
+ * \returns The index entry for the data chunk.
+ *
+ * Attempts to find the data chunk of the given name at the given frame. If it is not present at
+ * this frame, attempt to read from frame 0.
+ */
+static const gsd_index_entry* read_chunk(gsd_handle& handle, uint64_t frame, const char* name)
+    {
+    const gsd_index_entry* entry = gsd_find_chunk(&handle, frame, name);
+    if (entry == NULL && frame != 0)
+        {
+        entry = gsd_find_chunk(&handle, 0, name);
+        }
+    if (entry == NULL)
+        {
+        throw std::runtime_error(std::string("GSD chunk not found ") + name);
+        }
+    return entry;
+    }
+
+//! Read a frame from a GSD file
+/*!
+ * \param filename GSD file.
+ * \param frame Frame index.
+ * \returns The snapshot.
+ */
+static Snapshot read_snapshot(const std::string& filename, uint64_t frame)
+    {
+    gsd_handle handle;
+    if (gsd_open(&handle, filename.c_str(), GSD_OPEN_READONLY) != GSD_SUCCESS)
+        {
+        throw std::runtime_error("Unable to open GSD file " + filename);
+        }
+
+    Snapshot snap;
+    try
+        {
+        // simulation box
+        const gsd_index_entry* box_entry = read_chunk(handle, frame, "configuration/box");
+        if (box_entry->type != GSD_TYPE_FLOAT)
+            {
+            throw std::runtime_error("configuration/box must be single precision");
+            }
+        float box[6];
+        gsd_read_chunk(&handle, box, box_entry);
+        snap.L = make_float3(box[0], box[1], box[2]);
+        
+        // number of particles and its positions
+        const gsd_index_entry* pos_entry = read_chunk(handle, frame, "particles/position");
+        if (pos_entry->type != GSD_TYPE_FLOAT)
+            {
+            throw std::runtime_error("particles/position must be single precision");
+            }
+        snap.N = static_cast<unsigned int>(pos_entry->N);
+        snap.positions = neighbor::shared_array<float3>(snap.N);
+        gsd_read_chunk(&handle, snap.positions.get(), pos_entry);
+        }
+    catch (...)
+        {
+        gsd_close(&handle);
+        throw;
+        }  
+    gsd_close(&handle);
+
+    return snap;
+    }
+
+//! Select the fastest tunable parameter
+/*!
+ * \param params Valid values for the tunable parameter (e.g., block sizes).
+ * \param f Function that launches the kernel with a given parameter.
+ * \param samples Number of time samples to take at each parameter.
+ * \returns The parameter with the smallest median time.
+ *
+ * Every parameter is timed \a samples times with CUDA events, and the one with
+ * the smallest median is chosen.
+ */
+unsigned int tune(const std::vector<unsigned int>& params,
+                  const std::function<void (unsigned int)>& f,
+                  unsigned int samples)
+    {
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    unsigned int best_param = params.at(0);
+    float best_time = std::numeric_limits<float>::max();
+    std::vector<float> times(samples);
+    for (unsigned int p : params)
+        {
+        // warmup
+        f(p);
+
+        // time each call
+        for (unsigned int i=0; i < samples; ++i)
+            {
+            cudaEventRecord(start, 0);
+            f(p);
+            cudaEventRecord(stop, 0);
+            cudaEventSynchronize(stop);
+            cudaEventElapsedTime(&times[i], start, stop);
+            }
+
+        // median
+        std::nth_element(times.begin(), times.begin() + samples/2, times.end());
+        const float median = times[samples/2];
+        if (median < best_time)
+            {
+            best_time = median;
+            best_param = p;
+            }
+        }
+
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+
+    return best_param;
     }
 
 //! Performs a simple benchmark of the LBVH.
 /*!
  * LBVH build and traversal time are profiled for a set of simulation snapshots stored
  * in a GSD file. For each frame, a new LBVH and LBVH traverser are constructed. Their
- * autotuners are warmed up for 200 calls before freezing the parameters and profiling
- * for 500 calls. The results are stored for each snapshot in an output tabulated file.
- * The benchmark is to determine the number of particles within a distance \a rcut of
- * each particle (i.e., computing the number of neighbors).
+ * kernel block sizes are tuned by scanning all valid values before profiling for 500
+ * calls. The results are stored for each snapshot in an output tabulated file. The 
+ * benchmark is to determine the number of particles within a distance \a rcut of each 
+ * particle (i.e., computing the number of neighbors).
  *
  * The command line parameters are:
  *
- *      ./benchmark_lbvh <input> <Nframes> <rcut> <output>
+ *      ./lbvh_benchmark <input> <Nframes> <rcut> <output>
  *
  * - <input>: GSD file to benchmark
  * - <Nframes>: Number of frames to benchmark in GSD file, starting from 0.
@@ -79,10 +189,6 @@ double profile(const std::function <void ()>& f, unsigned int samples)
  */
 int main(int argc, char * argv[])
     {
-    #ifdef ENABLE_MPI
-    MPI_Init(&argc, &argv);
-    #endif
-
     // parse the filename
     std::string filename, outf;
     uint64_t num_frames(0);
@@ -90,7 +196,7 @@ int main(int argc, char * argv[])
     if (argc != 5)
         {
         std::cout << "Usage: lbvh_benchmark <input> <Nframes> <rcut> <output>" << std::endl;
-        return safe_exit(1);
+        return 1;
         }
     else
         {
@@ -104,14 +210,7 @@ int main(int argc, char * argv[])
     try
         {
         std::cout << "Benchmark for " << filename << " using LBVH with rcut = " << rcut << std::endl;
-        std::shared_ptr<ExecutionConfiguration> exec_conf(new ExecutionConfiguration(ExecutionConfiguration::GPU));
-        #ifdef ENABLE_MPI
-        if (exec_conf->getNRanks() > 1)
-            {
-            exec_conf->msg->error() << "Benchmarks cannot be run in MPI" << std::endl;
-            throw std::runtime_error("Benchmarks cannot be run in MPI");
-            }
-        #endif
+        cudaSetDevice(0);
 
         // write benchmark results to file
         std::ofstream output;
@@ -125,122 +224,99 @@ int main(int argc, char * argv[])
             std::cout << "Frame " << frame << std::endl;
             std::cout << "------------" << std::endl;
             // read snapshot
-            auto reader = std::make_shared<GSDReader>(exec_conf, filename, frame, false);
+            const Snapshot snap = read_snapshot(filename, frame);
+            const unsigned int N = snap.N;
 
-            // setup system and neighborlist
-            auto sysdef = std::make_shared<SystemDefinition>(reader->getSnapshot(), exec_conf);
-            auto pdata = sysdef->getParticleData();
+            const float3 lo = make_float3(-0.5f*snap.L.x, -0.5f*snap.L.y, -0.5f*snap.L.z);
+            const float3 hi = make_float3(0.5f*snap.L.x, 0.5f*snap.L.y, 0.5f*snap.L.z);
 
             // build the lbvh
             LBVHWrapper lbvh;
-            Autotuner lbvh_tuner(lbvh.getTunableParameters(), 5, 100000, "lbvh_tuner", exec_conf);
-            const BoxDim& box = pdata->getBox();
 
-            // warmup the lbvh autotuners
-            ArrayHandle<Scalar4> d_postype(pdata->getPositions(), access_location::device, access_mode::read);
-
-            for (unsigned int i=0; i < 200; ++i)
-                {
-                // warmup the lbvh autotuner
-                for (unsigned int i=0; i < 200; ++i)
-                    {
-                    lbvh_tuner.begin();
-                    lbvh.build(d_postype.data, pdata->getN(), box.getLo(), box.getHi(), lbvh_tuner.getParam());
-                    lbvh_tuner.end();
-                    }
-                }
-            lbvh_tuner.setEnabled(false);
-            std::cout << "LBVH tuner: " << lbvh_tuner.getParam() << std::endl;
+            // tune the lbvh block size
+            const unsigned int lbvh_param = tune(lbvh.getTunableParameters(),
+                                                 [&](unsigned int param){lbvh.build(snap.positions.get(), N, lo, hi, param);},
+                                                 5);
+            std::cout << "LBVH tuner: " << lbvh_param << std::endl;
 
             // profile lbvh build times
             std::vector<double> times(5);
+            
+            for (size_t i=0; i < times.size(); ++i)
                 {
-                ArrayHandle<Scalar4> d_postype(pdata->getPositions(), access_location::device, access_mode::read);
-
-                for (size_t i=0; i < times.size(); ++i)
-                    {
-                    times[i] = profile([&]{lbvh.build(d_postype.data, pdata->getN(), box.getLo(), box.getHi(), lbvh_tuner.getParam());}, 500);
-                    }
+                times[i] = profile([&]{lbvh.build(snap.positions.get(), N, lo, hi, lbvh_param);}, 500);
                 }
+            
             std::sort(times.begin(), times.end());
             std::cout << "Median LBVH build time: " << times[times.size()/2]<< " ms / build" << std::endl;
             output << std::setw(8) << frame << " " << std::setw(16) << std::fixed << std::setprecision(5) << times[times.size()/2];
             cudaDeviceSynchronize();
 
             // make traversal volumes
-            GlobalArray<Scalar4> spheres(pdata->getN(), exec_conf);
-            GlobalArray<Scalar3> images(27, exec_conf);
-            GlobalArray<unsigned int> hits(pdata->getN(), exec_conf);
+            neighbor::shared_array<float4> spheres(N);
+            neighbor::shared_array<float3> images(27);
+            neighbor::shared_array<unsigned int> hits(N);
+                
+            auto primitives = lbvh.getPrimitives();
+            for (unsigned int i=0; i < N; ++i)
                 {
-                ArrayHandle<Scalar4> h_spheres(spheres, access_location::host, access_mode::overwrite);
-                ArrayHandle<Scalar4> h_pos(pdata->getPositions(), access_location::host, access_mode::read);
-                auto primitives = lbvh.getPrimitives();
-                for (unsigned int i=0; i < pdata->getN(); ++i)
-                    {
-                    unsigned int tag = primitives[i];
-                    const Scalar4 postype = h_pos.data[tag];
-                    const Scalar3 pos = make_scalar3(postype.x, postype.y, postype.z);
-                    h_spheres.data[i] = make_scalar4(pos.x, pos.y, pos.z, rcut);
-                    }
+                unsigned int tag = primitives[i];
+                const float3 pos = snap.positions[tag];
+                spheres[i] = make_float4(pos.x, pos.y, pos.z, float(rcut));
+                }
 
-                // 26 periodic image vectors
-                ArrayHandle<Scalar3> h_images(images, access_location::host, access_mode::overwrite);
-                const Scalar3 L = pdata->getBox().getL();
-                h_images.data[0] = make_scalar3(0,0,0);
-                unsigned int idx = 1;
-                for (int ix=-1; ix <= 1; ++ix)
+            // 26 periodic image vectors
+            const float3 L = snap.L;
+            images[0] = make_float3(0,0,0);
+            unsigned int idx = 1;
+            for (int ix=-1; ix <= 1; ++ix)
+                {
+                for (int iy=-1; iy <= 1; ++iy)
                     {
-                    for (int iy=-1; iy <= 1; ++iy)
+                    for (int iz=-1; iz <= 1; ++iz)
                         {
-                        for (int iz=-1; iz <= 1; ++iz)
-                            {
-                            if (ix == 0 && iy == 0 && iz == 0) continue;
-                            h_images.data[idx++] = make_scalar3(L.x*ix, L.y*iy, L.z*iz);
-                            }
+                        if (ix == 0 && iy == 0 && iz == 0) continue;
+                        images[idx++] = make_float3(L.x*ix, L.y*iy, L.z*iz);
                         }
                     }
                 }
 
             // traversal
             LBVHTraverserWrapper traverser;
-            Autotuner traverser_tuner(traverser.getTunableParameters(), 5, 100000, "traverser_tuner", exec_conf);
+
+            // tune the traverser block size
+            const unsigned int traverser_param = tune(traverser.getTunableParameters(),
+                    [&](unsigned int param){ traverser.traverse(hits.get(), spheres.get(), N, lbvh.get(), images.get(), 27, param);},
+                    5);
+            std::cout << "Traverser tuner: " << traverser_param << std::endl;
+
+            for (size_t i=0; i < times.size(); ++ i)
                 {
-                ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
-                ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
-
-                ArrayHandle<Scalar3> d_images(images, access_location::device, access_mode::read);
-                // warmup the autotuner
-                for (unsigned int i=0; i < 200; ++i)
-                    {
-                    traverser_tuner.begin();
-                    traverser.traverse(d_hits.data, d_spheres.data, pdata->getN(), lbvh.get(), d_images.data, 27, traverser_tuner.getParam());
-                    traverser_tuner.end();
-                    }
-                traverser_tuner.setEnabled(false);
-                std::cout << "Traverser tuner: " << lbvh_tuner.getParam() << std::endl;
-
-                for (size_t i=0; i < times.size(); ++ i)
-                    {
-                    times[i] = profile([&]{traverser.traverse(d_hits.data, d_spheres.data, pdata->getN(), lbvh.get(), d_images.data, 27, traverser_tuner.getParam());},500);
-                    }
+                times[i] = profile([&]{traverser.traverse(hits.get(), spheres.get(), N, lbvh.get(), images.get(), 27, traverser_param);},500);
                 }
+
             std::sort(times.begin(), times.end());
             std::cout << "Median LBVH rope time: " << times[times.size()/2]<< " ms / traversal" << std::endl;
             output << " " << std::setw(16) << std::fixed << std::setprecision(5) << times[times.size()/2] << std::endl;
 
-            ArrayHandle<unsigned int> h_hits(hits, access_location::host, access_mode::read);
-            unsigned int min = *std::min_element(h_hits.data, h_hits.data + pdata->getN());
-            unsigned int max = *std::max_element(h_hits.data, h_hits.data + pdata->getN());
-            double mean = std::accumulate(h_hits.data, h_hits.data + pdata->getN(), 0.0) / pdata->getN();
+            cudaDeviceSynchronize();
+            unsigned int min = *std::min_element(hits.get(), hits.get() + N);
+            unsigned int max = *std::max_element(hits.get(), hits.get() + N);
+            double mean = std::accumulate(hits.get(), hits.get() + N, 0.0) / N;
             std::cout << "min: " << min << ", max: " << max << ", mean: " << mean << std::endl;
             std::cout << std::endl;
             }
         }
+    catch(const std::exception& e)
+        {
+        std::cerr << "**error** " << e.what() << std::endl;
+        return 1;
+        }
     catch(...)
         {
         std::cerr << "**error** Program terminated due to exception." << std::endl;
-        return safe_exit(1);
+        return 1;
         }
 
-    return safe_exit(0);
+    return 0;
     }
