@@ -5,20 +5,7 @@
 #ifndef NEIGHBOR_APPROXIMATE_MATH_H_
 #define NEIGHBOR_APPROXIMATE_MATH_H_
 
-#include <hipper/hipper_runtime.h>
-
-/*
- * Intrinsics only work in CUDA, so defining NEIGHBOR_NO_INTRINSIC_ROUND
- * indicates to use approximate math functions that are supported in HIP.
- *
- * Note that even in CUDA defining NEIGHBOR_NO_INTRINSIC_ROUND will force
- * the use of the approximate functions, which may be useful for testing
- * purposes. However, the intrinsics should be more performant, so this
- * is opt-in only, and the default is to use intrinsics in CUDA.
- */
-#ifndef HIPPER_PLATFORM_NVCC
-#define NEIGHBOR_NO_INTRINSIC_ROUND
-#endif
+#include <cuda_runtime.h>
 
 // cfloat needed for FLT_MAX
 #ifdef NEIGHBOR_NO_INTRINSIC_ROUND
@@ -28,7 +15,7 @@
 #define DEVICE __device__ __forceinline__
 
 namespace neighbor
-{
+    {
 
 //! Approximate math operations.
 /*!
@@ -43,7 +30,7 @@ namespace neighbor
  * these functions.
  */
 namespace approx
-{
+    {
 //! Convert a double to a float, rounding down.
 /*!
  * \param x The double to convert.
@@ -54,12 +41,12 @@ namespace approx
  */
 DEVICE float double2float_rd(double x)
     {
-    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __double2float_rd(x);
-    #else
+#else
     float y = static_cast<float>(x);
     return (static_cast<double>(y) <= x) ? y : nextafterf(y, -FLT_MAX);
-    #endif
+#endif
     }
 
 //! Convert a double to a float, rounding up.
@@ -72,12 +59,12 @@ DEVICE float double2float_rd(double x)
  */
 DEVICE float double2float_ru(double x)
     {
-    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __double2float_ru(x);
-    #else
+#else
     float y = static_cast<float>(x);
     return (static_cast<double>(y) >= x) ? y : nextafterf(y, FLT_MAX);
-    #endif
+#endif
     }
 
 //! Add two floats, rounding the result down.
@@ -95,11 +82,11 @@ DEVICE float double2float_ru(double x)
  */
 DEVICE float fadd_rd(float x, float y)
     {
-    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
-    return __fadd_rd(x,y);
-    #else
-    return nextafterf(x+y, -FLT_MAX);
-    #endif
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+    return __fadd_rd(x, y);
+#else
+    return nextafterf(x + y, -FLT_MAX);
+#endif
     }
 
 //! Add two floats, rounding the result up.
@@ -117,11 +104,11 @@ DEVICE float fadd_rd(float x, float y)
  */
 DEVICE float fadd_ru(float x, float y)
     {
-    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
-    return __fadd_ru(x,y);
-    #else
-    return nextafterf(x+y, FLT_MAX);
-    #endif
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+    return __fadd_ru(x, y);
+#else
+    return nextafterf(x + y, FLT_MAX);
+#endif
     }
 
 //! Subtract two floats, rounding the result down.
@@ -139,11 +126,11 @@ DEVICE float fadd_ru(float x, float y)
  */
 DEVICE float fsub_rd(float x, float y)
     {
-    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
-    return __fsub_rd(x,y);
-    #else
-    return nextafterf(x-y, -FLT_MAX);
-    #endif
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+    return __fsub_rd(x, y);
+#else
+    return nextafterf(x - y, -FLT_MAX);
+#endif
     }
 
 //! Subtract two floats, rounding the result up.
@@ -161,11 +148,11 @@ DEVICE float fsub_rd(float x, float y)
  */
 DEVICE float fsub_ru(float x, float y)
     {
-    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
-    return __fsub_ru(x,y);
-    #else
-    return nextafterf(x-y, FLT_MAX);
-    #endif
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+    return __fsub_ru(x, y);
+#else
+    return nextafterf(x - y, FLT_MAX);
+#endif
     }
 
 //! Multiply two floats, rounding the result down.
@@ -183,11 +170,11 @@ DEVICE float fsub_ru(float x, float y)
  */
 DEVICE float fmul_rd(float x, float y)
     {
-    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
-    return __fmul_rd(x,y);
-    #else
-    return nextafterf(x*y, -FLT_MAX);
-    #endif
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+    return __fmul_rd(x, y);
+#else
+    return nextafterf(x * y, -FLT_MAX);
+#endif
     }
 
 //! Multiply two floats, rounding the result up.
@@ -205,11 +192,11 @@ DEVICE float fmul_rd(float x, float y)
  */
 DEVICE float fmul_ru(float x, float y)
     {
-    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
-    return __fmul_ru(x,y);
-    #else
-    return nextafterf(x*y, FLT_MAX);
-    #endif
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+    return __fmul_ru(x, y);
+#else
+    return nextafterf(x * y, FLT_MAX);
+#endif
     }
 
 //! Divide two floats, rounding the result down.
@@ -227,11 +214,11 @@ DEVICE float fmul_ru(float x, float y)
  */
 DEVICE float fdiv_rd(float x, float y)
     {
-    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
-    return __fdiv_rd(x,y);
-    #else
-    return nextafterf(x/y, -FLT_MAX);
-    #endif
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+    return __fdiv_rd(x, y);
+#else
+    return nextafterf(x / y, -FLT_MAX);
+#endif
     }
 
 //! Divide two floats, rounding the result up.
@@ -249,11 +236,11 @@ DEVICE float fdiv_rd(float x, float y)
  */
 DEVICE float fdiv_ru(float x, float y)
     {
-    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
-    return __fdiv_ru(x,y);
-    #else
-    return nextafterf(x/y, FLT_MAX);
-    #endif
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+    return __fdiv_ru(x, y);
+#else
+    return nextafterf(x / y, FLT_MAX);
+#endif
     }
 
 //! Take the reciprocal of a float, rounding the result down.
@@ -270,11 +257,11 @@ DEVICE float fdiv_ru(float x, float y)
  */
 DEVICE float frcp_rd(float x)
     {
-    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __frcp_rd(x);
-    #else
-    return nextafterf(1.0f/x, -FLT_MAX);
-    #endif
+#else
+    return nextafterf(1.0f / x, -FLT_MAX);
+#endif
     }
 
 //! Take the reciprocal of a float, rounding the result up.
@@ -291,11 +278,11 @@ DEVICE float frcp_rd(float x)
  */
 DEVICE float frcp_ru(float x)
     {
-    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
     return __frcp_ru(x);
-    #else
-    return nextafterf(1.0f/x, FLT_MAX);
-    #endif
+#else
+    return nextafterf(1.0f / x, FLT_MAX);
+#endif
     }
 
 //! Fused multiply-add, rounding the result down.
@@ -314,11 +301,11 @@ DEVICE float frcp_ru(float x)
  */
 DEVICE float fmaf_rd(float x, float y, float z)
     {
-    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
-    return __fmaf_rd(x,y,z);
-    #else
-    return nextafterf(fmaf(x,y,z), -FLT_MAX);
-    #endif
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+    return __fmaf_rd(x, y, z);
+#else
+    return nextafterf(fmaf(x, y, z), -FLT_MAX);
+#endif
     }
 
 //! Fused multiply-add, rounding the result up.
@@ -337,14 +324,14 @@ DEVICE float fmaf_rd(float x, float y, float z)
  */
 DEVICE float fmaf_ru(float x, float y, float z)
     {
-    #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
-    return __fmaf_ru(x,y,z);
-    #else
-    return nextafterf(fmaf(x,y,z), FLT_MAX);
-    #endif
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+    return __fmaf_ru(x, y, z);
+#else
+    return nextafterf(fmaf(x, y, z), FLT_MAX);
+#endif
     }
-} // end namespace approx
-} // end namespace neighbor
+    } // end namespace approx
+    } // end namespace neighbor
 
 #undef DEVICE
 

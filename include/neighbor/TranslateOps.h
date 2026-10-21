@@ -7,10 +7,10 @@
 #ifndef NEIGHBOR_TRANSLATE_OPS_H_
 #define NEIGHBOR_TRANSLATE_OPS_H_
 
-#include <hipper/hipper_runtime.h>
+#include <cuda_runtime.h>
 
 namespace neighbor
-{
+    {
 
 //! Self-image operator
 /*!
@@ -20,7 +20,7 @@ struct SelfOp
     {
     typedef float3 type;
 
-    SelfOp() {}
+    SelfOp() { }
 
     //! Get the image vector
     /*!
@@ -32,7 +32,7 @@ struct SelfOp
      */
     __device__ __forceinline__ float3 get(const unsigned int idx) const
         {
-        return make_float3(0.f,0.f,0.f);
+        return make_float3(0.f, 0.f, 0.f);
         }
 
     //! Get the number of images
@@ -56,16 +56,14 @@ struct ImageListOp
     {
     typedef Real3 type;
 
-    ImageListOp() : images(NULL), N(0) {}
+    ImageListOp() : images(NULL), N(0) { }
 
     //! Constructor
     /*!
      * \param images_ Array of images.
      * \param N_ Number of images
      */
-    ImageListOp(const Real3* images_, unsigned int N_)
-        : images(images_), N(N_)
-        {}
+    ImageListOp(const Real3* images_, unsigned int N_) : images(images_), N(N_) { }
 
     //! Get the image vector
     /*!
@@ -90,6 +88,6 @@ struct ImageListOp
     const unsigned int N;
     };
 
-} // end namespace neighbor
+    } // end namespace neighbor
 
 #endif // NEIGHBOR_TRANSLATE_OPS_H_

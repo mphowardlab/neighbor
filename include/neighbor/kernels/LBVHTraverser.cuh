@@ -7,19 +7,19 @@
 #ifndef NEIGHBOR_LBVH_TRAVERSER_CUH_
 #define NEIGHBOR_LBVH_TRAVERSER_CUH_
 
-#include <hipper/hipper_runtime.h>
-
 #include "../ApproximateMath.h"
+#include "../BoundingVolumes.h"
 #include "../LBVHData.h"
 #include "../LBVHTraverserData.h"
-#include "../BoundingVolumes.h"
+
+#include <cuda_runtime.h>
 
 namespace neighbor
-{
+    {
 namespace gpu
-{
+    {
 namespace kernel
-{
+    {
 //! Kernel to compress LBVH for rope traversal
 /*!
  * \param ctree Compressed LBVH.
@@ -50,7 +50,7 @@ __global__ void lbvh_compress_ropes(const LBVHCompressedData ctree,
                                     const unsigned int N_nodes)
     {
     // one thread per node
-    const int idx = hipper::threadRank<1,1>();
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= (int)N_nodes)
         return;
 
@@ -64,14 +64,17 @@ __global__ void lbvh_compress_ropes(const LBVHCompressedData ctree,
         float3 L = make_float3(approx::fsub_ru(tree_hi.x, tree_lo.x),
                                approx::fsub_ru(tree_hi.y, tree_lo.y),
                                approx::fsub_ru(tree_hi.z, tree_lo.z));
-        if (L.x <= 0.f) L.x = 1.0f;
-        if (L.y <= 0.f) L.y = 1.0f;
-        if (L.z <= 0.f) L.z = 1.0f;
+        if (L.x <= 0.f)
+            L.x = 1.0f;
+        if (L.y <= 0.f)
+            L.y = 1.0f;
+        if (L.z <= 0.f)
+            L.z = 1.0f;
 
         // round down the bin scale factor so that it always *underestimates* the offset
-        tree_bininv = make_float3(approx::fdiv_rd(1023.f,L.x),
-                                  approx::fdiv_rd(1023.f,L.y),
-                                  approx::fdiv_rd(1023.f,L.z));
+        tree_bininv = make_float3(approx::fdiv_rd(1023.f, L.x),
+                                  approx::fdiv_rd(1023.f, L.y),
+                                  approx::fdiv_rd(1023.f, L.z));
         }
     __syncthreads();
 
@@ -97,30 +100,36 @@ __global__ void lbvh_compress_ropes(const LBVHCompressedData ctree,
     // compress node data into one byte per box dim
     // low bounds are encoded relative to the low of the box, always rounding down
     const float3 lo = tree.lo[idx];
-    const uint3 lo_bin = make_uint3((unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(lo.x,tree_lo.x),tree_bininv.x)),
-                                    (unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(lo.y,tree_lo.y),tree_bininv.y)),
-                                    (unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(lo.z,tree_lo.z),tree_bininv.z)));
-    const unsigned int lo_bin3 = (lo_bin.x << 20) +  (lo_bin.y << 10) + lo_bin.z;
+    const uint3 lo_bin = make_uint3(
+        (unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(lo.x, tree_lo.x), tree_bininv.x)),
+        (unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(lo.y, tree_lo.y), tree_bininv.y)),
+        (unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(lo.z, tree_lo.z), tree_bininv.z)));
+    const unsigned int lo_bin3 = (lo_bin.x << 20) + (lo_bin.y << 10) + lo_bin.z;
 
     // high bounds are encoded relative to the high of the box, always rounding down
     const float3 hi = tree.hi[idx];
-    const uint3 hi_bin = make_uint3((unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(tree_hi.x,hi.x),tree_bininv.x)),
-                                    (unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(tree_hi.y,hi.y),tree_bininv.y)),
-                                    (unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(tree_hi.z,hi.z),tree_bininv.z)));
+    const uint3 hi_bin = make_uint3(
+        (unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(tree_hi.x, hi.x), tree_bininv.x)),
+        (unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(tree_hi.y, hi.y), tree_bininv.y)),
+        (unsigned int)floorf(approx::fmul_rd(approx::fsub_rd(tree_hi.z, hi.z), tree_bininv.z)));
     const unsigned int hi_bin3 = (hi_bin.x << 20) + (hi_bin.y << 10) + hi_bin.z;
 
     // node holds left child for internal nodes (>= 0) or primitive for leaf (< 0)
-    int left_flag = (idx < N_internal) ? tree.left[idx] : ~transform(tree.primitive[idx-N_internal]);
+    int left_flag
+        = (idx < N_internal) ? tree.left[idx] : ~transform(tree.primitive[idx - N_internal]);
 
     // stash all the data into one int4
     ctree.data[idx] = make_int4(lo_bin3, hi_bin3, left_flag, rope);
 
-    // first thread writes out the compression values, rounding down bin size to ensure box bounds always expand even with floats
+    // first thread writes out the compression values, rounding down bin size to ensure box bounds
+    // always expand even with floats
     if (idx == 0)
         {
         *ctree.lo = tree_lo;
         *ctree.hi = tree_hi;
-        *ctree.bins = make_float3(approx::frcp_rd(tree_bininv.x),approx::frcp_rd(tree_bininv.y),approx::frcp_rd(tree_bininv.z));
+        *ctree.bins = make_float3(approx::frcp_rd(tree_bininv.x),
+                                  approx::frcp_rd(tree_bininv.y),
+                                  approx::frcp_rd(tree_bininv.z));
         }
     }
 
@@ -159,7 +168,7 @@ __global__ void lbvh_traverse_ropes(const OutputOpT out,
                                     const TranslateOpT images)
     {
     // one thread per test
-    const unsigned int idx = hipper::threadRank<1,1>();
+    const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= query.size())
         return;
 
@@ -180,11 +189,12 @@ __global__ void lbvh_traverse_ropes(const OutputOpT out,
     // find image flags against root before divergence
     unsigned int flags = 0;
     const int nbits = (images.size() <= 32u) ? images.size() : 32;
-    for (unsigned int i=0; i < nbits; ++i)
+    for (unsigned int i = 0; i < nbits; ++i)
         {
         const typename TranslateOpT::type image = images.get(i);
-        const typename QueryOpT::Volume q = query.get(qdata,image);
-        if (query.overlap(q,tree_box)) flags |= 1u << i;
+        const typename QueryOpT::Volume q = query.get(qdata, image);
+        if (query.overlap(q, tree_box))
+            flags |= 1u << i;
         }
 
     // stackless search
@@ -216,27 +226,29 @@ __global__ void lbvh_traverse_ropes(const OutputOpT out,
             // load node and decompress bounds so that they always *expand*
             const int4 aabb = __ldg(lbvh.data + node);
             const unsigned int lo = aabb.x;
-            const float3 lof = make_float3(approx::fadd_rd(tree_box.lo.x, approx::fmul_rd((lo >> 20) & 0x3ffu,tree_bins.x)),
-                                           approx::fadd_rd(tree_box.lo.y, approx::fmul_rd((lo >> 10) & 0x3ffu,tree_bins.y)),
-                                           approx::fadd_rd(tree_box.lo.z, approx::fmul_rd((lo      ) & 0x3ffu,tree_bins.z)));
+            const float3 lof = make_float3(
+                approx::fadd_rd(tree_box.lo.x, approx::fmul_rd((lo >> 20) & 0x3ffu, tree_bins.x)),
+                approx::fadd_rd(tree_box.lo.y, approx::fmul_rd((lo >> 10) & 0x3ffu, tree_bins.y)),
+                approx::fadd_rd(tree_box.lo.z, approx::fmul_rd((lo) & 0x3ffu, tree_bins.z)));
 
             const unsigned int hi = aabb.y;
-            const float3 hif = make_float3(approx::fsub_ru(tree_box.hi.x, approx::fmul_rd((hi >> 20) & 0x3ffu,tree_bins.x)),
-                                           approx::fsub_ru(tree_box.hi.y, approx::fmul_rd((hi >> 10) & 0x3ffu,tree_bins.y)),
-                                           approx::fsub_ru(tree_box.hi.z, approx::fmul_rd((hi      ) & 0x3ffu,tree_bins.z)));
+            const float3 hif = make_float3(
+                approx::fsub_ru(tree_box.hi.x, approx::fmul_rd((hi >> 20) & 0x3ffu, tree_bins.x)),
+                approx::fsub_ru(tree_box.hi.y, approx::fmul_rd((hi >> 10) & 0x3ffu, tree_bins.y)),
+                approx::fsub_ru(tree_box.hi.z, approx::fmul_rd((hi) & 0x3ffu, tree_bins.z)));
             const int left = aabb.z;
 
             // advance to rope as a preliminary
             node = aabb.w;
 
             // if overlap, do work with primitive. otherwise, rope ahead
-            if (query.overlap(q, BoundingBox(lof,hif)))
+            if (query.overlap(q, BoundingBox(lof, hif)))
                 {
-                if(left < 0)
+                if (left < 0)
                     {
                     const int primitive = ~left;
-                    if (query.refine(qdata,primitive))
-                        out.process(result,primitive);
+                    if (query.refine(qdata, primitive))
+                        out.process(result, primitive);
                     // leaf nodes always move to their rope
                     }
                 else
@@ -246,11 +258,11 @@ __global__ void lbvh_traverse_ropes(const OutputOpT out,
                     }
                 }
             } // end stackless search
-        } while(true);
+        } while (true);
 
     out.finalize(result);
     }
-} // end namespace kernel
+    } // end namespace kernel
 
 //! Compress LBVH for rope traversal.
 /*!
@@ -273,21 +285,23 @@ void lbvh_compress_ropes(const LBVHCompressedData& ctree,
                          unsigned int N_internal,
                          unsigned int N_nodes,
                          unsigned int block_size,
-                         hipper::stream_t stream)
+                         cudaStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        hipper::funcAttributes_t attr;
-        hipper::funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_compress_ropes<TransformOpT>));
+        cudaFuncAttributes attr;
+        cudaFuncGetAttributes(
+            &attr,
+            reinterpret_cast<const void*>(kernel::lbvh_compress_ropes<TransformOpT>));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
-    const unsigned int num_blocks = (N_nodes + run_block_size - 1)/run_block_size;
+    const unsigned int num_blocks = (N_nodes + run_block_size - 1) / run_block_size;
 
-    hipper::KernelLauncher launcher(num_blocks, run_block_size, stream);
-    launcher(kernel::lbvh_compress_ropes<TransformOpT>, ctree, transform, tree, N_internal, N_nodes);
+    kernel::lbvh_compress_ropes<TransformOpT>
+        <<<num_blocks, run_block_size, 0, stream>>>(ctree, transform, tree, N_internal, N_nodes);
     }
 
 //! Traverse the LBVH using ropes.
@@ -311,7 +325,7 @@ void lbvh_traverse_ropes(const OutputOpT& out,
                          const QueryOpT& query,
                          const TranslateOpT& images,
                          unsigned int block_size,
-                         hipper::stream_t stream)
+                         cudaStream_t stream)
     {
     // quit if there are no images
     if (query.size() == 0 || images.size() == 0)
@@ -321,18 +335,20 @@ void lbvh_traverse_ropes(const OutputOpT& out,
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        hipper::funcAttributes_t attr;
-        hipper::funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_traverse_ropes<OutputOpT,QueryOpT,TranslateOpT>));
+        cudaFuncAttributes attr;
+        cudaFuncGetAttributes(&attr,
+                              reinterpret_cast<const void*>(
+                                  kernel::lbvh_traverse_ropes<OutputOpT, QueryOpT, TranslateOpT>));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
-    const unsigned int num_blocks = (query.size() + run_block_size - 1)/run_block_size;
+    const unsigned int num_blocks = (query.size() + run_block_size - 1) / run_block_size;
 
-    hipper::KernelLauncher launcher(num_blocks, run_block_size, stream);
-    launcher(kernel::lbvh_traverse_ropes<OutputOpT,QueryOpT,TranslateOpT>, out, lbvh, query, images);
+    kernel::lbvh_traverse_ropes<OutputOpT, QueryOpT, TranslateOpT>
+        <<<num_blocks, run_block_size, 0, stream>>>(out, lbvh, query, images);
     }
 
-} // end namespace gpu
-} // end namespace neighbor
+    } // end namespace gpu
+    } // end namespace neighbor
 
 #endif // NEIGHBOR_LBVH_TRAVERSER_CUH_

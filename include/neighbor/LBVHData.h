@@ -5,13 +5,13 @@
 #ifndef NEIGHBOR_LBVH_DATA_H_
 #define NEIGHBOR_LBVH_DATA_H_
 
-#include <hipper/hipper_runtime.h>
+#include <cuda_runtime.h>
 
 namespace neighbor
-{
+    {
 
 // LBVH sentinel has value of max signed int (~2 billion)
-const int LBVHSentinel=0x7fffffff;
+const int LBVHSentinel = 0x7fffffff;
 
 //! Linear bounding volume hierarchy raw data, writeable.
 /*!
@@ -21,27 +21,27 @@ const int LBVHSentinel=0x7fffffff;
  */
 struct LBVHData
     {
-    int* parent;                //!< Parent node
-    int* left;                  //!< Left child
-    int* right;                 //!< Right child
-    unsigned int* primitive;    //!< Primitives
-    float3* lo;                 //!< Lower bound of AABB
-    float3* hi;                 //!< Upper bound of AABB
-    int root;                   //!< Root index
+    int* parent;             //!< Parent node
+    int* left;               //!< Left child
+    int* right;              //!< Right child
+    unsigned int* primitive; //!< Primitives
+    float3* lo;              //!< Lower bound of AABB
+    float3* hi;              //!< Upper bound of AABB
+    int root;                //!< Root index
     };
 
 //! Linear bounding volume hierarchy raw data, read only.
 struct ConstLBVHData
     {
-    const int* parent;              //!< Parent node
-    const int* left;                //!< Left child
-    const int* right;               //!< Right child
-    const unsigned int* primitive;  //!< Primitives
-    const float3* lo;               //!< Lower bound of AABB
-    const float3* hi;               //!< Upper bound of AABB
-    int root;                       //!< Root index
+    const int* parent;             //!< Parent node
+    const int* left;               //!< Left child
+    const int* right;              //!< Right child
+    const unsigned int* primitive; //!< Primitives
+    const float3* lo;              //!< Lower bound of AABB
+    const float3* hi;              //!< Upper bound of AABB
+    int root;                      //!< Root index
     };
 
-} // end namespace neighbor
+    } // end namespace neighbor
 
 #endif // NEIGHBOR_LBVH_DATA_H_

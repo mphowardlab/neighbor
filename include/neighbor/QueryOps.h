@@ -5,12 +5,12 @@
 #ifndef NEIGHBOR_QUERY_OPS_H_
 #define NEIGHBOR_QUERY_OPS_H_
 
-#include <hipper/hipper_runtime.h>
-
 #include "BoundingVolumes.h"
 
+#include <cuda_runtime.h>
+
 namespace neighbor
-{
+    {
 
 //! Reference implementation of a query operation based on spherical volumes.
 /*!
@@ -18,16 +18,18 @@ namespace neighbor
  *  1. setup(): Initializes thread-local data for the query.
  *  2. get(): Constructs the bounding volume for a given image.
  *  3. overlap(): Tests if the bounding volume overlaps a bounding box.
- *  4. refine(): Takes a primitive that is overlapped by the bounding volume, and refines the intersection.
+ *  4. refine(): Takes a primitive that is overlapped by the bounding volume, and refines the
+ * intersection.
  *  5. size(): Return the number of query volumes to test.
  *
- * Each query operation additionally should specify (by typedef, etc.) a \a ThreadData type for its internal
- * data and a \a Volume for the type of query volume used. It is helpful to use a built-in BoundingVolume, which
- * already have overlap tests defined.
+ * Each query operation additionally should specify (by typedef, etc.) a \a ThreadData type for its
+ * internal data and a \a Volume for the type of query volume used. It is helpful to use a built-in
+ * BoundingVolume, which already have overlap tests defined.
  *
- * For accuracy, this reference implementation takes a point defining a spherical volume with radius stored
- * internally as (x,y,z,R). The precision is Scalar, and for accuracy, translations are also performed in Scalar
- * precision. The bounding volume is dropped into appropriate (lower) precision by the BoundingSphere.
+ * For accuracy, this reference implementation takes a point defining a spherical volume with radius
+ * stored internally as (x,y,z,R). The precision is Scalar, and for accuracy, translations are also
+ * performed in Scalar precision. The bounding volume is dropped into appropriate (lower) precision
+ * by the BoundingSphere.
  */
 struct SphereQueryOp
     {
@@ -36,9 +38,7 @@ struct SphereQueryOp
      * \param spheres_ Sphere data storing (x,y,z,R) for each query volume.
      * \param N_ The number of spheres.
      */
-    SphereQueryOp(float4 *spheres_, unsigned int N_)
-        : spheres(spheres_), N(N_)
-        {}
+    SphereQueryOp(float4* spheres_, unsigned int N_) : spheres(spheres_), N(N_) { }
 
     typedef float4 ThreadData;
     typedef BoundingSphere Volume;
@@ -64,7 +64,7 @@ struct SphereQueryOp
     __device__ __forceinline__ Volume get(const ThreadData& q, const float3& image) const
         {
         const float3 t = make_float3(q.x + image.x, q.y + image.y, q.z + image.z);
-        return BoundingSphere(t,q.w);
+        return BoundingSphere(t, q.w);
         }
 
     //! Test for overlap between bounding volume and box.
@@ -119,6 +119,6 @@ struct SphereQueryOp
     const unsigned int N;
     };
 
-} // end namespace neighbor
+    } // end namespace neighbor
 
 #endif // NEIGHBOR_QUERY_OPS_H_

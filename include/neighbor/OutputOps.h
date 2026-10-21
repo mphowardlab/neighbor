@@ -5,10 +5,10 @@
 #ifndef NEIGHBOR_OUTPUT_OPS_H_
 #define NEIGHBOR_OUTPUT_OPS_H_
 
-#include <hipper/hipper_runtime.h>
+#include <cuda_runtime.h>
 
 namespace neighbor
-{
+    {
 
 //! Count the number of neighbors
 /*!
@@ -34,9 +34,7 @@ struct CountNeighborsOp
      * The constructor is called on the host. The caller can use member variables of
      * the operation to stash pointers needed for sophisticated output workflows.
      */
-    CountNeighborsOp(unsigned int* nneigh_)
-        : nneigh(nneigh_)
-        {}
+    CountNeighborsOp(unsigned int* nneigh_) : nneigh(nneigh_) { }
 
     //! Lightweight data structure for thread-local data during traversal.
     /*!
@@ -50,9 +48,7 @@ struct CountNeighborsOp
         /*!
          * \param idx_ The thread index of the search sphere processed by the thread.
          */
-        __device__ ThreadData(const unsigned int idx_)
-            : idx(idx_), num_neigh(0)
-            {}
+        __device__ ThreadData(const unsigned int idx_) : idx(idx_), num_neigh(0) { }
 
         const int idx;          //!< Index of the search sphere being processed
         unsigned int num_neigh; //!< Number of numbers found
@@ -99,7 +95,7 @@ struct CountNeighborsOp
         nneigh[t.idx] = t.num_neigh;
         }
 
-    unsigned int* nneigh;   //!< Number of neighbors per-search sphere
+    unsigned int* nneigh; //!< Number of neighbors per-search sphere
     };
 
 //! Generate a neighbor list
@@ -112,22 +108,22 @@ struct CountNeighborsOp
  */
 struct NeighborListOp
     {
-    NeighborListOp(unsigned int* neigh_list_,
-                   unsigned int* nneigh_,
-                   unsigned int max_neigh_)
+    NeighborListOp(unsigned int* neigh_list_, unsigned int* nneigh_, unsigned int max_neigh_)
         : neigh_list(neigh_list_), nneigh(nneigh_), max_neigh(max_neigh_)
-        {}
+        {
+        }
 
     //! Thread-local data
     struct ThreadData
         {
         __device__ ThreadData(const unsigned int idx_, unsigned int first_)
             : idx(idx_), first(first_), num_neigh(0)
-            {}
+            {
+            }
 
-        const int idx;              //!< Index of primitive
-        const unsigned int first;   //!< First index to use for writing neighbors
-        unsigned int num_neigh;     //!< Number of neighbors for this thread
+        const int idx;            //!< Index of primitive
+        const unsigned int first; //!< First index to use for writing neighbors
+        unsigned int num_neigh;   //!< Number of neighbors for this thread
         };
 
     //! Initialize the local ThreadData
@@ -137,9 +133,8 @@ struct NeighborListOp
     template<class QueryDataT>
     __device__ __forceinline__ ThreadData setup(const unsigned int idx, const QueryDataT& q) const
         {
-        return ThreadData(idx, max_neigh*idx);
+        return ThreadData(idx, max_neigh * idx);
         }
-
 
     //! Process a new primitive that is overlapped.
     /*!
@@ -154,7 +149,7 @@ struct NeighborListOp
     __device__ __forceinline__ void process(ThreadData& t, const int primitive) const
         {
         if (t.num_neigh < max_neigh)
-            neigh_list[t.first+t.num_neigh] = primitive;
+            neigh_list[t.first + t.num_neigh] = primitive;
         ++t.num_neigh;
         }
 
@@ -170,11 +165,11 @@ struct NeighborListOp
         nneigh[t.idx] = t.num_neigh;
         }
 
-    unsigned int* neigh_list;       //!< Neighbors of each sphere
-    unsigned int* nneigh;           //!< Number of neighbors per search sphere
-    const unsigned int max_neigh;   //!< Maximum number of neighbors allocated per sphere
+    unsigned int* neigh_list;     //!< Neighbors of each sphere
+    unsigned int* nneigh;         //!< Number of neighbors per search sphere
+    const unsigned int max_neigh; //!< Maximum number of neighbors allocated per sphere
     };
 
-} // end namespace neighbor
+    } // end namespace neighbor
 
 #endif // NEIGHBOR_OUTPUT_OPS_H_

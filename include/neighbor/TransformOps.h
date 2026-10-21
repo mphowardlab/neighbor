@@ -7,20 +7,21 @@
 #ifndef NEIGHBOR_TRANSFORM_OPS_H_
 #define NEIGHBOR_TRANSFORM_OPS_H_
 
-#include <hipper/hipper_runtime.h>
+#include <cuda_runtime.h>
 #define HOSTDEVICE __host__ __device__ __forceinline__
 
 namespace neighbor
-{
+    {
 
 //! Mapping operation for an index
 /*!
  * A TransformOp is used to transform a primitive index into another cached value for traversal.
- * This may be useful for saving pointer indirection during traversal if, for example, the primitives used to
- * build the LBVH have already been sorted or correspond to a shifted range.
+ * This may be useful for saving pointer indirection during traversal if, for example, the
+ * primitives used to build the LBVH have already been sorted or correspond to a shifted range.
  *
- * The MapTransformOp is a reference implementation of a TransformOp. It takes a given primitive index and
- * returns the index mapped to a new value. Each TransformOp must supply an operator to perform this transformation.
+ * The MapTransformOp is a reference implementation of a TransformOp. It takes a given primitive
+ * index and returns the index mapped to a new value. Each TransformOp must supply an operator to
+ * perform this transformation.
  */
 struct MapTransformOp
     {
@@ -28,9 +29,7 @@ struct MapTransformOp
     /*!
      * \param map_ A map of primitive indexes to their another value.
      */
-    MapTransformOp(const unsigned int* map_)
-        : map(map_)
-        {}
+    MapTransformOp(const unsigned int* map_) : map(map_) { }
 
     //! Mapping operator
     /*!
@@ -42,13 +41,13 @@ struct MapTransformOp
         return map[primitive];
         }
 
-    const unsigned int* map;    //!< Map operation
+    const unsigned int* map; //!< Map operation
     };
-
 
 //! No transformation
 /*!
- * The NullTransformOp simply returns the original primitive index without applying an transformation.
+ * The NullTransformOp simply returns the original primitive index without applying an
+ * transformation.
  */
 struct NullTransformOp
     {
@@ -63,7 +62,7 @@ struct NullTransformOp
         }
     };
 
-} // end namespace neighbor
+    } // end namespace neighbor
 
 #undef HOSTDEVICE
 

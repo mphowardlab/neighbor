@@ -7,18 +7,18 @@
 #ifndef NEIGHBOR_KERNELS_LBVH_CUH_
 #define NEIGHBOR_KERNELS_LBVH_CUH_
 
-#include <hipper/hipper_runtime.h>
-#include <hipper/hipper_cub.h>
-
 #include "../BoundingVolumes.h"
 #include "../LBVHData.h"
 
+#include <cub/cub.cuh>
+#include <cuda_runtime.h>
+
 namespace neighbor
-{
+    {
 namespace gpu
-{
+    {
 namespace kernel
-{
+    {
 //! Expand a 10-bit integer into 30 bits by inserting 2 zeros after each bit.
 /*!
  * \param v unsigned integer with 10 bits set
@@ -26,13 +26,13 @@ namespace kernel
  * http://devblogs.nvidia.com/parallelforall/thinking-parallel-part-iii-tree-construction-gpu/
  */
 __device__ __forceinline__ unsigned int expandBits(unsigned int v)
-{
+    {
     v = (v * 0x00010001u) & 0xFF0000FFu;
     v = (v * 0x00000101u) & 0x0F00F00Fu;
     v = (v * 0x00000011u) & 0xC30C30C3u;
     v = (v * 0x00000005u) & 0x49249249u;
     return v;
-}
+    }
 
 //! Compute the 30-bit Morton code for a tuple of binned indexes.
 /*!
@@ -70,7 +70,7 @@ __device__ __forceinline__ unsigned int calcMortonCode(uint3 point)
  * up from \a d_codes) for performance reasons, since code_i can be cached by
  * the caller if making multiple calls to ::delta for different \a j.
  */
-__device__ __forceinline__ int delta(const unsigned int *d_codes,
+__device__ __forceinline__ int delta(const unsigned int* d_codes,
                                      const unsigned int code_i,
                                      const int i,
                                      const int j,
@@ -125,15 +125,15 @@ __device__ __forceinline__ unsigned int fractionToBin(float f)
  * is for subsequent sorting (see ::lbvh_sort_codes).
  */
 template<class InsertOpT>
-__global__ void lbvh_gen_codes(unsigned int *d_codes,
-                               unsigned int *d_indexes,
+__global__ void lbvh_gen_codes(unsigned int* d_codes,
+                               unsigned int* d_indexes,
                                const InsertOpT insert,
                                const float3 lo,
                                const float3 hi,
                                const unsigned int N)
     {
     // one thread per point
-    const unsigned int idx = hipper::threadRank<1,1>();
+    const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= N)
         return;
 
@@ -166,53 +166,53 @@ __global__ void lbvh_gen_codes(unsigned int *d_codes,
  * exactly N-1 internal nodes.) The algorithm is given by Figure 4 of
  * <a href="https://dl.acm.org/citation.cfm?id=2383801">Karras</a>.
  */
-__global__ static void lbvh_gen_tree(const LBVHData tree,
-                                     const unsigned int *d_codes,
-                                     const unsigned int N)
+__global__ static void
+lbvh_gen_tree(const LBVHData tree, const unsigned int* d_codes, const unsigned int N)
     {
     // one thread per internal node (= N-1 threads)
-    const unsigned int i = hipper::threadRank<1,1>();
-    if (i >= N-1)
+    const unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= N - 1)
         return;
 
     const unsigned int code_i = d_codes[i];
-    const int forward_prefix = delta(d_codes, code_i, i, i+1, N);
-    const int backward_prefix = delta(d_codes, code_i, i, i-1, N);
+    const int forward_prefix = delta(d_codes, code_i, i, i + 1, N);
+    const int backward_prefix = delta(d_codes, code_i, i, i - 1, N);
 
     // get direction of the range based on sign
     const int d = (forward_prefix >= backward_prefix) - (forward_prefix < backward_prefix);
 
     // get minimum prefix
-    const int min_prefix = delta(d_codes, code_i, i, i-d, N);
+    const int min_prefix = delta(d_codes, code_i, i, i - d, N);
 
     // get maximum prefix by binary search
     int lmax = 2;
-    while( delta(d_codes, code_i, i, i + d*lmax, N) > min_prefix)
+    while (delta(d_codes, code_i, i, i + d * lmax, N) > min_prefix)
         {
         lmax = lmax << 1;
         }
-    int l = 0; int t = lmax;
+    int l = 0;
+    int t = lmax;
     do
         {
         t = t >> 1;
-        if (delta(d_codes, code_i, i, i + (l+t)*d, N) > min_prefix)
+        if (delta(d_codes, code_i, i, i + (l + t) * d, N) > min_prefix)
             l = l + t;
-        }
-    while (t > 1);
-    const int j = i + l*d;
+        } while (t > 1);
+    const int j = i + l * d;
 
     // get the length of the common prefix
     const int common_prefix = delta(d_codes, code_i, i, j, N);
 
     // binary search to find split position
-    int s = 0; t = l;
+    int s = 0;
+    t = l;
     do
         {
         t = (t + 1) >> 1;
         // if proposed split lies within range
-        if (s+t < l)
+        if (s + t < l)
             {
-            const int split_prefix = delta(d_codes, code_i, i, i+(s+t)*d, N);
+            const int split_prefix = delta(d_codes, code_i, i, i + (s + t) * d, N);
 
             // if new split shares a longer number of bits, accept it
             if (split_prefix > common_prefix)
@@ -220,12 +220,11 @@ __global__ static void lbvh_gen_tree(const LBVHData tree,
                 s = s + t;
                 }
             }
-        }
-    while (t > 1);
-    const int split = i + s*d + min(d,0);
+        } while (t > 1);
+    const int split = i + s * d + min(d, 0);
 
-    const int left = (min(i,j) == split) ? split + (N-1) : split;
-    const int right = (max(i,j) == (split + 1)) ? split + N : split + 1;
+    const int left = (min(i, j) == split) ? split + (N - 1) : split;
+    const int right = (max(i, j) == (split + 1)) ? split + N : split + 1;
 
     // children
     tree.left[i] = left;
@@ -270,11 +269,11 @@ __global__ static void lbvh_gen_tree(const LBVHData tree,
 template<class InsertOpT>
 __global__ void lbvh_bubble_aabbs(const LBVHData tree,
                                   const InsertOpT insert,
-                                  unsigned int *d_locks,
+                                  unsigned int* d_locks,
                                   const unsigned int N)
     {
     // one thread per point
-    const unsigned int idx = hipper::threadRank<1,1>();
+    const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= N)
         return;
 
@@ -284,7 +283,7 @@ __global__ void lbvh_bubble_aabbs(const LBVHData tree,
     float3 hi = b.hi;
 
     // set aabb for the leaf node
-    int last = N-1+idx;
+    int last = N - 1 + idx;
     tree.lo[last] = lo;
     tree.hi[last] = hi;
     __threadfence();
@@ -306,14 +305,20 @@ __global__ void lbvh_bubble_aabbs(const LBVHData tree,
 
         // compute min / max bounds of the current thread with its sibling
         const float3 sib_lo = tree.lo[sibling];
-        if (sib_lo.x < lo.x) lo.x = sib_lo.x;
-        if (sib_lo.y < lo.y) lo.y = sib_lo.y;
-        if (sib_lo.z < lo.z) lo.z = sib_lo.z;
+        if (sib_lo.x < lo.x)
+            lo.x = sib_lo.x;
+        if (sib_lo.y < lo.y)
+            lo.y = sib_lo.y;
+        if (sib_lo.z < lo.z)
+            lo.z = sib_lo.z;
 
         const float3 sib_hi = tree.hi[sibling];
-        if (sib_hi.x > hi.x) hi.x = sib_hi.x;
-        if (sib_hi.y > hi.y) hi.y = sib_hi.y;
-        if (sib_hi.z > hi.z) hi.z = sib_hi.z;
+        if (sib_hi.x > hi.x)
+            hi.x = sib_hi.x;
+        if (sib_hi.y > hi.y)
+            hi.y = sib_hi.y;
+        if (sib_hi.z > hi.z)
+            hi.z = sib_hi.z;
 
         // write out bounding box to global memory
         tree.lo[current] = lo;
@@ -338,11 +343,10 @@ __global__ void lbvh_bubble_aabbs(const LBVHData tree,
  * and this would be overkill anyway.
  */
 template<class InsertOpT>
-__global__ void lbvh_one_primitive(const LBVHData tree,
-                                   const InsertOpT insert)
+__global__ void lbvh_one_primitive(const LBVHData tree, const InsertOpT insert)
     {
     // one thread only
-    const unsigned int idx = hipper::threadRank<1,1>();
+    const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= 1)
         return;
 
@@ -353,7 +357,7 @@ __global__ void lbvh_one_primitive(const LBVHData tree,
     tree.hi[0] = b.hi;
     }
 
-} // end namespace kernel
+    } // end namespace kernel
 
 //! Generate Morton codes for the primitives.
 /*!
@@ -371,28 +375,29 @@ __global__ void lbvh_one_primitive(const LBVHData tree,
  * \sa kernel::lbvh_gen_codes
  */
 template<class InsertOpT>
-void lbvh_gen_codes(unsigned int *d_codes,
-                    unsigned int *d_indexes,
+void lbvh_gen_codes(unsigned int* d_codes,
+                    unsigned int* d_indexes,
                     const InsertOpT& insert,
                     const float3 lo,
                     const float3 hi,
                     const unsigned int N,
                     const unsigned int block_size,
-                    hipper::stream_t stream)
+                    cudaStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        hipper::funcAttributes_t attr;
-        hipper::funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_gen_codes<InsertOpT>));
+        cudaFuncAttributes attr;
+        cudaFuncGetAttributes(&attr,
+                              reinterpret_cast<const void*>(kernel::lbvh_gen_codes<InsertOpT>));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
-    const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
+    const unsigned int num_blocks = (N + run_block_size - 1) / run_block_size;
 
-    hipper::KernelLauncher launcher(num_blocks, run_block_size, stream);
-    launcher(kernel::lbvh_gen_codes<InsertOpT>, d_codes, d_indexes, insert, lo, hi, N);
+    kernel::lbvh_gen_codes<InsertOpT>
+        <<<num_blocks, run_block_size, 0, stream>>>(d_codes, d_indexes, insert, lo, hi, N);
     }
 
 //! Sort the primitives into Morton code order.
@@ -414,26 +419,26 @@ void lbvh_gen_codes(unsigned int *d_codes,
  * This function must be called twice in order for the sort to occur. When \a d_tmp is NULL
  * on the first call, CUB sizes the temporary storage that is required and sets it in \a tmp_bytes.
  * Some versions of CUB were buggy and required \a d_tmp be allocated even
- * when \a tmp_bytes was 0. To bypass this, allocate a small amount (say, 4B) when \a tmp_bytes is 0.
- * The second call will then sort the Morton codes and indexes. The sorted data will be in the
+ * when \a tmp_bytes was 0. To bypass this, allocate a small amount (say, 4B) when \a tmp_bytes is
+ * 0. The second call will then sort the Morton codes and indexes. The sorted data will be in the
  * appropriate buffer, which can be determined by the returned flags.
  */
-inline uchar2 lbvh_sort_codes(void *d_tmp,
-                              size_t &tmp_bytes,
-                              unsigned int *d_codes,
-                              unsigned int *d_alt_codes,
-                              unsigned int *d_indexes,
-                              unsigned int *d_alt_indexes,
+inline uchar2 lbvh_sort_codes(void* d_tmp,
+                              size_t& tmp_bytes,
+                              unsigned int* d_codes,
+                              unsigned int* d_alt_codes,
+                              unsigned int* d_indexes,
+                              unsigned int* d_alt_indexes,
                               const unsigned int N,
-                              hipper::stream_t stream)
+                              cudaStream_t stream)
     {
-    hipper::cub::DoubleBuffer<unsigned int> d_keys(d_codes, d_alt_codes);
-    hipper::cub::DoubleBuffer<unsigned int> d_vals(d_indexes, d_alt_indexes);
+    cub::DoubleBuffer<unsigned int> d_keys(d_codes, d_alt_codes);
+    cub::DoubleBuffer<unsigned int> d_vals(d_indexes, d_alt_indexes);
 
-    hipper::cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, 30, stream);
+    cub::DeviceRadixSort::SortPairs(d_tmp, tmp_bytes, d_keys, d_vals, N, 0, 30, stream);
 
     // mark that the arrays should be flipped if the final result is not in the primary array
-    uchar2 swap = make_uchar2(0,0);
+    uchar2 swap = make_uchar2(0, 0);
     if (d_tmp != NULL)
         {
         swap.x = (d_keys.selector == 1);
@@ -453,24 +458,23 @@ inline uchar2 lbvh_sort_codes(void *d_tmp,
  * \sa kernel::lbvh_gen_tree
  */
 inline void lbvh_gen_tree(const LBVHData tree,
-                          const unsigned int *d_codes,
+                          const unsigned int* d_codes,
                           const unsigned int N,
                           const unsigned int block_size,
-                          hipper::stream_t stream)
+                          cudaStream_t stream)
     {
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        hipper::funcAttributes_t attr;
-        hipper::funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_gen_tree));
+        cudaFuncAttributes attr;
+        cudaFuncGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_gen_tree));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
-    const unsigned int num_blocks = ((N-1) + run_block_size - 1)/run_block_size;
+    const unsigned int num_blocks = ((N - 1) + run_block_size - 1) / run_block_size;
 
-    hipper::KernelLauncher launcher(num_blocks, run_block_size, stream);
-    launcher(kernel::lbvh_gen_tree, tree, d_codes, N);
+    kernel::lbvh_gen_tree<<<num_blocks, run_block_size, 0, stream>>>(tree, d_codes, N);
     }
 
 //! Bubble the bounding boxes up the tree hierarchy.
@@ -491,26 +495,27 @@ inline void lbvh_gen_tree(const LBVHData tree,
 template<class InsertOpT>
 void lbvh_bubble_aabbs(const LBVHData tree,
                        const InsertOpT& insert,
-                       unsigned int *d_locks,
+                       unsigned int* d_locks,
                        const unsigned int N,
                        const unsigned int block_size,
-                       hipper::stream_t stream)
+                       cudaStream_t stream)
     {
-    hipper::memsetAsync(d_locks, 0, (N-1)*sizeof(unsigned int), stream);
+    cudaMemsetAsync(d_locks, 0, (N - 1) * sizeof(unsigned int), stream);
 
     // clamp block size
     static unsigned int max_block_size = UINT_MAX;
     if (max_block_size == UINT_MAX)
         {
-        hipper::funcAttributes_t attr;
-        hipper::funcGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_bubble_aabbs<InsertOpT>));
+        cudaFuncAttributes attr;
+        cudaFuncGetAttributes(&attr,
+                              reinterpret_cast<const void*>(kernel::lbvh_bubble_aabbs<InsertOpT>));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
-    const unsigned int num_blocks = (N + run_block_size - 1)/run_block_size;
+    const unsigned int num_blocks = (N + run_block_size - 1) / run_block_size;
 
-    hipper::KernelLauncher launcher(num_blocks, run_block_size, stream);
-    launcher(kernel::lbvh_bubble_aabbs<InsertOpT>, tree, insert, d_locks, N);
+    kernel::lbvh_bubble_aabbs<InsertOpT>
+        <<<num_blocks, run_block_size, 0, stream>>>(tree, insert, d_locks, N);
     }
 
 //! Set data for a one-primitive LBVH.
@@ -524,15 +529,12 @@ void lbvh_bubble_aabbs(const LBVHData tree,
  * \sa kernel::lbvh_one_primitive
  */
 template<class InsertOpT>
-void lbvh_one_primitive(const LBVHData tree,
-                        const InsertOpT& insert,
-                        hipper::stream_t stream)
+void lbvh_one_primitive(const LBVHData tree, const InsertOpT& insert, cudaStream_t stream)
     {
-    hipper::KernelLauncher launcher(1,1,stream);
-    launcher(kernel::lbvh_one_primitive<InsertOpT>, tree, insert);
+    kernel::lbvh_one_primitive<<<1, 1, 0, stream>>>(tree, insert);
     }
 
-} // end namespace gpu
-} // end namespace neighbor
+    } // end namespace gpu
+    } // end namespace neighbor
 
 #endif // NEIGHBOR_KERNELS_LBVH_CUH_

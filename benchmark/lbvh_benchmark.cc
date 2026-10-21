@@ -11,11 +11,11 @@
 #include "hoomd/SystemDefinition.h"
 
 #include <algorithm>
-#include <functional>
-#include <numeric>
-#include <iostream>
 #include <fstream>
+#include <functional>
 #include <iomanip>
+#include <iostream>
+#include <numeric>
 
 //! Convenience wrapper to return an exit code in MPI-compiled HOOMD.
 /*!
@@ -26,9 +26,9 @@
  */
 int safe_exit(int val)
     {
-    #ifdef ENABLE_MPI
+#ifdef ENABLE_MPI
     MPI_Finalize();
-    #endif // ENABLE_MPI
+#endif // ENABLE_MPI
     return val;
     }
 
@@ -43,20 +43,20 @@ int safe_exit(int val)
  * computed. It is recommended to warmup and then freeze any autotuner parameters
  * before profiling.
  */
-double profile(const std::function <void ()>& f, unsigned int samples)
+double profile(const std::function<void()>& f, unsigned int samples)
     {
     ClockSource t;
 
     cudaDeviceSynchronize();
     uint64_t start = t.getTime();
-    for (unsigned int i=0; i < samples; ++i)
+    for (unsigned int i = 0; i < samples; ++i)
         {
         f();
         }
     cudaDeviceSynchronize();
     uint64_t elapsed = t.getTime() - start;
 
-    return double(elapsed)/1e6/double(samples);
+    return double(elapsed) / 1e6 / double(samples);
     }
 
 //! Performs a simple benchmark of the LBVH.
@@ -77,11 +77,11 @@ double profile(const std::function <void ()>& f, unsigned int samples)
  * - <rcut>: Cutoff radius for computing overlaps.
  * - <output>: Name of tabulated file with output.
  */
-int main(int argc, char * argv[])
+int main(int argc, char* argv[])
     {
-    #ifdef ENABLE_MPI
+#ifdef ENABLE_MPI
     MPI_Init(&argc, &argv);
-    #endif
+#endif
 
     // parse the filename
     std::string filename, outf;
@@ -103,24 +103,27 @@ int main(int argc, char * argv[])
     // try to execute the benchmark
     try
         {
-        std::cout << "Benchmark for " << filename << " using LBVH with rcut = " << rcut << std::endl;
-        std::shared_ptr<ExecutionConfiguration> exec_conf(new ExecutionConfiguration(ExecutionConfiguration::GPU));
-        #ifdef ENABLE_MPI
+        std::cout << "Benchmark for " << filename << " using LBVH with rcut = " << rcut
+                  << std::endl;
+        std::shared_ptr<ExecutionConfiguration> exec_conf(
+            new ExecutionConfiguration(ExecutionConfiguration::GPU));
+#ifdef ENABLE_MPI
         if (exec_conf->getNRanks() > 1)
             {
             exec_conf->msg->error() << "Benchmarks cannot be run in MPI" << std::endl;
             throw std::runtime_error("Benchmarks cannot be run in MPI");
             }
-        #endif
+#endif
 
         // write benchmark results to file
         std::ofstream output;
         output.open(outf.c_str());
         output << "# Benchmark for " << filename << " using LBVH with rcut = " << rcut << std::endl;
         output << "#" << std::endl;
-        output << "# " << std::setw(6) << "frame" << std::setw(16) << "build (ms)" << std::setw(16) << "traverse (ms)" << std::endl;
+        output << "# " << std::setw(6) << "frame" << std::setw(16) << "build (ms)" << std::setw(16)
+               << "traverse (ms)" << std::endl;
 
-        for (uint64_t frame=0; frame < num_frames; ++frame)
+        for (uint64_t frame = 0; frame < num_frames; ++frame)
             {
             std::cout << "Frame " << frame << std::endl;
             std::cout << "------------" << std::endl;
@@ -137,15 +140,21 @@ int main(int argc, char * argv[])
             const BoxDim& box = pdata->getBox();
 
             // warmup the lbvh autotuners
-            ArrayHandle<Scalar4> d_postype(pdata->getPositions(), access_location::device, access_mode::read);
+            ArrayHandle<Scalar4> d_postype(pdata->getPositions(),
+                                           access_location::device,
+                                           access_mode::read);
 
-            for (unsigned int i=0; i < 200; ++i)
+            for (unsigned int i = 0; i < 200; ++i)
                 {
                 // warmup the lbvh autotuner
-                for (unsigned int i=0; i < 200; ++i)
+                for (unsigned int i = 0; i < 200; ++i)
                     {
                     lbvh_tuner.begin();
-                    lbvh.build(d_postype.data, pdata->getN(), box.getLo(), box.getHi(), lbvh_tuner.getParam());
+                    lbvh.build(d_postype.data,
+                               pdata->getN(),
+                               box.getLo(),
+                               box.getHi(),
+                               lbvh_tuner.getParam());
                     lbvh_tuner.end();
                     }
                 }
@@ -155,16 +164,29 @@ int main(int argc, char * argv[])
             // profile lbvh build times
             std::vector<double> times(5);
                 {
-                ArrayHandle<Scalar4> d_postype(pdata->getPositions(), access_location::device, access_mode::read);
+                ArrayHandle<Scalar4> d_postype(pdata->getPositions(),
+                                               access_location::device,
+                                               access_mode::read);
 
-                for (size_t i=0; i < times.size(); ++i)
+                for (size_t i = 0; i < times.size(); ++i)
                     {
-                    times[i] = profile([&]{lbvh.build(d_postype.data, pdata->getN(), box.getLo(), box.getHi(), lbvh_tuner.getParam());}, 500);
+                    times[i] = profile(
+                        [&]
+                        {
+                            lbvh.build(d_postype.data,
+                                       pdata->getN(),
+                                       box.getLo(),
+                                       box.getHi(),
+                                       lbvh_tuner.getParam());
+                        },
+                        500);
                     }
                 }
             std::sort(times.begin(), times.end());
-            std::cout << "Median LBVH build time: " << times[times.size()/2]<< " ms / build" << std::endl;
-            output << std::setw(8) << frame << " " << std::setw(16) << std::fixed << std::setprecision(5) << times[times.size()/2];
+            std::cout << "Median LBVH build time: " << times[times.size() / 2] << " ms / build"
+                      << std::endl;
+            output << std::setw(8) << frame << " " << std::setw(16) << std::fixed
+                   << std::setprecision(5) << times[times.size() / 2];
             cudaDeviceSynchronize();
 
             // make traversal volumes
@@ -172,10 +194,14 @@ int main(int argc, char * argv[])
             GlobalArray<Scalar3> images(27, exec_conf);
             GlobalArray<unsigned int> hits(pdata->getN(), exec_conf);
                 {
-                ArrayHandle<Scalar4> h_spheres(spheres, access_location::host, access_mode::overwrite);
-                ArrayHandle<Scalar4> h_pos(pdata->getPositions(), access_location::host, access_mode::read);
+                ArrayHandle<Scalar4> h_spheres(spheres,
+                                               access_location::host,
+                                               access_mode::overwrite);
+                ArrayHandle<Scalar4> h_pos(pdata->getPositions(),
+                                           access_location::host,
+                                           access_mode::read);
                 auto primitives = lbvh.getPrimitives();
-                for (unsigned int i=0; i < pdata->getN(); ++i)
+                for (unsigned int i = 0; i < pdata->getN(); ++i)
                     {
                     unsigned int tag = primitives[i];
                     const Scalar4 postype = h_pos.data[tag];
@@ -184,18 +210,21 @@ int main(int argc, char * argv[])
                     }
 
                 // 26 periodic image vectors
-                ArrayHandle<Scalar3> h_images(images, access_location::host, access_mode::overwrite);
+                ArrayHandle<Scalar3> h_images(images,
+                                              access_location::host,
+                                              access_mode::overwrite);
                 const Scalar3 L = pdata->getBox().getL();
-                h_images.data[0] = make_scalar3(0,0,0);
+                h_images.data[0] = make_scalar3(0, 0, 0);
                 unsigned int idx = 1;
-                for (int ix=-1; ix <= 1; ++ix)
+                for (int ix = -1; ix <= 1; ++ix)
                     {
-                    for (int iy=-1; iy <= 1; ++iy)
+                    for (int iy = -1; iy <= 1; ++iy)
                         {
-                        for (int iz=-1; iz <= 1; ++iz)
+                        for (int iz = -1; iz <= 1; ++iz)
                             {
-                            if (ix == 0 && iy == 0 && iz == 0) continue;
-                            h_images.data[idx++] = make_scalar3(L.x*ix, L.y*iy, L.z*iz);
+                            if (ix == 0 && iy == 0 && iz == 0)
+                                continue;
+                            h_images.data[idx++] = make_scalar3(L.x * ix, L.y * iy, L.z * iz);
                             }
                         }
                     }
@@ -203,40 +232,66 @@ int main(int argc, char * argv[])
 
             // traversal
             LBVHTraverserWrapper traverser;
-            Autotuner traverser_tuner(traverser.getTunableParameters(), 5, 100000, "traverser_tuner", exec_conf);
+            Autotuner traverser_tuner(traverser.getTunableParameters(),
+                                      5,
+                                      100000,
+                                      "traverser_tuner",
+                                      exec_conf);
                 {
-                ArrayHandle<unsigned int> d_hits(hits, access_location::device, access_mode::overwrite);
+                ArrayHandle<unsigned int> d_hits(hits,
+                                                 access_location::device,
+                                                 access_mode::overwrite);
                 ArrayHandle<Scalar4> d_spheres(spheres, access_location::device, access_mode::read);
 
                 ArrayHandle<Scalar3> d_images(images, access_location::device, access_mode::read);
                 // warmup the autotuner
-                for (unsigned int i=0; i < 200; ++i)
+                for (unsigned int i = 0; i < 200; ++i)
                     {
                     traverser_tuner.begin();
-                    traverser.traverse(d_hits.data, d_spheres.data, pdata->getN(), lbvh.get(), d_images.data, 27, traverser_tuner.getParam());
+                    traverser.traverse(d_hits.data,
+                                       d_spheres.data,
+                                       pdata->getN(),
+                                       lbvh.get(),
+                                       d_images.data,
+                                       27,
+                                       traverser_tuner.getParam());
                     traverser_tuner.end();
                     }
                 traverser_tuner.setEnabled(false);
                 std::cout << "Traverser tuner: " << lbvh_tuner.getParam() << std::endl;
 
-                for (size_t i=0; i < times.size(); ++ i)
+                for (size_t i = 0; i < times.size(); ++i)
                     {
-                    times[i] = profile([&]{traverser.traverse(d_hits.data, d_spheres.data, pdata->getN(), lbvh.get(), d_images.data, 27, traverser_tuner.getParam());},500);
+                    times[i] = profile(
+                        [&]
+                        {
+                            traverser.traverse(d_hits.data,
+                                               d_spheres.data,
+                                               pdata->getN(),
+                                               lbvh.get(),
+                                               d_images.data,
+                                               27,
+                                               traverser_tuner.getParam());
+                        },
+                        500);
                     }
                 }
             std::sort(times.begin(), times.end());
-            std::cout << "Median LBVH rope time: " << times[times.size()/2]<< " ms / traversal" << std::endl;
-            output << " " << std::setw(16) << std::fixed << std::setprecision(5) << times[times.size()/2] << std::endl;
+            std::cout << "Median LBVH rope time: " << times[times.size() / 2] << " ms / traversal"
+                      << std::endl;
+            output << " " << std::setw(16) << std::fixed << std::setprecision(5)
+                   << times[times.size() / 2] << std::endl;
 
             ArrayHandle<unsigned int> h_hits(hits, access_location::host, access_mode::read);
             unsigned int min = *std::min_element(h_hits.data, h_hits.data + pdata->getN());
             unsigned int max = *std::max_element(h_hits.data, h_hits.data + pdata->getN());
-            double mean = std::accumulate(h_hits.data, h_hits.data + pdata->getN(), 0.0) / pdata->getN();
+            double mean
+                = std::accumulate(h_hits.data, h_hits.data + pdata->getN(), 0.0) / pdata->getN();
             std::cout << "min: " << min << ", max: " << max << ", mean: " << mean << std::endl;
             std::cout << std::endl;
             }
         }
-    catch(...)
+    catch (...)
         {
         std::cerr << "**error** Program terminated due to exception." << std::endl;
         return safe_exit(1);

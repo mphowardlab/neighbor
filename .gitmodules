@@ -1,3 +1,0 @@
-[submodule "extern/hipper"]
-	path = extern/hipper
-	url = https://github.com/mphowardlab/hipper.git
