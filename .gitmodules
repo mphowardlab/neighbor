@@ -1,0 +1,3 @@
+[submodule "extern/gsd"]
+	path = extern/gsd
+	url = https://github.com/glotzerlab/gsd
