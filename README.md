@@ -14,22 +14,14 @@ volume hierarchies. For additional details, please refer to the following public
 
 For installation:
 
-* CMake >= 3.9
+* CMake >= 3.21
 
 To use with NVIDIA GPUs:
 
-* [CUDA](https://docs.nvidia.com/cuda) toolkit.
-* [CUB](https://github.com/NVlabs/cub).
+* [CUDA](https://docs.nvidia.com/cuda) toolkit (tests and benchmarks).
 
-To use with AMD GPUs:
+Optional:
 
-* [HIP](https://github.com/ROCm-Developer-Tools/HIP).
-* [hipCUB](https://github.com/ROCmSoftwarePlatform/hipCUB).
-
-Optionally:
-
-* [hipper](https://github.com/mphowardlab/hipper) header-only GPU runtime
-  interoperability layer. If not found, it will be added as a git submodule.
 * [upp11](https://github.com/DronMDF/upp11) header-only test library. If
   not found, it will be downloaded automatically to the build directory.
 
@@ -43,12 +35,6 @@ make install
 (It can be included as part of an existing project, or simply downloaded.)
 CMake projects can discover the installation using `find_package` in `CONFIG`
 mode and should link against the `neighbor::neighbor` target.
-
-neighbor will select between a CUDA or HIP build using the `NEIGHBOR_HIP` define.
-If `NEIGHBOR_HIP=ON`, neighbor will use HIP for the GPU runtime, and both
-NVIDIA and AMD GPUs are supported. If `NEIGHBOR_HIP=OFF`, neighbor will use
-CUDA for the GPU runtime. If only NVIDIA GPUs are targeted, performance may
-be slightly improved by setting `NEIGHBOR_HIP=OFF`.
 
 ## Testing
 
