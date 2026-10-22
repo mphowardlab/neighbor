@@ -1,18 +1,17 @@
 // Copyright (c) 2018-2020, Michael P. Howard
-// Copyright (c) 2021, Auburn University
+// Copyright (c) 2021-2026, Auburn University
 // This file is released under the Modified BSD License.
 
 #include "lbvh_benchmark.cuh"
 
-#include <gsd/gsd.h>
-
 #include <algorithm>
 #include <chrono>
-#include <functional>
-#include <numeric>
-#include <iostream>
 #include <fstream>
+#include <functional>
+#include <gsd/gsd.h>
 #include <iomanip>
+#include <iostream>
+#include <numeric>
 
 //! Profile a function call
 /*!
@@ -24,11 +23,11 @@
  * and then the GPU is synchronized again. The total elapsed time in milliseconds is
  * computed. It is recommended to tune the launch parameters before profiling.
  */
-double profile(const std::function <void ()>& f, unsigned int samples)
+double profile(const std::function<void()>& f, unsigned int samples)
     {
     cudaDeviceSynchronize();
     const auto start = std::chrono::steady_clock::now();
-    for (unsigned int i=0; i < samples; ++i)
+    for (unsigned int i = 0; i < samples; ++i)
         {
         f();
         }
@@ -41,9 +40,9 @@ double profile(const std::function <void ()>& f, unsigned int samples)
 //! Snapshot read from a GSD file
 struct Snapshot
     {
-    unsigned int N;                             //!< Number of particles
-    float3 L;                                   //!< Simulation box lengths
-    neighbor::shared_array<float3> positions;   //!< Particle positions
+    unsigned int N;                           //!< Number of particles
+    float3 L;                                 //!< Simulation box lengths
+    neighbor::shared_array<float3> positions; //!< Particle positions
     };
 
 //! Find the data chunk of the given name at the given frame
@@ -96,7 +95,7 @@ static Snapshot read_snapshot(const std::string& filename, uint64_t frame)
         float box[6];
         gsd_read_chunk(&handle, box, box_entry);
         snap.L = make_float3(box[0], box[1], box[2]);
-        
+
         // number of particles and its positions
         const gsd_index_entry* pos_entry = read_chunk(handle, frame, "particles/position");
         if (pos_entry->type != GSD_TYPE_FLOAT)
@@ -111,7 +110,7 @@ static Snapshot read_snapshot(const std::string& filename, uint64_t frame)
         {
         gsd_close(&handle);
         throw;
-        }  
+        }
     gsd_close(&handle);
 
     return snap;
@@ -128,7 +127,7 @@ static Snapshot read_snapshot(const std::string& filename, uint64_t frame)
  * the smallest median is chosen.
  */
 unsigned int tune(const std::vector<unsigned int>& params,
-                  const std::function<void (unsigned int)>& f,
+                  const std::function<void(unsigned int)>& f,
                   unsigned int samples)
     {
     cudaEvent_t start, stop;
@@ -144,7 +143,7 @@ unsigned int tune(const std::vector<unsigned int>& params,
         f(p);
 
         // time each call
-        for (unsigned int i=0; i < samples; ++i)
+        for (unsigned int i = 0; i < samples; ++i)
             {
             cudaEventRecord(start, 0);
             f(p);
@@ -154,8 +153,8 @@ unsigned int tune(const std::vector<unsigned int>& params,
             }
 
         // median
-        std::nth_element(times.begin(), times.begin() + samples/2, times.end());
-        const float median = times[samples/2];
+        std::nth_element(times.begin(), times.begin() + samples / 2, times.end());
+        const float median = times[samples / 2];
         if (median < best_time)
             {
             best_time = median;
@@ -174,8 +173,8 @@ unsigned int tune(const std::vector<unsigned int>& params,
  * LBVH build and traversal time are profiled for a set of simulation snapshots stored
  * in a GSD file. For each frame, a new LBVH and LBVH traverser are constructed. Their
  * kernel block sizes are tuned by scanning all valid values before profiling for 500
- * calls. The results are stored for each snapshot in an output tabulated file. The 
- * benchmark is to determine the number of particles within a distance \a rcut of each 
+ * calls. The results are stored for each snapshot in an output tabulated file. The
+ * benchmark is to determine the number of particles within a distance \a rcut of each
  * particle (i.e., computing the number of neighbors).
  *
  * The command line parameters are:
@@ -187,7 +186,7 @@ unsigned int tune(const std::vector<unsigned int>& params,
  * - <rcut>: Cutoff radius for computing overlaps.
  * - <output>: Name of tabulated file with output.
  */
-int main(int argc, char * argv[])
+int main(int argc, char* argv[])
     {
     // parse the filename
     std::string filename, outf;
@@ -209,7 +208,8 @@ int main(int argc, char * argv[])
     // try to execute the benchmark
     try
         {
-        std::cout << "Benchmark for " << filename << " using LBVH with rcut = " << rcut << std::endl;
+        std::cout << "Benchmark for " << filename << " using LBVH with rcut = " << rcut
+                  << std::endl;
         cudaSetDevice(0);
 
         // write benchmark results to file
@@ -217,9 +217,10 @@ int main(int argc, char * argv[])
         output.open(outf.c_str());
         output << "# Benchmark for " << filename << " using LBVH with rcut = " << rcut << std::endl;
         output << "#" << std::endl;
-        output << "# " << std::setw(6) << "frame" << std::setw(16) << "build (ms)" << std::setw(16) << "traverse (ms)" << std::endl;
+        output << "# " << std::setw(6) << "frame" << std::setw(16) << "build (ms)" << std::setw(16)
+               << "traverse (ms)" << std::endl;
 
-        for (uint64_t frame=0; frame < num_frames; ++frame)
+        for (uint64_t frame = 0; frame < num_frames; ++frame)
             {
             std::cout << "Frame " << frame << std::endl;
             std::cout << "------------" << std::endl;
@@ -227,38 +228,42 @@ int main(int argc, char * argv[])
             const Snapshot snap = read_snapshot(filename, frame);
             const unsigned int N = snap.N;
 
-            const float3 lo = make_float3(-0.5f*snap.L.x, -0.5f*snap.L.y, -0.5f*snap.L.z);
-            const float3 hi = make_float3(0.5f*snap.L.x, 0.5f*snap.L.y, 0.5f*snap.L.z);
+            const float3 lo = make_float3(-0.5f * snap.L.x, -0.5f * snap.L.y, -0.5f * snap.L.z);
+            const float3 hi = make_float3(0.5f * snap.L.x, 0.5f * snap.L.y, 0.5f * snap.L.z);
 
             // build the lbvh
             LBVHWrapper lbvh;
 
             // tune the lbvh block size
-            const unsigned int lbvh_param = tune(lbvh.getTunableParameters(),
-                                                 [&](unsigned int param){lbvh.build(snap.positions.get(), N, lo, hi, param);},
-                                                 5);
+            const unsigned int lbvh_param = tune(
+                lbvh.getTunableParameters(),
+                [&](unsigned int param) { lbvh.build(snap.positions.get(), N, lo, hi, param); },
+                5);
             std::cout << "LBVH tuner: " << lbvh_param << std::endl;
 
             // profile lbvh build times
             std::vector<double> times(5);
-            
-            for (size_t i=0; i < times.size(); ++i)
+
+            for (size_t i = 0; i < times.size(); ++i)
                 {
-                times[i] = profile([&]{lbvh.build(snap.positions.get(), N, lo, hi, lbvh_param);}, 500);
+                times[i] = profile([&] { lbvh.build(snap.positions.get(), N, lo, hi, lbvh_param); },
+                                   500);
                 }
-            
+
             std::sort(times.begin(), times.end());
-            std::cout << "Median LBVH build time: " << times[times.size()/2]<< " ms / build" << std::endl;
-            output << std::setw(8) << frame << " " << std::setw(16) << std::fixed << std::setprecision(5) << times[times.size()/2];
+            std::cout << "Median LBVH build time: " << times[times.size() / 2] << " ms / build"
+                      << std::endl;
+            output << std::setw(8) << frame << " " << std::setw(16) << std::fixed
+                   << std::setprecision(5) << times[times.size() / 2];
             cudaDeviceSynchronize();
 
             // make traversal volumes
             neighbor::shared_array<float4> spheres(N);
             neighbor::shared_array<float3> images(27);
             neighbor::shared_array<unsigned int> hits(N);
-                
+
             auto primitives = lbvh.getPrimitives();
-            for (unsigned int i=0; i < N; ++i)
+            for (unsigned int i = 0; i < N; ++i)
                 {
                 unsigned int tag = primitives[i];
                 const float3 pos = snap.positions[tag];
@@ -267,16 +272,17 @@ int main(int argc, char * argv[])
 
             // 26 periodic image vectors
             const float3 L = snap.L;
-            images[0] = make_float3(0,0,0);
+            images[0] = make_float3(0, 0, 0);
             unsigned int idx = 1;
-            for (int ix=-1; ix <= 1; ++ix)
+            for (int ix = -1; ix <= 1; ++ix)
                 {
-                for (int iy=-1; iy <= 1; ++iy)
+                for (int iy = -1; iy <= 1; ++iy)
                     {
-                    for (int iz=-1; iz <= 1; ++iz)
+                    for (int iz = -1; iz <= 1; ++iz)
                         {
-                        if (ix == 0 && iy == 0 && iz == 0) continue;
-                        images[idx++] = make_float3(L.x*ix, L.y*iy, L.z*iz);
+                        if (ix == 0 && iy == 0 && iz == 0)
+                            continue;
+                        images[idx++] = make_float3(L.x * ix, L.y * iy, L.z * iz);
                         }
                     }
                 }
@@ -285,19 +291,42 @@ int main(int argc, char * argv[])
             LBVHTraverserWrapper traverser;
 
             // tune the traverser block size
-            const unsigned int traverser_param = tune(traverser.getTunableParameters(),
-                    [&](unsigned int param){ traverser.traverse(hits.get(), spheres.get(), N, lbvh.get(), images.get(), 27, param);},
-                    5);
+            const unsigned int traverser_param = tune(
+                traverser.getTunableParameters(),
+                [&](unsigned int param)
+                {
+                    traverser.traverse(hits.get(),
+                                       spheres.get(),
+                                       N,
+                                       lbvh.get(),
+                                       images.get(),
+                                       27,
+                                       param);
+                },
+                5);
             std::cout << "Traverser tuner: " << traverser_param << std::endl;
 
-            for (size_t i=0; i < times.size(); ++ i)
+            for (size_t i = 0; i < times.size(); ++i)
                 {
-                times[i] = profile([&]{traverser.traverse(hits.get(), spheres.get(), N, lbvh.get(), images.get(), 27, traverser_param);},500);
+                times[i] = profile(
+                    [&]
+                    {
+                        traverser.traverse(hits.get(),
+                                           spheres.get(),
+                                           N,
+                                           lbvh.get(),
+                                           images.get(),
+                                           27,
+                                           traverser_param);
+                    },
+                    500);
                 }
 
             std::sort(times.begin(), times.end());
-            std::cout << "Median LBVH rope time: " << times[times.size()/2]<< " ms / traversal" << std::endl;
-            output << " " << std::setw(16) << std::fixed << std::setprecision(5) << times[times.size()/2] << std::endl;
+            std::cout << "Median LBVH rope time: " << times[times.size() / 2] << " ms / traversal"
+                      << std::endl;
+            output << " " << std::setw(16) << std::fixed << std::setprecision(5)
+                   << times[times.size() / 2] << std::endl;
 
             cudaDeviceSynchronize();
             unsigned int min = *std::min_element(hits.get(), hits.get() + N);
@@ -307,12 +336,12 @@ int main(int argc, char * argv[])
             std::cout << std::endl;
             }
         }
-    catch(const std::exception& e)
+    catch (const std::exception& e)
         {
         std::cerr << "**error** " << e.what() << std::endl;
         return 1;
         }
-    catch(...)
+    catch (...)
         {
         std::cerr << "**error** Program terminated due to exception." << std::endl;
         return 1;

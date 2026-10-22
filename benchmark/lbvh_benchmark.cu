@@ -1,9 +1,8 @@
 // Copyright (c) 2018-2020, Michael P. Howard
-// Copyright (c) 2021, Auburn University
+// Copyright (c) 2021-2026, Auburn University
 // This file is released under the Modified BSD License.
 
 #include "lbvh_benchmark.cuh"
-
 #include "neighbor/neighbor.h"
 
 //! Host function approximating double2float round-down
@@ -33,7 +32,11 @@ LBVHWrapper::LBVHWrapper()
     lbvh_ = std::make_shared<neighbor::LBVH>();
     }
 
-void LBVHWrapper::build(const float3* pos, unsigned int N, const float3& lo, const float3& hi, unsigned int param)
+void LBVHWrapper::build(const float3* pos,
+                        unsigned int N,
+                        const float3& lo,
+                        const float3& hi,
+                        unsigned int param)
     {
     float3 lof = make_float3(double2float_rd(lo.x), double2float_rd(lo.y), double2float_rd(lo.z));
     float3 hif = make_float3(double2float_ru(hi.x), double2float_ru(hi.y), double2float_ru(hi.z));
@@ -67,7 +70,11 @@ void LBVHTraverserWrapper::traverse(unsigned int* hits,
     neighbor::CountNeighborsOp count(hits);
     ParticleQueryOp query(spheres, N);
     neighbor::ImageListOp<float3> translate(images, Nimages);
-    trav_->traverse(neighbor::LBVHTraverser::LaunchParameters(param), *lbvh, query, count, translate);
+    trav_->traverse(neighbor::LBVHTraverser::LaunchParameters(param),
+                    *lbvh,
+                    query,
+                    count,
+                    translate);
     };
 
 std::vector<unsigned int> LBVHTraverserWrapper::getTunableParameters() const
