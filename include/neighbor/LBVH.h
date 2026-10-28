@@ -1,21 +1,20 @@
 // Copyright (c) 2018-2020, Michael P. Howard
-// Copyright (c) 2021, Auburn University
+// Copyright (c) 2021-2026, Auburn University
 // This file is released under the Modified BSD License.
 
 #ifndef NEIGHBOR_LBVH_H_
 #define NEIGHBOR_LBVH_H_
 
-#include <assert.h>
-#include <hipper/hipper_runtime.h>
-
+#include "LBVHData.h"
 #include "Memory.h"
 #include "Tunable.h"
-
-#include "LBVHData.h"
 #include "kernels/LBVH.cuh"
 
+#include <assert.h>
+#include <cuda_runtime.h>
+
 namespace neighbor
-{
+    {
 //! Linear bounding volume hierarchy.
 /*!
  * A linear bounding hierarchy (LBVH) is a binary tree structure that can be used for overlap
@@ -29,8 +28,8 @@ namespace neighbor
  * intersected nodes until the primitives are reached.
  *
  * The LBVH class constructs such a hierarchy on the GPU using the ::build method. The
- * primitives can be injected using a templated insert operation, which converts them to bounding boxes.
- * Regardless of the precision of the primitives, the bounding boxes are stored in
+ * primitives can be injected using a templated insert operation, which converts them to bounding
+ * boxes. Regardless of the precision of the primitives, the bounding boxes are stored in
  * single-precision in a way that preserves correctness of the tree. The build algorithm
  * is due to Karras with 30-bit Morton codes to sort primitives.
  *
@@ -47,179 +46,183 @@ namespace neighbor
 class LBVH : public Tunable<unsigned int>
     {
     public:
-        //! Setup an unallocated LBVH.
-        LBVH()
-            : Tunable<unsigned int>(32, 1024, 32),
-              m_root(LBVHSentinel), m_N(0), m_N_internal(0), m_N_nodes(0)
-            {
-            }
+    //! Setup an unallocated LBVH.
+    LBVH()
+        : Tunable<unsigned int>(32, 1024, 32), m_root(LBVHSentinel), m_N(0), m_N_internal(0),
+          m_N_nodes(0)
+        {
+        }
 
-        //! Setup LBVH memory for building.
-        template<class InsertOpT>
-        void setup(const LaunchParameters& params, const InsertOpT& insert)
-            {
-            allocate(params, insert.size());
-            }
+    //! Setup LBVH memory for building.
+    template<class InsertOpT>
+    void setup(const LaunchParameters& params, const InsertOpT& insert)
+        {
+        allocate(params, insert.size());
+        }
 
-        //! Setup LBVH memory for building.
-        template<class InsertOpT>
-        void setup(hipper::stream_t stream, const InsertOpT& insert)
-            {
-            setup(LaunchParameters(32, stream), insert);
-            }
+    //! Setup LBVH memory for building.
+    template<class InsertOpT>
+    void setup(cudaStream_t stream, const InsertOpT& insert)
+        {
+        setup(LaunchParameters(32, stream), insert);
+        }
 
-        //! Setup LBVH memory for building.
-        template<class InsertOpT>
-        void setup(const InsertOpT& insert)
-            {
-            setup(0, insert);
-            }
+    //! Setup LBVH memory for building.
+    template<class InsertOpT>
+    void setup(const InsertOpT& insert)
+        {
+        setup(0, insert);
+        }
 
-        //! Build the LBVH in a stream with tunable parameters.
-        template<class InsertOpT>
-        void build(const LaunchParameters& params, const InsertOpT& insert, const float3& lo, const float3& hi);
+    //! Build the LBVH in a stream with tunable parameters.
+    template<class InsertOpT>
+    void build(const LaunchParameters& params,
+               const InsertOpT& insert,
+               const float3& lo,
+               const float3& hi);
 
-        //! Build the LBVH in a stream.
-        /*!
-         * \param stream CUDA stream for kernel execution.
-         * \param insert The insert operation holding the primitives.
-         * \param lo Lower bound of the scene.
-         * \param hi Upper bound of the scene.
-         *
-         * \tparam InsertOpT The kind of insert operation.
-         *
-         * The tunable block size defaults to 32 threads per block.
-         */
-        template<class InsertOpT>
-        void build(hipper::stream_t stream, const InsertOpT& insert, const float3& lo, const float3& hi)
-            {
-            build(LaunchParameters(32,stream), insert, lo, hi);
-            }
+    //! Build the LBVH in a stream.
+    /*!
+     * \param stream CUDA stream for kernel execution.
+     * \param insert The insert operation holding the primitives.
+     * \param lo Lower bound of the scene.
+     * \param hi Upper bound of the scene.
+     *
+     * \tparam InsertOpT The kind of insert operation.
+     *
+     * The tunable block size defaults to 32 threads per block.
+     */
+    template<class InsertOpT>
+    void build(cudaStream_t stream, const InsertOpT& insert, const float3& lo, const float3& hi)
+        {
+        build(LaunchParameters(32, stream), insert, lo, hi);
+        }
 
-        //! Build the LBVH.
-        /*!
-         * \param insert The insert operation holding the primitives.
-         * \param lo Lower bound of the scene.
-         * \param hi Upper bound of the scene.
-         *
-         * \tparam InsertOpT The kind of insert operation.
-         *
-         * The tunable block size defaults to 32 threads per block, and the kernel executes in the default stream.
-         */
-        template<class InsertOpT>
-        void build(const InsertOpT& insert, const float3& lo, const float3& hi)
-            {
-            build(0, insert, lo, hi);
-            }
+    //! Build the LBVH.
+    /*!
+     * \param insert The insert operation holding the primitives.
+     * \param lo Lower bound of the scene.
+     * \param hi Upper bound of the scene.
+     *
+     * \tparam InsertOpT The kind of insert operation.
+     *
+     * The tunable block size defaults to 32 threads per block, and the kernel executes in the
+     * default stream.
+     */
+    template<class InsertOpT>
+    void build(const InsertOpT& insert, const float3& lo, const float3& hi)
+        {
+        build(0, insert, lo, hi);
+        }
 
-        //! Get the LBVH root node.
-        int getRoot() const
-            {
-            return m_root;
-            }
+    //! Get the LBVH root node.
+    int getRoot() const
+        {
+        return m_root;
+        }
 
-        //! Get the number of primitives.
-        unsigned int getN() const
-            {
-            return m_N;
-            }
+    //! Get the number of primitives.
+    unsigned int getN() const
+        {
+        return m_N;
+        }
 
-        //! Get the number of internal nodes.
-        unsigned int getNInternal() const
-            {
-            return m_N_internal;
-            }
+    //! Get the number of internal nodes.
+    unsigned int getNInternal() const
+        {
+        return m_N_internal;
+        }
 
-        //! Get the total number of nodes.
-        unsigned int getNNodes() const
-            {
-            return m_N_nodes;
-            }
+    //! Get the total number of nodes.
+    unsigned int getNNodes() const
+        {
+        return m_N_nodes;
+        }
 
-        //! Get the array of parents of a given node.
-        const shared_array<int>& getParents() const
-            {
-            return m_parent;
-            }
+    //! Get the array of parents of a given node.
+    const shared_array<int>& getParents() const
+        {
+        return m_parent;
+        }
 
-        //! Get the array of left children of a given node.
-        const shared_array<int>& getLeftChildren() const
-            {
-            return m_left;
-            }
+    //! Get the array of left children of a given node.
+    const shared_array<int>& getLeftChildren() const
+        {
+        return m_left;
+        }
 
-        //! Get the array of right children of a given node.
-        const shared_array<int>& getRightChildren() const
-            {
-            return m_right;
-            }
+    //! Get the array of right children of a given node.
+    const shared_array<int>& getRightChildren() const
+        {
+        return m_right;
+        }
 
-        //! Get the lower bounds of the boxes enclosing a node.
-        const shared_array<float3>& getLowerBounds() const
-            {
-            return m_lo;
-            }
+    //! Get the lower bounds of the boxes enclosing a node.
+    const shared_array<float3>& getLowerBounds() const
+        {
+        return m_lo;
+        }
 
-        //! Get the upper bounds of the boxes enclosing a node.
-        const shared_array<float3>& getUpperBounds() const
-            {
-            return m_hi;
-            }
+    //! Get the upper bounds of the boxes enclosing a node.
+    const shared_array<float3>& getUpperBounds() const
+        {
+        return m_hi;
+        }
 
-        //! Get the original indexes of the primitives in each leaf node.
-        const shared_array<unsigned int>& getPrimitives() const
-            {
-            return m_indexes.current();
-            }
+    //! Get the original indexes of the primitives in each leaf node.
+    const shared_array<unsigned int>& getPrimitives() const
+        {
+        return m_indexes.current();
+        }
 
-        //! Get the pointer version of the read-only data in the tree.
-        const ConstLBVHData data() const
-            {
-            ConstLBVHData tree;
-            tree.parent = m_parent.get();
-            tree.left = m_left.get();
-            tree.right = m_right.get();
-            tree.primitive = m_indexes.current().get();
-            tree.lo = m_lo.get();
-            tree.hi = m_hi.get();
-            tree.root = m_root;
-            return tree;
-            }
+    //! Get the pointer version of the read-only data in the tree.
+    const ConstLBVHData data() const
+        {
+        ConstLBVHData tree;
+        tree.parent = m_parent.get();
+        tree.left = m_left.get();
+        tree.right = m_right.get();
+        tree.primitive = m_indexes.current().get();
+        tree.lo = m_lo.get();
+        tree.hi = m_hi.get();
+        tree.root = m_root;
+        return tree;
+        }
 
     private:
-        int m_root;                 //!< Root index
-        unsigned int m_N;           //!< Number of primitives in the tree
-        unsigned int m_N_internal;  //!< Number of internal nodes in tree
-        unsigned int m_N_nodes;     //!< Number of nodes in the tree
+    int m_root;                //!< Root index
+    unsigned int m_N;          //!< Number of primitives in the tree
+    unsigned int m_N_internal; //!< Number of internal nodes in tree
+    unsigned int m_N_nodes;    //!< Number of nodes in the tree
 
-        shared_array<int> m_parent; //!< Parent node
-        shared_array<int> m_left;   //!< Left child
-        shared_array<int> m_right;  //!< Right child
-        shared_array<float3> m_lo;  //!< Lower bound of AABB
-        shared_array<float3> m_hi;  //!< Upper bound of AABB
+    shared_array<int> m_parent; //!< Parent node
+    shared_array<int> m_left;   //!< Left child
+    shared_array<int> m_right;  //!< Right child
+    shared_array<float3> m_lo;  //!< Lower bound of AABB
+    shared_array<float3> m_hi;  //!< Upper bound of AABB
 
-        buffered_array<unsigned int> m_codes;   //!< Morton codes
-        buffered_array<unsigned int> m_indexes; //!< Primitive indexes
-        shared_array<unsigned char> m_tmp;      //!< Temporary memory for sorting
+    buffered_array<unsigned int> m_codes;   //!< Morton codes
+    buffered_array<unsigned int> m_indexes; //!< Primitive indexes
+    shared_array<unsigned char> m_tmp;      //!< Temporary memory for sorting
 
-        shared_array<unsigned int> m_locks; //!< Node locks for generating aabb hierarchy
+    shared_array<unsigned int> m_locks; //!< Node locks for generating aabb hierarchy
 
-        //! Allocate.
-        void allocate(const LaunchParameters& params, unsigned int N);
+    //! Allocate.
+    void allocate(const LaunchParameters& params, unsigned int N);
 
-        //! Get the pointer version of the data in the tree.
-        const LBVHData data()
-            {
-            LBVHData tree;
-            tree.parent = m_parent.get();
-            tree.left = m_left.get();
-            tree.right = m_right.get();
-            tree.primitive = m_indexes.current().get();
-            tree.lo = m_lo.get();
-            tree.hi = m_hi.get();
-            tree.root = m_root;
-            return tree;
-            }
+    //! Get the pointer version of the data in the tree.
+    const LBVHData data()
+        {
+        LBVHData tree;
+        tree.parent = m_parent.get();
+        tree.left = m_left.get();
+        tree.right = m_right.get();
+        tree.primitive = m_indexes.current().get();
+        tree.lo = m_lo.get();
+        tree.hi = m_hi.get();
+        tree.root = m_root;
+        return tree;
+        }
     };
 
 /*!
@@ -236,13 +239,17 @@ class LBVH : public Tunable<unsigned int>
  * may lead to a low quality LBVH.
  */
 template<class InsertOpT>
-void LBVH::build(const LaunchParameters& params, const InsertOpT& insert, const float3& lo, const float3& hi)
+void LBVH::build(const LaunchParameters& params,
+                 const InsertOpT& insert,
+                 const float3& lo,
+                 const float3& hi)
     {
     // resize memory for the tree (will do nothing if setup already called)
     setup(params, insert);
 
     // if N = 0, don't do anything and quit, since this is an empty lbvh
-    if (m_N == 0) return;
+    if (m_N == 0)
+        return;
 
     // single-particle just needs a small amount of data
     if (m_N == 1)
@@ -265,7 +272,7 @@ void LBVH::build(const LaunchParameters& params, const InsertOpT& insert, const 
                         params.tunable,
                         params.stream);
 
-    // sort morton codes
+        // sort morton codes
         {
         uchar2 swap;
 
@@ -292,25 +299,18 @@ void LBVH::build(const LaunchParameters& params, const InsertOpT& insert, const 
                                     params.stream);
 
         // flip the buffer selector if the sorted codes or indexes are in the alternate array
-        if (swap.x) m_codes.flip();
-        if (swap.y) m_indexes.flip();
+        if (swap.x)
+            m_codes.flip();
+        if (swap.y)
+            m_indexes.flip();
         }
 
     // process hierarchy and bubble aabbs
     LBVHData tree = data();
 
-    gpu::lbvh_gen_tree(tree,
-                       m_codes.current().get(),
-                       m_N,
-                       params.tunable,
-                       params.stream);
+    gpu::lbvh_gen_tree(tree, m_codes.current().get(), m_N, params.tunable, params.stream);
 
-    gpu::lbvh_bubble_aabbs(tree,
-                           insert,
-                           m_locks.get(),
-                           m_N,
-                           params.tunable,
-                           params.stream);
+    gpu::lbvh_bubble_aabbs(tree, insert, m_locks.get(), m_N, params.tunable, params.stream);
     }
 
 /*!
@@ -332,7 +332,8 @@ void LBVH::build(const LaunchParameters& params, const InsertOpT& insert, const 
 inline void LBVH::allocate(const LaunchParameters& params, unsigned int N)
     {
     // do nothing if N has not changed
-    if (N == m_N) return;
+    if (N == m_N)
+        return;
 
     m_root = 0;
     m_N = N;
@@ -389,7 +390,8 @@ inline void LBVH::allocate(const LaunchParameters& params, unsigned int N)
                          m_indexes.alternate().get(),
                          m_N,
                          params.stream);
-    if (tmp_bytes == 0) tmp_bytes = 4; // make at least 4 bytes (old workaround)
+    if (tmp_bytes == 0)
+        tmp_bytes = 4; // make at least 4 bytes (old workaround)
     if (tmp_bytes > m_tmp.size())
         {
         shared_array<unsigned char> tmp(tmp_bytes);
@@ -397,6 +399,6 @@ inline void LBVH::allocate(const LaunchParameters& params, unsigned int N)
         }
     }
 
-} // end namespace neighbor
+    } // end namespace neighbor
 
 #endif // NEIGHBOR_LBVH_H_

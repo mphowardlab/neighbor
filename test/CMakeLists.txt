@@ -21,25 +21,16 @@ if(NOT UPP11_Found)
     find_package(UPP11 REQUIRED)
 endif()
 
-if(NEIGHBOR_HIP)
-    set(HIPPER_MODE HIPPER_HIP)
-else()
-    set(HIPPER_MODE HIPPER_CUDA)
-endif()
-
 foreach(TEST_SRC ${TEST_LIST})
     get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
 
     add_executable(${TEST_NAME} ${TEST_SRC})
-    target_compile_definitions(${TEST_NAME} PRIVATE ${HIPPER_MODE})
     target_link_libraries(${TEST_NAME} PRIVATE neighbor::neighbor UPP11::UPP11)
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 
-    # under CUDA, also force the test without intrinsics
-    if(NOT NEIGHBOR_HIP)
-        add_executable(${TEST_NAME}_nointrinsic ${TEST_SRC})
-        target_compile_definitions(${TEST_NAME}_nointrinsic PRIVATE NEIGHBOR_NO_INTRINSIC_ROUND ${HIPPER_MODE})
-        target_link_libraries(${TEST_NAME}_nointrinsic PRIVATE neighbor::neighbor UPP11::UPP11)
-        add_test(NAME ${TEST_NAME}_nointrinsic COMMAND ${TEST_NAME}_nointrinsic)
-    endif()
+    # also test without intrinsics
+    add_executable(${TEST_NAME}_nointrinsic ${TEST_SRC})
+    target_compile_definitions(${TEST_NAME}_nointrinsic PRIVATE NEIGHBOR_NO_INTRINSIC_ROUND)
+    target_link_libraries(${TEST_NAME}_nointrinsic PRIVATE neighbor::neighbor UPP11::UPP11)
+    add_test(NAME ${TEST_NAME}_nointrinsic COMMAND ${TEST_NAME}_nointrinsic)
 endforeach()

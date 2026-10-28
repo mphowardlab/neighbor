@@ -1,27 +1,23 @@
 // Copyright (c) 2018-2020, Michael P. Howard
-// Copyright (c) 2021, Auburn University
+// Copyright (c) 2021-2026, Auburn University
 // This file is released under the Modified BSD License.
 
-// Maintainer: mphoward
-
-#include <hipper/hipper_runtime.h>
-
 #include "neighbor/neighbor.h"
-
-#include <random>
-
 #include "upp11_config.h"
+
+#include <cuda_runtime.h>
+#include <random>
 UP_MAIN();
 
 // Test of basic LBVH build and traverse functionalities
-UP_TEST( lbvh_test )
+UP_TEST(lbvh_test)
     {
     std::shared_ptr<neighbor::LBVH> lbvh;
 
     // make some GPU streams to test with
-    hipper::stream_t streams[2];
-    hipper::streamCreate(&streams[0]); // different stream
-    streams[1] = 0; // default stream
+    cudaStream_t streams[2];
+    cudaStreamCreate(&streams[0]); // different stream
+    streams[1] = 0;                // default stream
 
     // points for tree
     neighbor::shared_array<float3> points(3);
@@ -61,12 +57,12 @@ UP_TEST( lbvh_test )
     const float3 max = make_float3(1024, 1024, 1024);
     const float3 min = make_float3(0, 0, 0);
 
-    for (unsigned int i=0; i < 2; ++i)
+    for (unsigned int i = 0; i < 2; ++i)
         {
         lbvh = std::make_shared<neighbor::LBVH>();
             {
             lbvh->build(streams[i], neighbor::PointInsertOp(points.get(), 3), min, max);
-            hipper::streamSynchronize(streams[i]);
+            cudaStreamSynchronize(streams[i]);
             }
 
         UP_ASSERT_EQUAL(lbvh->getN(), 3);
@@ -126,11 +122,11 @@ UP_TEST( lbvh_test )
             neighbor::CountNeighborsOp count(hits.get());
             neighbor::SphereQueryOp query(spheres.get(), (unsigned int)spheres.size());
             traverser.traverse(*lbvh, query, count);
-            hipper::deviceSynchronize();
+            cudaDeviceSynchronize();
             }
 
         auto data = traverser.getData();
-        // Node 0
+            // Node 0
             {
             int4 node = data[0];
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 0);
@@ -138,7 +134,7 @@ UP_TEST( lbvh_test )
             UP_ASSERT_EQUAL((int)node.z, 1);
             UP_ASSERT_EQUAL((int)node.w, neighbor::LBVHSentinel);
             }
-        // Node 1
+            // Node 1
             {
             int4 node = data[1];
 
@@ -147,23 +143,23 @@ UP_TEST( lbvh_test )
             UP_ASSERT_EQUAL((int)node.z, 2);
             UP_ASSERT_EQUAL((int)node.w, 4);
             }
-        // Node 2
+            // Node 2
             {
             int4 node = data[2];
 
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 0);
-            #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 1023);
-            #else
+#else
             /* approximate rounding pushes this bound, but it is still watertight
              * because it means a smaller value is subtracted from the upper bound
              */
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 1022);
-            #endif
+#endif
             UP_ASSERT_EQUAL((int)node.z, ~2);
             UP_ASSERT_EQUAL((int)node.w, 3);
             }
-        // Node 3
+            // Node 3
             {
             int4 node = data[3];
 
@@ -172,18 +168,18 @@ UP_TEST( lbvh_test )
             UP_ASSERT_EQUAL((int)node.z, ~1);
             UP_ASSERT_EQUAL((int)node.w, 4);
             }
-        // Node 4
+            // Node 4
             {
             int4 node = data[4];
 
-            #ifndef NEIGHBOR_NO_INTRINSIC_ROUND
+#ifndef NEIGHBOR_NO_INTRINSIC_ROUND
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 1023);
-            #else
+#else
             /* approximate rounding pushes this bound, but it is still watertight
              * because it means a smaller value is added to set the lower bound
              */
             UP_ASSERT_EQUAL(((unsigned int)node.x >> 20) & 0x3ffu, 1022);
-            #endif
+#endif
             UP_ASSERT_EQUAL(((unsigned int)node.y >> 20) & 0x3ffu, 0);
             UP_ASSERT_EQUAL((int)node.z, ~0);
             UP_ASSERT_EQUAL((int)node.w, neighbor::LBVHSentinel);
@@ -201,50 +197,47 @@ UP_TEST( lbvh_test )
 
     // test traverser neigh list op
     std::cout << "Testing traverser neighbor list..." << std::endl;
-    for (unsigned int i=0; i < 2; ++i)
+    for (unsigned int i = 0; i < 2; ++i)
         {
         neighbor::LBVHTraverser traverser;
         // setup nlist data structures
         const unsigned int max_neigh = 2;
-        neighbor::shared_array<unsigned int> neigh_list(max_neigh*spheres.size());
+        neighbor::shared_array<unsigned int> neigh_list(max_neigh * spheres.size());
         neighbor::shared_array<unsigned int> nneigh(spheres.size());
-        // generate list on gpu
+            // generate list on gpu
             {
-            neighbor::NeighborListOp nl_op(neigh_list.get(),
-                                           nneigh.get(),
-                                           max_neigh);
+            neighbor::NeighborListOp nl_op(neigh_list.get(), nneigh.get(), max_neigh);
 
-            neighbor::SphereQueryOp query(spheres.get(),
-                                          (unsigned int)spheres.size());
+            neighbor::SphereQueryOp query(spheres.get(), (unsigned int)spheres.size());
 
             traverser.traverse(streams[i], *lbvh, query, nl_op);
-            hipper::streamSynchronize(streams[i]);
+            cudaStreamSynchronize(streams[i]);
             }
 
-        // check output
+            // check output
             {
             UP_ASSERT_EQUAL(nneigh[0], 1);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*0+0], 2);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 0 + 0], 2);
 
             UP_ASSERT_EQUAL(nneigh[1], 1);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*1+0], 1);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 1 + 0], 1);
 
             UP_ASSERT_EQUAL(nneigh[2], 1);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*2+0], 0);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 2 + 0], 0);
 
             UP_ASSERT_EQUAL(nneigh[3], 2);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*3+0], 2);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*3+1], 1);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 3 + 0], 2);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 3 + 1], 1);
 
             UP_ASSERT_EQUAL(nneigh[4], 2);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*4+0], 1);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*4+1], 0);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 4 + 0], 1);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 4 + 1], 0);
 
             UP_ASSERT_EQUAL(nneigh[5], 3);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*5+0], 2);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*5+1], 1);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 5 + 0], 2);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 5 + 1], 1);
             // this neighbor should be left off because it exceeds max neigh
-            //UP_ASSERT_EQUAL(neigh_list[max_neigh*5+2], 0);
+            // UP_ASSERT_EQUAL(neigh_list[max_neigh*5+2], 0);
 
             UP_ASSERT_EQUAL(nneigh[6], 0);
             }
@@ -265,72 +258,69 @@ UP_TEST( lbvh_test )
 
         // setup nlist data structures
         const unsigned int max_neigh = 2;
-        neighbor::shared_array<unsigned int> neigh_list(max_neigh*spheres.size());
+        neighbor::shared_array<unsigned int> neigh_list(max_neigh * spheres.size());
         neighbor::shared_array<unsigned int> nneigh(spheres.size());
-        // generate list on gpu
+            // generate list on gpu
             {
-            neighbor::NeighborListOp nl_op(neigh_list.get(),
-                                           nneigh.get(),
-                                           max_neigh);
+            neighbor::NeighborListOp nl_op(neigh_list.get(), nneigh.get(), max_neigh);
 
-            neighbor::SphereQueryOp query(spheres.get(),
-                                          (unsigned int)spheres.size());
+            neighbor::SphereQueryOp query(spheres.get(), (unsigned int)spheres.size());
 
             neighbor::MapTransformOp transform(map.get());
 
             traverser.traverse(*lbvh, query, nl_op, neighbor::SelfOp(), transform);
-            hipper::deviceSynchronize();
+            cudaDeviceSynchronize();
             }
 
-        // check output
+            // check output
             {
             UP_ASSERT_EQUAL(nneigh[0], 1);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*0+0], 0);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 0 + 0], 0);
 
             UP_ASSERT_EQUAL(nneigh[1], 1);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*1+0], 1);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 1 + 0], 1);
 
             UP_ASSERT_EQUAL(nneigh[2], 1);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*2+0], 2);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 2 + 0], 2);
 
             UP_ASSERT_EQUAL(nneigh[3], 2);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*3+0], 0);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*3+1], 1);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 3 + 0], 0);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 3 + 1], 1);
 
             UP_ASSERT_EQUAL(nneigh[4], 2);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*4+0], 1);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*4+1], 2);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 4 + 0], 1);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 4 + 1], 2);
 
             UP_ASSERT_EQUAL(nneigh[5], 3);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*5+0], 0);
-            UP_ASSERT_EQUAL(neigh_list[max_neigh*5+1], 1);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 5 + 0], 0);
+            UP_ASSERT_EQUAL(neigh_list[max_neigh * 5 + 1], 1);
             // this neighbor should be left off because it exceeds max neigh
-            //UP_ASSERT_EQUAL(neigh_list[max_neigh*5+2], 2);
+            // UP_ASSERT_EQUAL(neigh_list[max_neigh*5+2], 2);
 
             UP_ASSERT_EQUAL(nneigh[6], 0);
             }
         }
 
-    hipper::streamDestroy(streams[0]);
+    cudaStreamDestroy(streams[0]);
     }
 
 // Test that LBVH traverser handles images correctly
-UP_TEST( lbvh_periodic_test )
+UP_TEST(lbvh_periodic_test)
     {
     auto lbvh = std::make_shared<neighbor::LBVH>();
 
     // points for tree
     neighbor::shared_array<float3> points(3);
         {
-        points[0] = make_float3( 1.9f, 1.9f, 1.9f);
-        points[1] = make_float3(  0.f, 0.f,  0.f);
-        points[2] = make_float3(-1.9f,-1.9f,-1.9f);
+        points[0] = make_float3(1.9f, 1.9f, 1.9f);
+        points[1] = make_float3(0.f, 0.f, 0.f);
+        points[2] = make_float3(-1.9f, -1.9f, -1.9f);
         }
 
-    const float3 max = make_float3( 2.f, 2.f, 2.f);
-    const float3 min = make_float3(-2.f,-2.f,-2.f);
+    const float3 max = make_float3(2.f, 2.f, 2.f);
+    const float3 min = make_float3(-2.f, -2.f, -2.f);
     lbvh->build(neighbor::PointInsertOp(points.get(), (unsigned int)points.size()), min, max);
-    hipper::deviceSynchronize();
+    cudaDeviceSynchronize();
 
     // query spheres for tree that intersect through boundaries
     neighbor::shared_array<float4> spheres(2);
@@ -339,16 +329,16 @@ UP_TEST( lbvh_periodic_test )
         // p2
         spheres[0] = make_float4(-1.9f, 1.9f, 1.9f, 0.5f);
         // p1
-        spheres[1] = make_float4( 1.9f,-1.9f,-1.9f, 0.5f);
+        spheres[1] = make_float4(1.9f, -1.9f, -1.9f, 0.5f);
 
-        unsigned int idx=0;
-        for (int ix=-1; ix <= 1; ++ix)
+        unsigned int idx = 0;
+        for (int ix = -1; ix <= 1; ++ix)
             {
-            for (int iy=-1; iy <= 1; ++iy)
+            for (int iy = -1; iy <= 1; ++iy)
                 {
-                for (int iz=-1; iz <= 1; ++iz)
+                for (int iz = -1; iz <= 1; ++iz)
                     {
-                    images[idx++] = make_float3((float)(4*ix),(float)(4*iy),(float)(4*iz));
+                    images[idx++] = make_float3((float)(4 * ix), (float)(4 * iy), (float)(4 * iz));
                     }
                 }
             }
@@ -360,27 +350,25 @@ UP_TEST( lbvh_periodic_test )
         {
         neighbor::CountNeighborsOp count(hits.get());
 
-        neighbor::SphereQueryOp query(spheres.get(),
-                                      (unsigned int)spheres.size());
+        neighbor::SphereQueryOp query(spheres.get(), (unsigned int)spheres.size());
 
         traverser.traverse(*lbvh, query, count);
-        hipper::deviceSynchronize();
+        cudaDeviceSynchronize();
 
         UP_ASSERT_EQUAL(hits[0], 0);
         UP_ASSERT_EQUAL(hits[1], 0);
         }
 
-    // 2 hits with images
+        // 2 hits with images
         {
         neighbor::CountNeighborsOp count(hits.get());
 
-        neighbor::SphereQueryOp query(spheres.get(),
-                                      (unsigned int)spheres.size());
+        neighbor::SphereQueryOp query(spheres.get(), (unsigned int)spheres.size());
 
         neighbor::ImageListOp<float3> translate(images.get(), (unsigned int)images.size());
 
         traverser.traverse(*lbvh, query, count, translate);
-        hipper::deviceSynchronize();
+        cudaDeviceSynchronize();
 
         UP_ASSERT_EQUAL(hits[0], 2);
         UP_ASSERT_EQUAL(hits[1], 2);
@@ -388,13 +376,13 @@ UP_TEST( lbvh_periodic_test )
     }
 
 // Test that LBVH counts at least the same number of neighbors in an ideal gas as brute force
-UP_TEST( lbvh_validate )
+UP_TEST(lbvh_validate)
     {
     auto lbvh = std::make_shared<neighbor::LBVH>();
 
     // N particles in orthorhombic box
-    const float3 L = make_float3(20,15,25);
-    const unsigned int N = static_cast<unsigned int>(1.0*L.x*L.y*L.z);
+    const float3 L = make_float3(20, 15, 25);
+    const unsigned int N = static_cast<unsigned int>(1.0 * L.x * L.y * L.z);
     const float rcut = 1.0;
 
     // generate random points in the box
@@ -402,21 +390,21 @@ UP_TEST( lbvh_validate )
         {
         std::mt19937 mt(42);
         std::uniform_real_distribution<float> U(-0.5, 0.5);
-        for (unsigned int i=0; i < N; ++i)
+        for (unsigned int i = 0; i < N; ++i)
             {
-            points[i] = make_float3(L.x*U(mt), L.y*U(mt), L.z*U(mt));
+            points[i] = make_float3(L.x * U(mt), L.y * U(mt), L.z * U(mt));
             }
         }
 
-    const float3 lo = make_float3(-0.5f*L.x, -0.5f*L.y, -0.5f*L.z);
-    const float3 hi = make_float3( 0.5f*L.x,  0.5f*L.y,  0.5f*L.z);
+    const float3 lo = make_float3(-0.5f * L.x, -0.5f * L.y, -0.5f * L.z);
+    const float3 hi = make_float3(0.5f * L.x, 0.5f * L.y, 0.5f * L.z);
     lbvh->build(neighbor::PointInsertOp(points.get(), N), lo, hi);
-    hipper::deviceSynchronize();
+    cudaDeviceSynchronize();
 
     // query spheres for tree
     neighbor::shared_array<float4> spheres(N);
         {
-        for (unsigned int i=0; i < N; ++i)
+        for (unsigned int i = 0; i < N; ++i)
             {
             const float3 point = points[i];
             spheres[i] = make_float4(point.x, point.y, point.z, rcut);
@@ -426,14 +414,15 @@ UP_TEST( lbvh_validate )
     // traversal images
     neighbor::shared_array<float3> images(27);
         {
-        unsigned int idx=0;
-        for (int ix=-1; ix <= 1; ++ix)
+        unsigned int idx = 0;
+        for (int ix = -1; ix <= 1; ++ix)
             {
-            for (int iy=-1; iy <= 1; ++iy)
+            for (int iy = -1; iy <= 1; ++iy)
                 {
-                for (int iz=-1; iz <= 1; ++iz)
+                for (int iz = -1; iz <= 1; ++iz)
                     {
-                    images[idx++] = make_float3(L.x*((float)ix), L.y*((float)iy), L.z*((float)iz));
+                    images[idx++]
+                        = make_float3(L.x * ((float)ix), L.y * ((float)iy), L.z * ((float)iz));
                     }
                 }
             }
@@ -445,40 +434,44 @@ UP_TEST( lbvh_validate )
         {
         neighbor::CountNeighborsOp count(hits.get());
 
-        neighbor::SphereQueryOp query(spheres.get(),
-                                      (unsigned int)spheres.size());
+        neighbor::SphereQueryOp query(spheres.get(), (unsigned int)spheres.size());
 
-        neighbor::ImageListOp<float3> translate(images.get(),
-                                                (unsigned int)images.size());
+        neighbor::ImageListOp<float3> translate(images.get(), (unsigned int)images.size());
 
         traverser.traverse(*lbvh, query, count, translate);
-        hipper::deviceSynchronize();
+        cudaDeviceSynchronize();
         }
 
     // generate list of reference collisions
     std::vector<unsigned int> ref_hits(N);
         {
-        const float rcut2 = rcut*rcut;
+        const float rcut2 = rcut * rcut;
         std::fill(ref_hits.begin(), ref_hits.end(), 0);
-        for (unsigned int i=0; i < N; ++i)
+        for (unsigned int i = 0; i < N; ++i)
             {
             const float3 ri = points[i];
-            for (unsigned int j=i; j < N; ++j)
+            for (unsigned int j = i; j < N; ++j)
                 {
                 const float3 rj = points[j];
-                float3 dr = make_float3(rj.x-ri.x, rj.y-ri.y, rj.z-ri.z);
+                float3 dr = make_float3(rj.x - ri.x, rj.y - ri.y, rj.z - ri.z);
 
                 // minimum image
-                if (dr.x >= hi.x) dr.x -= L.x;
-                else if (dr.x < lo.x) dr.x += L.x;
+                if (dr.x >= hi.x)
+                    dr.x -= L.x;
+                else if (dr.x < lo.x)
+                    dr.x += L.x;
 
-                if (dr.y >= hi.y) dr.y -= L.y;
-                else if (dr.y < lo.y) dr.y += L.y;
+                if (dr.y >= hi.y)
+                    dr.y -= L.y;
+                else if (dr.y < lo.y)
+                    dr.y += L.y;
 
-                if (dr.z >= hi.z) dr.z -= L.z;
-                else if (dr.z < lo.z) dr.z += L.z;
+                if (dr.z >= hi.z)
+                    dr.z -= L.z;
+                else if (dr.z < lo.z)
+                    dr.z += L.z;
 
-                const float dr2 = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
+                const float dr2 = dr.x * dr.x + dr.y * dr.y + dr.z * dr.z;
                 if (dr2 <= rcut2)
                     {
                     ++ref_hits[i];
@@ -489,9 +482,9 @@ UP_TEST( lbvh_validate )
             }
         }
 
-    // check that tree always has at least as many hits as the reference
+        // check that tree always has at least as many hits as the reference
         {
-        for (unsigned int i=0; i < N; ++i)
+        for (unsigned int i = 0; i < N; ++i)
             {
             if (hits[i] < ref_hits[i])
                 {
@@ -503,7 +496,7 @@ UP_TEST( lbvh_validate )
     }
 
 // Test of basic LBVH build and traverse functionalities
-UP_TEST( lbvh_small_test )
+UP_TEST(lbvh_small_test)
     {
     auto lbvh = std::make_shared<neighbor::LBVH>();
 
@@ -525,7 +518,7 @@ UP_TEST( lbvh_small_test )
     const float3 max = make_float3(1024, 1024, 1024);
     const float3 min = make_float3(0, 0, 0);
     lbvh->build(neighbor::PointInsertOp(points.get(), 1), min, max);
-    hipper::deviceSynchronize();
+    cudaDeviceSynchronize();
         {
         UP_ASSERT_EQUAL(lbvh->getN(), 1);
         UP_ASSERT_EQUAL(lbvh->getRoot(), 0);
@@ -560,15 +553,14 @@ UP_TEST( lbvh_small_test )
             {
             neighbor::CountNeighborsOp count(hits.get());
 
-            neighbor::SphereQueryOp query(spheres.get(),
-                                          (unsigned int)spheres.size());
+            neighbor::SphereQueryOp query(spheres.get(), (unsigned int)spheres.size());
 
             traverser.traverse(*lbvh, query, count);
-            hipper::deviceSynchronize();
+            cudaDeviceSynchronize();
             }
 
         auto data = traverser.getData();
-        // only one node, just check its index contents
+            // only one node, just check its index contents
             {
             int4 node = data[0];
             UP_ASSERT_EQUAL((int)node.z, ~0);
