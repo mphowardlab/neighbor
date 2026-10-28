@@ -18,29 +18,32 @@ For installation:
 
 To use with NVIDIA GPUs:
 
-* [CUDA](https://docs.nvidia.com/cuda) toolkit (tests and benchmarks).
+* [CUDA](https://docs.nvidia.com/cuda) toolkit.
 
 Optional:
 
 * [upp11](https://github.com/DronMDF/upp11) header-only test library. If
-  not found, it will be downloaded automatically to the build directory.
+  not found, it will be downloaded automatically to the build directory when
+  `NEIGHBOR_TEST=ON`.
 
 ## Compiling
 
 The neighbor library is header-only. It can be installed via CMake:
-```
+
+```bash
 cmake ..
 make install
 ```
+
 (It can be included as part of an existing project, or simply downloaded.)
 CMake projects can discover the installation using `find_package` in `CONFIG`
 mode and should link against the `neighbor::neighbor` target.
 
 ## Testing
 
-If neighbor is being built directly by CMake, tests can optionally be built
-with a working CUDA or HIP installation by setting `NEIGHBOR_TEST=ON`. Run the
-included test suite with `ctest`.
+If neighbor is being built directly by CMake, tests can optionally be built with
+a working CUDA installation by setting `NEIGHBOR_TEST=ON`. Run the included test
+suite with `ctest`.
 
 ## Versioning
 
