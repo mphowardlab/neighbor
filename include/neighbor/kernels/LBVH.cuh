@@ -165,8 +165,12 @@ __global__ void lbvh_gen_codes(unsigned int* d_codes,
  * One thread is used per *internal* node. (The LBVH guarantees that there are
  * exactly N-1 internal nodes.) The algorithm is given by Figure 4 of
  * <a href="https://dl.acm.org/citation.cfm?id=2383801">Karras</a>.
+ *
+ * The inline keyword is ignored for __global__ functions, so this function is
+ * declared with a dummy template parameter to force it inline.
  */
-__global__ static void
+template<typename T = void>
+__global__ void
 lbvh_gen_tree(const LBVHData tree, const unsigned int* d_codes, const unsigned int N)
     {
     // one thread per internal node (= N-1 threads)
@@ -341,6 +345,12 @@ __global__ void lbvh_bubble_aabbs(const LBVHData tree,
  * The one-primitive LBVH needs to be handled in a special kernel
  * because it violates assumptions about how to traverse the tree,
  * and this would be overkill anyway.
+ *
+ * There is only a root node (no parent) and one primitive (0). The lo and hi
+ * bounds are just that of the primitive.
+ *
+ * The left and right members of the tree are uninitialized when there is only
+ * one primitive, so nothing needs to be done to these.
  */
 template<class InsertOpT>
 __global__ void lbvh_one_primitive(const LBVHData tree, const InsertOpT insert)
@@ -353,6 +363,7 @@ __global__ void lbvh_one_primitive(const LBVHData tree, const InsertOpT insert)
     const BoundingBox b = insert.get(0);
 
     tree.parent[0] = LBVHSentinel;
+    tree.primitive[0] = 0;
     tree.lo[0] = b.lo;
     tree.hi[0] = b.hi;
     }
@@ -468,7 +479,7 @@ inline void lbvh_gen_tree(const LBVHData tree,
     if (max_block_size == UINT_MAX)
         {
         cudaFuncAttributes attr;
-        cudaFuncGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_gen_tree));
+        cudaFuncGetAttributes(&attr, reinterpret_cast<const void*>(kernel::lbvh_gen_tree<>));
         max_block_size = attr.maxThreadsPerBlock;
         }
     const unsigned int run_block_size = (block_size < max_block_size) ? block_size : max_block_size;
